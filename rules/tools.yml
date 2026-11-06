@@ -1,0 +1,36 @@
+ruff:
+  timeout: 120
+  exit_codes: [0, 1]
+  target_version: py314
+  loads:
+    - pyproject.toml
+    - ruff.toml
+    - .ruff.toml
+rg:
+  timeout: 60
+  exit_codes: [0, 1]
+  loads:
+    - .ignore
+    - .rgignore
+    - .ripgreprc
+    - .gitignore
+shellcheck:
+  timeout: 120
+  exit_codes: [0, 1]
+  loads:
+    - .shellcheckrc
+actionlint:
+  timeout: 60
+  exit_codes: [0, 1]
+  loads:
+    - .github/actionlint.yaml
+    - .github/actionlint.yml
+    - actionlint.yaml
+lizard:
+  timeout: 300
+  exit_codes: [0]
+  stderr_fails: true
+  loads:
+    - whitelizard.txt
+    - lizard_ext/__init__.py
+    - lizard_languages/__init__.py

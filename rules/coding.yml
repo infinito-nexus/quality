@@ -1,0 +1,65 @@
+- id: coding.unused-import
+  severity: medium
+  summary: Imported name is never used
+  enforcer:
+    python:
+      tool: ruff
+      codes: [F401]
+- id: coding.undefined-name
+  severity: high
+  summary: Name is used but never defined
+  enforcer:
+    python:
+      tool: ruff
+      codes: [F821]
+- id: coding.import-order
+  severity: low
+  summary: Imports are not sorted
+  enforcer:
+    python:
+      tool: ruff
+      codes: [I001]
+- id: coding.implicit-namespace
+  severity: low
+  summary: Python file sits in a package without __init__.py
+  file_level: true
+  enforcer:
+    python:
+      tool: ruff
+      codes: [INP001]
+- id: coding.syntax-error
+  severity: high
+  summary: File does not parse or decode
+  enforcer:
+    python:
+      tool: ruff
+      codes: [E902]
+      always_reported: [invalid-syntax]
+- id: coding.shell-lint
+  severity: medium
+  summary: Shell script violates a shellcheck check
+  enforcer:
+    shell:
+      tool: shellcheck
+- id: coding.workflow-lint
+  severity: medium
+  summary: GitHub workflow violates an actionlint check
+  enforcer:
+    workflow:
+      tool: actionlint
+- id: coding.structural
+  severity: medium
+  summary: Per-language structural rule matched
+  pending: true
+  tier: fast
+  enforcer:
+    code:
+      tool: ast-grep
+- id: coding.dockerfile
+  severity: medium
+  summary: Dockerfile violates a hadolint check
+  pending: true
+  tier: fast
+  enforcer:
+    dockerfile:
+      tool: hadolint
