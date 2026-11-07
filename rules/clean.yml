@@ -1,0 +1,57 @@
+- id: clean.file-lines
+  severity: medium
+  summary: File exceeds the line limit
+  metric:
+    limit: 500
+  exclude:
+    - /tests/
+    - "*.lock"
+    - package-lock.json
+    - locales/
+    - generated/
+  enforcer:
+    code:
+      builtin: file-lines
+- id: clean.complexity
+  severity: medium
+  summary: Function exceeds the cyclomatic complexity limit
+  metric:
+    limit: 10
+  enforcer:
+    python:
+      tool: lizard
+      field: ccn
+- id: clean.function-length
+  severity: medium
+  summary: Function exceeds the length limit
+  metric:
+    limit: 50
+  enforcer:
+    python:
+      tool: lizard
+      field: nloc
+- id: clean.parameters
+  severity: medium
+  summary: Function exceeds the parameter limit
+  metric:
+    limit: 5
+  enforcer:
+    python:
+      tool: lizard
+      field: parameters
+- id: clean.tool-pragma
+  severity: medium
+  summary: Tool pragma added; use a nocheck comment with a reason
+  enforcer:
+    code:
+      tool: rg
+      comment_only: true
+      pattern: '(?i)(#|//)\s*((ruff:\s*|flake8:\s*)?noqa\b|ruff:\s*disable\b|shellcheck\s+disable|ast-grep-ignore)|#\s*lizard\s+forgive'
+- id: clean.clones
+  severity: medium
+  summary: Duplicated code block
+  pending: true
+  tier: deep
+  enforcer:
+    code:
+      tool: jscpd

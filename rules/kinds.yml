@@ -1,0 +1,61 @@
+extensions:
+  .py: python
+  .pyi: python
+  .sh: shell
+  .bash: shell
+  .js: javascript
+  .mjs: javascript
+  .cjs: javascript
+  .ts: typescript
+  .tsx: tsx
+  .java: java
+  .kt: kotlin
+  .rs: rust
+  .go: go
+  .rb: ruby
+  .php: php
+  .lua: lua
+  .c: c
+  .h: c
+  .cpp: cpp
+  .hpp: cpp
+shebangs:
+  bash: shell
+  sh: shell
+  dash: shell
+  python: python
+  pypy: python
+  node: javascript
+globs:
+  workflow:
+    - /.github/workflows/*.yml
+    - /.github/workflows/*.yaml
+code:
+  - python
+  - shell
+  - javascript
+  - typescript
+  - tsx
+  - java
+  - kotlin
+  - rust
+  - go
+  - ruby
+  - php
+  - lua
+  - c
+  - cpp
+comment_markers:
+  shell: "#"
+  ruby: "#"
+  javascript: "//"
+  typescript: "//"
+  tsx: "//"
+  java: "//"
+  kotlin: "//"
+  rust: "//"
+  go: "//"
+  php: "//"
+  c: "//"
+  cpp: "//"
+  lua: "--"

@@ -1,0 +1,66 @@
+- id: security.secret
+  severity: critical
+  summary: Secret in tracked content
+  hard: true
+  history: true
+  pending: true
+  tier: fast
+  enforcer:
+    code:
+      tool: gitleaks
+- id: security.eval-exec
+  severity: critical
+  summary: eval or exec of non-literal input
+  hard: true
+  enforcer:
+    python:
+      tool: ruff
+      codes: [S307, S102]
+- id: security.tls-disabled
+  severity: critical
+  summary: TLS certificate verification is disabled
+  hard: true
+  enforcer:
+    python:
+      tool: ruff
+      codes: [S501, S323]
+- id: security.shell-exec
+  severity: critical
+  summary: Shell execution of non-literal input
+  hard: true
+  enforcer:
+    python:
+      tool: ruff
+      codes: [S602, S604, S605]
+      unless_message: seems safe
+- id: security.oversized-code
+  severity: high
+  summary: Changed code file over the size limit, so no rule could read it
+  hard: true
+  file_level: true
+  enforcer: size-guard
+- id: security.temp-path
+  severity: medium
+  summary: Hardcoded temporary file or directory
+  enforcer:
+    python:
+      tool: ruff
+      codes: [S108]
+- id: security.static-analysis
+  severity: high
+  summary: Semgrep rule set matched
+  pending: true
+  tier: deep
+  enforcer:
+    code:
+      tool: semgrep
+- id: security.vulnerable-dependency
+  severity: high
+  summary: Dependency with a known vulnerability
+  pending: true
+  tier: deep
+  enforcer:
+    code:
+      tool: trivy
+    lockfile:
+      tool: osv-scanner

@@ -1,21 +1,38 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "quality"
-version = "0.1.0"
-description = ""
+name = "kvb-quality"
+dynamic = ["version"]
+description = "One language-agnostic quality gate for staged changes and whole repositories"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Kevin Veen-Birkenbach", email = "kevin@veen.world" }]
-license = { text = "All rights reserved by Kevin Veen-Birkenbach" }
+license = "MIT"
+license-files = ["LICENSE"]
 urls = { Homepage = "https://github.com/kevinveenbirkenbach/quality" }
 
-dependencies = []
+dependencies = ["PyYAML", "pathspec"]
+
+[project.scripts]
+quality = "quality.cli:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+packages = ["quality", "quality.adapters", "quality.rules"]
+include-package-data = false
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools.package-dir]
+"" = "src"
+"quality.rules" = "rules"
+
+[tool.setuptools.package-data]
+"quality.rules" = ["*.yml"]
+
+[tool.setuptools.dynamic]
+version = { attr = "quality.__version__" }
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider -rs"
+pythonpath = ["src"]
+testpaths = ["tests"]
