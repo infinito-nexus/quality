@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 authors = [{ name = "Kevin Veen-Birkenbach", email = "kevin@veen.world" }]
 license = "MIT"
 license-files = ["LICENSE"]
-urls = { Homepage = "https://github.com/kevinveenbirkenbach/quality" }
+urls = { Homepage = "https://github.com/infinito-nexus/quality" }
 
 dependencies = ["PyYAML", "pathspec"]
 

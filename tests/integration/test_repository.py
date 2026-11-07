@@ -71,7 +71,7 @@ def test_name_and_script():
 
 def test_mirrors_list_the_right_project():
     lines = (ROOT / "MIRRORS").read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "git@github.com:kevinveenbirkenbach/quality.git"
+    assert lines[0] == "git@github.com:infinito-nexus/quality.git"
     assert "https://pypi.org/project/kvb-quality/" in lines
     assert "https://pypi.org/project/quality/" not in lines
 
