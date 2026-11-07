@@ -59,3 +59,4 @@ comment_markers:
   c: "//"
   cpp: "//"
   lua: "--"
+  workflow: "#"

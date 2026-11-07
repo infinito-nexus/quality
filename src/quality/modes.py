@@ -7,19 +7,31 @@ from pathlib import Path
 
 from quality import QualityError
 from quality.adapters import Collector, Runtime, refuse_inside
+from quality.adapters.builtin import (
+    changed_folders,
+    folder_items,
+    prefix_groups,
+    tree_children,
+)
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.ignorefile import audit_lines, describe, split_ignored
 from quality.ignorefile import parse as parse_ignore
 from quality.repo import Repo, hardened_env
 from quality.report import Outcome
-from quality.ruledata import RuleData, load, locate
+from quality.ruledata import (
+    FOLDER_ITEMS,
+    PREFIX_GROUPS,
+    SIZE_GUARD,
+    RuleData,
+    load,
+    locate,
+)
 from quality.snapshot import Snapshot, materialize
 from quality.suppress import split_nocheck
 
 FAST_TIER = ("fast",)
 ALL_TIERS = ("fast", "deep")
 HEAD_ONLY_NOTE = "HEAD only: history not scanned"
-SIZE_GUARD = "size-guard"
 
 
 @dataclass(frozen=True)
@@ -63,6 +75,21 @@ class Session:
             for path in paths
             if self.data.kinds.code_name(path)
         ]
+
+    def structure(self, snapshot: Snapshot, folders: list | None) -> list:
+        """
+        Args:
+            snapshot: Snapshot of a whole tree or index.
+            folders: Folders to measure, or None for every folder.
+
+        Returns:
+            Folder size and prefix group findings of those folders.
+        """
+        children = tree_children(snapshot)
+        chosen = sorted(children) if folders is None else folders
+        return folder_items(self.data.runner_rule(FOLDER_ITEMS), children, chosen) + prefix_groups(
+            self.data.runner_rule(PREFIX_GROUPS), children, chosen
+        )
 
     def pending_notes(self, tiers: tuple) -> list:
         return [
@@ -173,7 +200,12 @@ def parent_baseline(session: Session, plan: Plan, parent: str, index: int):
     wanted |= {change.old_path for change in plan.changes if change.old_path}
     paths = sorted(path for path in wanted if path in snapshot.files)
     hits = session.collector.collect(snapshot, paths, soft_rule)
+    hits += session.structure(snapshot, plan_folders(plan))
     return baseline_of(hits, {old: new for new, old in renames_back.items()})
+
+
+def plan_folders(plan: Plan) -> list:
+    return changed_folders([path for change in plan.changes for path in (change.path, change.old_path) if path])
 
 
 def judged(session: Session, plan: Plan, notes: list) -> Outcome:
@@ -190,6 +222,7 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
     unchecked = [path for path in plan.head.unchecked if path in changed]
     hits = session.collector.collect(plan.head, touched_paths(plan), every_rule)
     hits += session.oversized(plan.head, unchecked)
+    hits += session.structure(plan.head, plan_folders(plan))
     kept, ignored = split_ignored(hits, plan.soft_entries, plan.hard_entries)
     kept, nocheck = split_nocheck(kept, plan.head)
     findings = [hit for hit in kept if hit.rule.hard]
@@ -219,6 +252,7 @@ def check_all(session: Session, _options: Options) -> Outcome:
         raise QualityError("--all found zero files in the index")
     hits = session.collector.collect(head, head.paths(), every_rule)
     hits += session.oversized(head, head.unchecked)
+    hits += session.structure(head, None)
     entries = parse_ignore(head.ignore_data(), session.data)
     kept, ignored = split_ignored(hits, entries, entries)
     stale = [entry for entry in entries if entry not in ignored]

@@ -11,6 +11,10 @@ RESERVED_FILES = ("tools.yml", "limits.yml", "kinds.yml")
 VERSION_SUFFIX = re.compile(r"[0-9.]+$")
 CODE_KIND = "code"
 BUILTIN = "builtin"
+SIZE_GUARD = "size-guard"
+FOLDER_ITEMS = "folder-items"
+PREFIX_GROUPS = "prefix-groups"
+RUNNER_CHECKS = (SIZE_GUARD, FOLDER_ITEMS, PREFIX_GROUPS)
 
 
 def require(mapping: dict, key: str, where: str):
@@ -187,6 +191,8 @@ def build_rule(raw: dict, where: str) -> Rule:
     )
     if rule.history and not rule.hard:
         raise QualityError(f"rule data: {entry} sets history without hard")
+    if not isinstance(rule.enforcer, dict) and rule.enforcer not in RUNNER_CHECKS:
+        raise QualityError(f"rule data: {entry} names an enforcer the runner does not know")
     if rule.pending:
         require(raw, "tier", entry)
     return rule

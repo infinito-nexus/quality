@@ -12,6 +12,27 @@
   enforcer:
     code:
       builtin: file-lines
+- id: clean.folder-items
+  severity: medium
+  summary: Folder exceeds the direct item limit
+  metric:
+    limit: 12
+  enforcer: folder-items
+- id: clean.prefix-groups
+  severity: medium
+  summary: Sibling files share a name prefix; move them into a folder
+  metric:
+    limit: 1
+    exempt: [test]
+  enforcer: prefix-groups
+- id: clean.inline-script
+  severity: medium
+  summary: Inline script exceeds the logical line limit
+  metric:
+    limit: 11
+  enforcer:
+    workflow:
+      builtin: inline-script
 - id: clean.complexity
   severity: medium
   summary: Function exceeds the cyclomatic complexity limit
