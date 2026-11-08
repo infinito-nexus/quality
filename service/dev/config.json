@@ -1,0 +1,41 @@
+{
+  "state_dir": "/state",
+  "legal_dir": "/legal",
+  "secret_file": "/run/secrets/web",
+  "public_url": "http://localhost:18098",
+  "access": {"anonymous": true, "captcha": true},
+  "rate_limits": {
+    "anonymous_per_ip_hour": 30,
+    "anonymous_hourly_total": 200,
+    "per_host_hour": 20,
+    "registered_per_user_hour": 60
+  },
+  "oidc": null,
+  "jobs_dir": "/jobs",
+  "job_storage": "volume",
+  "container": ["docker"],
+  "runtime": "runc",
+  "images": {"scan": "quality-check/scan:local", "scan_version": "local"},
+  "fetch": {
+    "network": "quality-check-fetch",
+    "proxy": "http://10.213.0.2:3128",
+    "user_agent": "quality-check local inspection"
+  },
+  "database": {"dir": "/db", "update_hours": null, "max_age_hours": 168},
+  "limits": {
+    "upload_bytes": 1048576,
+    "job_bytes": 1500000,
+    "report_bytes": 4194304,
+    "anonymous_queue": 20,
+    "jobs_per_run": 10,
+    "concurrency": 2,
+    "retention_hours": 48,
+    "session_hours": 8,
+    "captcha_cost": 5000,
+    "captcha_seconds": 300,
+    "inodes": 200000,
+    "repo_bytes": {"member": 1073741824, "registered": 536870912, "anonymous": 268435456},
+    "timeouts": {"fetch": 120, "prepare": 30, "scan": 600, "database": 900},
+    "step": {"memory": "2g", "cpus": "2", "pids": 512, "tmp_bytes": 268435456}
+  }
+}

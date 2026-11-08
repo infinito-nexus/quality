@@ -1,0 +1,11 @@
+- rule: clean.folder-items
+  paths: ["."]
+  reason: the root holds the runner package and, by requirement 002 decision 2, the role under ansible/ and the service under service/
+- rule: clean.folder-items
+  paths: ["ansible/roles/web-app-cst-quality-check/meta"]
+  reason: Infinito.Nexus core fixes one file per topic under a role's meta/ (utils/roles/mapping.py in core), so the folder cannot be split
+- rule: coding.implicit-namespace
+  paths:
+    - ansible/roles/web-app-cst-quality-check/files/python/script.py
+    - service/verify/extra_vars.py
+  reason: standalone scripts run by path; sys-service copies script.py alone, so a package file next to it would never ship

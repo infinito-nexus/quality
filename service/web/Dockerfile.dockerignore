@@ -1,0 +1,5 @@
+*
+!service/web/requirements.txt
+!service/web/quality_web
+!ansible/roles/web-app-cst-quality-check/files/python/script.py
+**/__pycache__

@@ -1,0 +1,58 @@
+---
+- name: "🧱 Require the role source of '{{ application_id }}'"
+  ansible.builtin.assert:
+    that: "'source' in lookup('applications', application_id)"
+    fail_msg: "The registry serves no image of {{ application_id }} and applications.{{ application_id }}.source is not set, so nothing can be built"
+    quiet: true
+
+- name: "🗜️ Reserve an archive path on the controller"
+  ansible.builtin.tempfile:
+    suffix: .tar.gz
+  register: quality_check_archive
+  delegate_to: localhost
+  become: false
+
+- name: "📦 Stage the source of '{{ application_id }}'"
+  block:
+    - name: "📥 Pack the source of '{{ application_id }}' on the controller"
+      ansible.builtin.script:
+        cmd: >-
+          shell/pack_source.sh
+          {{ QUALITY_CHECK_SOURCE.url | quote }}
+          {{ QUALITY_CHECK_SOURCE.get('version', '') | quote }}
+          {{ quality_check_archive.path | quote }}
+      changed_when: true
+      delegate_to: localhost
+      become: false
+
+    - name: "🧹 Empty the build context of '{{ application_id }}'"
+      ansible.builtin.file:
+        path: "{{ QUALITY_CHECK_BUILD_DIR }}"
+        state: "{{ item }}"
+        mode: "0755"
+      loop: [absent, directory]
+
+    - name: "📤 Unpack the source of '{{ application_id }}'"
+      ansible.builtin.unarchive:
+        src: "{{ quality_check_archive.path }}"
+        dest: "{{ QUALITY_CHECK_BUILD_DIR }}"
+      register: quality_check_build_context
+  always:
+    - name: "🗑️ Remove the archive from the controller"
+      ansible.builtin.file:
+        path: "{{ quality_check_archive.path }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+
+- name: "🔨 Build the scan image of '{{ application_id }}'"
+  ansible.builtin.command:
+    argv:
+      - container
+      - build
+      - "--file={{ QUALITY_CHECK_BUILD_DIR }}/service/nix/Dockerfile"
+      - "--target=scan"
+      - "--build-arg=PACKAGE=scan"
+      - "--tag={{ lookup('image', application_id, 'scan', tag_only=True) }}"
+      - "{{ QUALITY_CHECK_BUILD_DIR }}"
+  changed_when: true

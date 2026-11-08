@@ -46,7 +46,7 @@ def wheel(tmp_path_factory) -> Path:
     copy_of_this_repository(copy)
     for path in SERVICE_PATHS:
         planted = copy / path / "planted.py"
-        planted.parent.mkdir(parents=True)
+        planted.parent.mkdir(parents=True, exist_ok=True)
         planted.write_text("x = 1\n", encoding="utf-8")
     dist = work / "dist"
     subprocess.run(
@@ -120,9 +120,9 @@ def test_wheel_runs_from_its_packaged_rules(wheel, target, tmp_path):
 
 
 def test_all_on_this_repository(tmp_path):
-    missing = [tool for tool in pending_tools() if shutil.which(tool) is None]
-    if missing:
-        pytest.skip(f"needs {', '.join(missing)}: the deep tier and secret scanner are phase C")
+    pending = pending_tools()
+    if pending:
+        pytest.skip(f"pending rules need {', '.join(pending)}: the deep tier and secret scanner are phase C")
     copy = Target.create(tmp_path / "self")
     copy_of_this_repository(copy.path)
     copy.commit()

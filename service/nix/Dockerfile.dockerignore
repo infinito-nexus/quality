@@ -1,0 +1,7 @@
+*
+!flake.nix
+!flake.lock
+!src
+!rules
+!service/nix/squid.conf
+**/__pycache__

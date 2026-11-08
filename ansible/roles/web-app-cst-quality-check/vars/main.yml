@@ -1,0 +1,71 @@
+---
+application_id: "web-app-cst-quality-check"
+system_service_id: "web-app-cst-quality-check"
+
+QUALITY_CHECK: "{{ lookup('config', application_id, 'services.quality-check') }}"
+QUALITY_CHECK_PROXY: "{{ lookup('config', application_id, 'services.proxy') }}"
+QUALITY_CHECK_SCAN: "{{ lookup('config', application_id, 'services.scan') }}"
+QUALITY_CHECK_PULL_POLICY: "{{ lookup('config', application_id, 'services.quality-check.pull_policy', '') }}"
+QUALITY_CHECK_SOURCE: "{{ lookup('applications', application_id).source }}"
+QUALITY_CHECK_VOLUMES_DIR: "{{ lookup('container', application_id, 'directories.volumes') }}"
+QUALITY_CHECK_CONFIG_DIR: "{{ [QUALITY_CHECK_VOLUMES_DIR, 'config'] | path_join }}"
+QUALITY_CHECK_SECRETS_DIR: "{{ [QUALITY_CHECK_VOLUMES_DIR, 'secrets'] | path_join }}"
+QUALITY_CHECK_BUILD_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'build'] | path_join }}"
+QUALITY_CHECK_LAUNCHER_CONFIG: "{{ [QUALITY_CHECK_CONFIG_DIR, 'launcher.json'] | path_join }}"
+QUALITY_CHECK_STATE_DIR: "/var/lib/{{ application_id }}/state"
+QUALITY_CHECK_JOBS_DIR: "/run/{{ application_id }}/jobs"
+QUALITY_CHECK_DATABASE_DIR: "/var/lib/{{ application_id }}/database"
+QUALITY_CHECK_WEB_UID: 65532
+QUALITY_CHECK_STEP_UID: 65534
+QUALITY_CHECK_URL: "{{ lookup('tls', application_id, 'url.origin') }}"
+# nocheck: host-local-fact  compose only: the host rendering site.conf runs the egress proxy, so its own addresses are the targets the proxy must refuse
+QUALITY_CHECK_HOST_ADDRESSES: "{{ ((ansible_facts['all_ipv4_addresses'] | default([])) + (ansible_facts['all_ipv6_addresses'] | default([])) + ['127.0.0.1']) | unique }}"
+QUALITY_CHECK_SSO_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') | bool }}"
+QUALITY_CHECK_IMAGES: ["quality-check", "scan", "proxy"]
+QUALITY_CHECK_STATE_VOLUMES:
+  - {type: bind, source: "{{ QUALITY_CHECK_STATE_DIR }}/spool", target: /state/spool, bind: {create_host_path: false}}
+  - {type: bind, source: "{{ QUALITY_CHECK_STATE_DIR }}/reports", target: /state/reports, read_only: true, bind: {create_host_path: false}}
+QUALITY_CHECK_LIMITS: >-
+  {{ QUALITY_CHECK.limits | combine({
+       'retention_hours': QUALITY_CHECK.retention_hours,
+       'step': QUALITY_CHECK.limits.step | combine({
+         'memory': QUALITY_CHECK_SCAN.mem_limit,
+         'cpus': QUALITY_CHECK_SCAN.cpus | string,
+         'pids': QUALITY_CHECK_SCAN.pids_limit})}) }}
+
+QUALITY_CHECK_OIDC:
+  issuer: "{{ OIDC.CLIENT.ISSUER_URL }}"
+  client_id: "{{ lookup('config', application_id, 'services.sso.oidc.clients.web') }}"
+  redirect_uri: "{{ QUALITY_CHECK_URL }}/account/callback"
+  logout_redirect: "{{ QUALITY_CHECK_URL }}/"
+  group_claim: "{{ RBAC.GROUP.CLAIM }}"
+  member_group: "/{{ lookup('rbac_group_path', application_id=application_id, role='member') }}"
+
+QUALITY_CHECK_WEB_CONFIG:
+  state_dir: /state
+  legal_dir: "{{ lookup('volume', application_id, 'legal').target }}"
+  secret_file: "{{ lookup('volume', application_id, 'web_secret').target }}"
+  public_url: "{{ QUALITY_CHECK_URL }}"
+  access: "{{ QUALITY_CHECK.access }}"
+  rate_limits: "{{ QUALITY_CHECK.rate_limits }}"
+  limits: "{{ QUALITY_CHECK_LIMITS }}"
+  oidc: "{{ QUALITY_CHECK_OIDC if QUALITY_CHECK_SSO_ENABLED | bool else None }}"
+
+QUALITY_CHECK_LAUNCHER:
+  state_dir: "{{ QUALITY_CHECK_STATE_DIR }}"
+  jobs_dir: "{{ QUALITY_CHECK_JOBS_DIR }}"
+  job_storage: tmpfs
+  container: ["container"]
+  runtime: "{{ SANDBOX_RUNTIME }}"
+  images:
+    scan: "{{ lookup('image', application_id, 'scan', tag_only=True) }}"
+    scan_version: "{{ lookup('config', application_id, 'services.scan.version') }}"
+  fetch:
+    network: "{{ QUALITY_CHECK_PROXY.network }}"
+    proxy: "http://{{ QUALITY_CHECK_PROXY.address }}:3128"
+    user_agent: "quality-check (+{{ QUALITY_CHECK_URL }}/privacy)"
+  database:
+    dir: "{{ QUALITY_CHECK_DATABASE_DIR }}"
+    update_hours: "{{ QUALITY_CHECK.database.update_hours }}"
+    max_age_hours: "{{ QUALITY_CHECK.database.max_age_hours }}"
+  limits: "{{ QUALITY_CHECK_LIMITS }}"

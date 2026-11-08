@@ -1,0 +1,35 @@
+---
+- services:
+    sso:
+      enabled: true
+      shared: true
+    prometheus:
+      enabled: true
+      shared: true
+    semaphore:
+      enabled: true
+      shared: true
+    docs:
+      enabled: false
+      shared: false
+    quality-check:
+      access:
+        anonymous: true
+        captcha: true
+- services:
+    sso:
+      enabled: false
+      shared: false
+    prometheus:
+      enabled: false
+      shared: false
+    semaphore:
+      enabled: false
+      shared: false
+    docs:
+      enabled: true
+      shared: true
+    quality-check:
+      access:
+        anonymous: false
+        captcha: true

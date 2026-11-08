@@ -1,0 +1,29 @@
+--- # nocheck: backup-service-flag  configuration files only; reports and jobs live on a tmpfs mount that no backup should see
+web_config:
+  type: config
+  source: "{{ [lookup('container', 'web-app-cst-quality-check', 'directories.volumes'), 'config', 'web.json'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: quality-check
+      target: /etc/quality-web/config.json
+web_secret:
+  type: secret
+  source: "{{ [lookup('container', 'web-app-cst-quality-check', 'directories.volumes'), 'secrets', 'web'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: quality-check
+      target: /run/secrets/web
+legal:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-cst-quality-check', 'directories.volumes'), 'config', 'legal'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: quality-check
+      target: /legal
+proxy_site:
+  type: config
+  source: "{{ [lookup('container', 'web-app-cst-quality-check', 'directories.volumes'), 'config', 'site.conf'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: proxy
+      target: /etc/squid/site.conf

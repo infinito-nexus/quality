@@ -1,0 +1,33 @@
+{% set quality_check_kc_origins = lookup('network_urls', lookup('tls', 'web-app-cst-quality-check', 'url.origin')) %}
+{
+  "clientId": "{{ lookup('config', 'web-app-cst-quality-check', 'services.sso.oidc.clients.web') }}",
+  "name": "Quality check",
+  "description": "Public client of the hosted quality scan: authorization code flow with S256 PKCE, no secret.",
+  "enabled": true,
+  "clientAuthenticatorType": "client-secret",
+  "redirectUris": {{ quality_check_kc_origins | map('regex_replace', '$', '/account/callback') | list | to_json }},
+  "webOrigins": {{ quality_check_kc_origins | to_json }},
+  "bearerOnly": false,
+  "consentRequired": false,
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "publicClient": true,
+  "frontchannelLogout": false,
+  "protocol": "openid-connect",
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": {{ quality_check_kc_origins | map('regex_replace', '$', '/') | join('##') | to_json }},
+    "oauth2.device.authorization.grant.enabled": "false",
+    "oidc.ciba.grant.enabled": "false",
+    "display.on.consent.screen": "false"
+  },
+  "fullScopeAllowed": false,
+  "defaultClientScopes": [
+    "basic",
+    "profile",
+    "{{ KEYCLOAK_RBAC_GROUP_CLAIM }}"
+  ],
+  "optionalClientScopes": []
+}

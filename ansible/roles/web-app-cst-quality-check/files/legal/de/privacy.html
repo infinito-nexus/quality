@@ -1,0 +1,14 @@
+<h1>Datenschutz</h1>
+<h2>Was verarbeitet wird</h2>
+<ul>
+  <li>Die eingereichte Repository-URL, Datei oder der eingefügte Text. Sie werden nur von statischen Werkzeugen geprüft und nie ausgeführt, am Ende des Auftrags gelöscht und nie wieder ausgeliefert.</li>
+  <li>Der Bericht: je Befund Regel, Pfad, Zeile, Schweregrad und eine feste Zusammenfassung, bei Repositories der Commit, dazu die angewandten Ausnahmen. Er enthält keine Adresse, keinen Benutzernamen und keine E-Mail.</li>
+  <li>Ihre Netzwerkadresse, nur im Arbeitsspeicher und nur als täglich wechselnder Schlüssel-Hash, um Ratenlimits durchzusetzen. Ein Neustart des Dienstes verwirft sie.</li>
+  <li>Nach einer Anmeldung: Ihr Benutzername und ob Sie zur Gruppe des Dienstes gehören, nur im Arbeitsspeicher für die Sitzung.</li>
+</ul>
+<h2>Wie lange</h2>
+<p>Berichte werden 48 Stunden nach ihrer Erstellung gelöscht. Auftragsdaten liegen in einem Dateisystem im Arbeitsspeicher und sind nach dem Auftrag oder einem Neustart weg.</p>
+<h2>Was nicht verarbeitet wird</h2>
+<p>Der Webserver dieses Dienstes schreibt dafür kein Zugriffs- und kein Fehlerprotokoll. Der Verbindungsaufbau vor Bekanntwerden des Servernamens (Fehler im TLS-Handshake) kann weiterhin im hostweiten Protokoll des Webservers erscheinen. Kein Tracking, keine Analyse, kein Cookie für anonyme Besuche, und das Captcha läuft in Ihrem Browser, ohne einen Dritten zu kontaktieren.</p>
+<h2>Ausgehende Anfragen</h2>
+<p>Um ein Repository zu holen, verbindet sich der Dienst über einen Proxy, der private und lokale Adressen ablehnt, mit dem genannten Host. Dieser sieht die Adresse des Dienstes und eine feste Kennung, nicht Ihre.</p>

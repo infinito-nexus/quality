@@ -1,0 +1,130 @@
+name: quality-check-inspect
+
+services:
+  scan:
+    profiles: ["image"]
+    image: quality-check/scan:local
+    build:
+      context: ..
+      dockerfile: service/nix/Dockerfile
+      target: scan
+      args:
+        PACKAGE: scan
+
+  state:
+    image: docker:29.0.1-cli
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        mkdir -p /state/spool /state/reports /state/claimed
+        && chown 65532:65532 /state/spool
+        && chmod 0700 /state/spool /state/claimed
+        && chmod 0755 /state/reports
+    volumes:
+      - state:/state
+    network_mode: none
+
+  proxy:
+    image: quality-check/proxy:local
+    build:
+      context: ..
+      dockerfile: service/nix/Dockerfile
+      target: proxy
+      args:
+        PACKAGE: proxy
+    read_only: true
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16m
+    volumes:
+      - ./dev/site.conf:/etc/squid/site.conf:ro
+    networks:
+      fetch:
+        ipv4_address: 10.213.0.2
+      egress: {}
+
+  web:
+    image: quality-check/web:local
+    build:
+      context: ..
+      dockerfile: service/web/Dockerfile
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    tmpfs:
+      - /tmp:size=16m
+    depends_on:
+      state:
+        condition: service_completed_successfully
+    volumes:
+      - ./dev/config.json:/etc/quality-web/config.json:ro
+      - ../build/web-secret:/run/secrets/web:ro
+      - ../ansible/roles/web-app-cst-quality-check/files/legal:/legal:ro
+      - type: volume
+        source: state
+        target: /state/spool
+        volume:
+          subpath: spool
+      - type: volume
+        source: state
+        target: /state/reports
+        read_only: true
+        volume:
+          subpath: reports
+    networks:
+      front: {}
+
+  front:
+    image: nginxinc/nginx-unprivileged:1.29-alpine
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:size=8m
+    volumes:
+      - ./dev/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:18098:8080"
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      front: {}
+
+  launcher:
+    image: quality-check/launcher:local
+    build:
+      context: ..
+      dockerfile: service/dev/Dockerfile
+    depends_on:
+      state:
+        condition: service_completed_successfully
+      proxy:
+        condition: service_started
+    volumes:
+      - ./dev/config.json:/etc/quality-check/config.json:ro
+      - state:/state
+      - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: none
+
+volumes:
+  state: {}
+
+networks:
+  front: {}
+  egress: {}
+  fetch:
+    name: quality-check-fetch
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
+    ipam:
+      config:
+        - subnet: 10.213.0.0/24

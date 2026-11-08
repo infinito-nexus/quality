@@ -21,8 +21,17 @@
       shellcheck
       trivy
     ];
+    runner = pkgs.python3.withPackages (ps: [ ps.pathspec ps.pyyaml ]);
+    squid = assert pkgs.lib.versions.major pkgs.squid.version == "7"; pkgs.squid;
   in {
-    packages.${system}.tools = pkgs.buildEnv { name = "quality-tools"; paths = tools; };
+    packages.${system} = {
+      tools = pkgs.buildEnv { name = "quality-tools"; paths = tools; };
+      scan = pkgs.buildEnv {
+        name = "quality-scan";
+        paths = tools ++ (with pkgs; [ runner bash cacert coreutils git ]);
+      };
+      proxy = pkgs.buildEnv { name = "quality-proxy"; paths = [ squid ]; };
+    };
     devShells.${system}.default = pkgs.mkShell {
       packages = tools ++ [ (pkgs.python3.withPackages (ps: [ ps.pathspec ps.pytest ps.pyyaml ])) ];
     };

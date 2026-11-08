@@ -1,0 +1,5 @@
+---
+client_max_body_size: 3m
+status_codes:
+  default:
+    - 404

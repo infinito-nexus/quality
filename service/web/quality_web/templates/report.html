@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Quality report{% endblock %}
+{% block main %}
+<h1>Quality report</h1>
+{% if report.status != "done" %}
+<p class="failed">Not checked: {{ report.reason }}.</p>
+<p>This submission was not scanned, so nothing can be said about its quality.</p>
+{% else %}
+<dl class="header">
+  {% if report.commit %}<dt>Commit</dt><dd><code>{{ report.commit }}</code></dd>{% endif %}
+  <dt>quality</dt><dd>{{ report.quality }}</dd>
+  <dt>Database</dt><dd>{% if report.database %}updated {{ report.database.updated }}{% else %}not used{% endif %}</dd>
+  {% if report.history %}<dt>History</dt><dd>{{ report.history }}</dd>{% endif %}
+</dl>
+<p>{{ report.result.findings | length }} finding(s) in the rules that ran. The submission controls its own exclusions, so this report is a claim, not proof.</p>
+{% if report.result.findings %}
+<table>
+  <thead><tr><th>Severity</th><th>Rule</th><th>Location</th><th>Summary</th></tr></thead>
+  <tbody>
+  {% for finding in report.result.findings %}
+  <tr>
+    <td>{{ finding.severity }}</td>
+    <td><code>{{ finding.rule }}</code></td>
+    <td><code>{{ finding.path }}{% if finding.line is not none %}:{{ finding.line }}{% endif %}</code></td>
+    <td>{{ finding.summary }}{% if finding.value is not none %} ({{ finding.value }}){% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<h2>Applied exclusions</h2>
+{% if report.result.ignored or report.result.nocheck %}
+<ul>
+  {% for entry in report.result.ignored %}<li><code>{{ entry.rule }}</code> off for {{ entry.paths | join(", ") or "the whole project" }}: {{ entry.reason }}</li>{% endfor %}
+  {% for entry in report.result.nocheck %}<li><code>{{ entry.rule }}</code> suppressed at <code>{{ entry.path }}:{{ entry.line }}</code></li>{% endfor %}
+</ul>
+{% else %}
+<p>None.</p>
+{% endif %}
+{% if report.result.incomplete or report.result.unchecked %}
+<h2>Not checked</h2>
+<ul>
+  {% for rule in report.result.incomplete %}<li>Rule <code>{{ rule }}</code> did not run.</li>{% endfor %}
+  {% for path in report.result.unchecked %}<li><code>{{ path }}</code> is over the size limit.</li>{% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+{% endblock %}

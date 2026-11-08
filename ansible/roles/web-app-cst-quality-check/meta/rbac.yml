@@ -1,0 +1,4 @@
+---
+roles:
+  member:
+    description: Submits scans at /account/ without a captcha and without a quota, and queues before every other tier

@@ -1,0 +1,174 @@
+---
+# nocheck: garbage-collector-required  reports and jobs live on tmpfs and expire after retention_hours; nothing persists to collect
+# nocheck: seaweedfs-required  reports live 48 hours on a tmpfs mount; there is no upload or media store to offload
+# nocheck: dynamic-flag  the sandbox runtime is mandatory for every scan step
+# nocheck: playwright-service-flag  the sandbox has no UI; the specs prove it through finished reports
+kata:
+  bond: 1
+  enabled: true
+  shared: true
+sso: # nocheck: login-methods  Reason: the app runs its own OIDC code flow with PKCE as its only sign-in; it has no form and no local accounts
+  bond: 1
+  enabled: "{{ 'web-app-keycloak' in group_names }}"
+  shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oidc
+  oidc:
+    clients:
+      web: quality-check
+  profile:
+    none_needed: "user name and member flag are held in memory per session; no editable profile fields"
+  backchannel:
+    logout: "no, native OIDC without a back-channel logout endpoint: /account/logout ends the session front-channel through the Keycloak end-session endpoint"
+    endpoint: "-"
+    documentation: "-"
+    session: "until /account/logout or the Keycloak session ends"
+docs:
+  bond: 0.5
+  enabled: "{{ 'web-app-docs' in group_names }}"
+  shared: "{{ 'web-app-docs' in group_names }}"
+# nocheck: dynamic-flag  the page ships no injected stylesheet; core's would add requests to another host
+# nocheck: playwright-service-flag  front-end injection is off by design
+css:
+  enabled: false
+  shared: false
+# nocheck: dynamic-flag  the page runs no script except the captcha widget
+# nocheck: playwright-service-flag  front-end injection is off by design
+javascript:
+  enabled: false
+  shared: false
+# nocheck: dynamic-flag  a tracker would see the report links, which are the only key to a report
+# nocheck: playwright-service-flag  front-end injection is off by design
+matomo:
+  enabled: false
+  shared: false
+# nocheck: dynamic-flag  the app ends its own session and sends the browser to Keycloak's end-session endpoint
+# nocheck: playwright-service-flag  front-end injection is off by design
+# nocheck: logout  the app logs out natively at /account/logout
+logout:
+  enabled: false
+  shared: false
+# nocheck: dynamic-flag  the dashboard frame would add requests to another host
+# nocheck: playwright-service-flag  front-end injection is off by design
+# nocheck: dashboard  the public scan page is not a tile of the operator dashboard
+dashboard:
+  enabled: false
+  shared: false
+# nocheck: dynamic-flag  the page keeps its own minimal stylesheet
+# nocheck: playwright-service-flag  front-end injection is off by design
+# nocheck: design-off  Reason: the scan page serves one small own stylesheet and no injected design, so the design queue has nothing to style
+design:
+  enabled: false
+  shared: false
+semaphore:
+  bond: 0.5
+  enabled: "{{ 'web-app-semaphore' in group_names }}"
+  shared: "{{ 'web-app-semaphore' in group_names }}"
+  control: true
+  status: started
+prometheus:
+  bond: 1
+  enabled: "{{ 'web-app-prometheus' in group_names }}"
+  shared: "{{ 'web-app-prometheus' in group_names }}"
+# nocheck: dynamic-flag  plain HTTP onion visitors have no crypto.subtle for the captcha and would share one rate limit bucket
+# nocheck: playwright-service-flag  onion access is off by design
+# nocheck: sso-variant-tor  tor.enabled is pinned false: the role has no onion, so no variant can run SSO over one
+tor:
+  enabled: false
+  shared: false
+# nocheck: playwright-service-flag  the role's own provider service; a role must not self-gate
+# nocheck: dynamic-flag  self-provider; the web service is deployed whenever the role runs
+quality-check:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: false
+  bond: 1
+  enabled: true
+  shared: true
+  provides: quality-check
+  name: quality-check-web
+  image: ghcr.io/infinito-nexus/quality/web
+  version: "0.1.0"
+  min_storage: 1GB
+  cpus: 0.5
+  mem_reservation: 0.128g
+  mem_limit: 0.512g
+  pids_limit: 128
+  ports:
+    internal:
+      http: 8080
+    local:
+      http: 7994
+  healthcheck:
+    test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8080/healthz', headers={'X-Real-IP': '127.0.0.1'}), timeout=4)"]
+  lifecycle: alpha
+  access:
+    anonymous: true
+    captcha: true
+  retention_hours: 48
+  rate_limits:
+    anonymous_per_ip_hour: 10
+    anonymous_hourly_total: 120
+    per_host_hour: 20
+    registered_per_user_hour: 30
+  database:
+    update_hours: 24
+    max_age_hours: 168
+  limits:
+    upload_bytes: 1048576
+    job_bytes: 1500000
+    report_bytes: 4194304
+    anonymous_queue: 20
+    jobs_per_run: 10
+    concurrency: 2
+    session_hours: 8
+    captcha_cost: 5000
+    captcha_seconds: 300
+    state_bytes: 268435456
+    state_inodes: 20000
+    inodes: 200000
+    repo_bytes:
+      member: 1073741824
+      registered: 536870912
+      anonymous: 268435456
+    timeouts:
+      fetch: 120
+      prepare: 30
+      scan: 600
+      database: 900
+    step:
+      tmp_bytes: 268435456
+# nocheck: dynamic-flag  the scan image runs every fetch, prepare and scan step; the launcher starts it, compose does not
+# nocheck: playwright-service-flag  the scan image has no UI; the specs prove it through finished reports
+scan:
+  bond: 1
+  enabled: true
+  shared: true
+  name: quality-check-scan
+  image: ghcr.io/infinito-nexus/quality/scan
+  version: "0.1.0"
+  cpus: 2
+  mem_reservation: 0.256g
+  mem_limit: 2g
+  pids_limit: 512
+# nocheck: dynamic-flag  the egress proxy is the only way out of the fetch network
+# nocheck: playwright-service-flag  the proxy has no UI; the specs prove it through a finished URL report
+proxy:
+  bond: 1
+  enabled: true
+  shared: true
+  name: quality-check-proxy
+  image: ghcr.io/infinito-nexus/quality/proxy
+  version: "0.1.0"
+  cpus: 0.25
+  mem_reservation: 0.064g
+  mem_limit: 0.256g
+  pids_limit: 64
+  # nocheck: version-key  Reason: static container IPv4 of the proxy on the fetch network, not a version
+  address: 192.168.89.2
+  network: quality-check-fetch
+  subnet: 192.168.89.0/24
+  dns_nameservers:
+    - 9.9.9.9
+    - 149.112.112.112

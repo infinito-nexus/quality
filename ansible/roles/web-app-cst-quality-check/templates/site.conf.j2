@@ -1,0 +1,2 @@
+dns_nameservers {{ QUALITY_CHECK_PROXY.dns_nameservers | join(' ') }}
+acl own_address dst {{ QUALITY_CHECK_HOST_ADDRESSES | join(' ') }}

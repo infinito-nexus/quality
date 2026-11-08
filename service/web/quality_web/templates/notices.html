@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Notices{% endblock %}
+{% block main %}
+<h1>Notices</h1>
+<p>The scan image bundles these tools, pinned through the repository's <code>flake.lock</code>. The service itself is MIT licensed.</p>
+<table>
+  <thead><tr><th>Component</th><th>Licence</th></tr></thead>
+  <tbody>
+    <tr><td>actionlint</td><td>MIT</td></tr>
+    <tr><td>ast-grep</td><td>MIT</td></tr>
+    <tr><td>gitleaks</td><td>MIT</td></tr>
+    <tr><td>lizard</td><td>MIT</td></tr>
+    <tr><td>ruff</td><td>MIT</td></tr>
+    <tr><td>ripgrep</td><td>Unlicense or MIT</td></tr>
+    <tr><td>osv-scanner</td><td>Apache-2.0</td></tr>
+    <tr><td>trivy</td><td>Apache-2.0</td></tr>
+    <tr><td>hadolint</td><td>GPL-3.0-only</td></tr>
+    <tr><td>ShellCheck</td><td>GPL-3.0-only</td></tr>
+    <tr><td>semgrep</td><td>LGPL-2.1-or-later</td></tr>
+    <tr><td>git</td><td>GPL-2.0-only</td></tr>
+    <tr><td>Squid (egress proxy)</td><td>GPL-2.0-or-later</td></tr>
+    <tr><td>ALTCHA widget and library</td><td>MIT</td></tr>
+    <tr><td>Flask</td><td>BSD-3-Clause</td></tr>
+    <tr><td>Authlib</td><td>BSD-3-Clause</td></tr>
+    <tr><td>gunicorn</td><td>MIT</td></tr>
+    <tr><td>requests</td><td>Apache-2.0</td></tr>
+  </tbody>
+</table>
+<p>Source of the GPL tools: <a href="https://github.com/NixOS/nixpkgs">nixpkgs</a> at the revision in <code>flake.lock</code> of <a href="https://github.com/infinito-nexus/quality">infinito-nexus/quality</a>.</p>
+{% endblock %}

@@ -1,0 +1,112 @@
+---
+- include_tasks: utils/once/flag.yml
+
+- name: "🧱 Refuse any mode but compose for '{{ application_id }}'"
+  ansible.builtin.assert:
+    that: IS_COMPOSE_MODE | bool
+    fail_msg: "{{ application_id }} deploys in compose mode only, not in {{ DEPLOYMENT_MODE }} mode: swarm drops the per-service runtime and the launcher runs per node"
+    quiet: true
+
+- name: "💾 Mount the state tmpfs of '{{ application_id }}' through fstab"
+  ansible.posix.mount:
+    path: "{{ QUALITY_CHECK_STATE_DIR }}"
+    src: tmpfs
+    fstype: tmpfs
+    opts: "size={{ QUALITY_CHECK.limits.state_bytes }},nr_inodes={{ QUALITY_CHECK.limits.state_inodes }},mode=0755,nosuid,nodev,noexec"
+    state: mounted
+
+- name: "🗂️ Declare the state, job and database directories of '{{ application_id }}'"
+  ansible.builtin.template: # nocheck: stack-host-template (per-host tmpfiles.d entry for the host-side launcher)
+    src: tmpfiles.conf.j2
+    dest: "/etc/tmpfiles.d/{{ application_id }}.conf"
+    mode: "0644"
+  register: quality_check_tmpfiles
+
+- name: "🗂️ Create the declared directories of '{{ application_id }}'"
+  ansible.builtin.command:
+    argv: ["systemd-tmpfiles", "--create", "/etc/tmpfiles.d/{{ application_id }}.conf"]
+  changed_when: quality_check_tmpfiles is changed
+
+- name: "📁 Create config and secret directories of '{{ application_id }}'"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ QUALITY_CHECK_CONFIG_DIR }}", mode: "0755"}
+    - {path: "{{ QUALITY_CHECK_SECRETS_DIR }}", mode: "0700"}
+
+- name: "⚙️ Write the configuration of '{{ application_id }}'"
+  ansible.builtin.copy: # nocheck: stack-host-consumer (compose only: the assert above refuses every other mode, so this host is the stack host)
+    content: "{{ item.content | to_nice_json }}\n"
+    dest: "{{ [QUALITY_CHECK_CONFIG_DIR, item.name] | path_join }}"
+    mode: "0444"
+  loop:
+    - {name: web.json, content: "{{ QUALITY_CHECK_WEB_CONFIG }}"}
+    - {name: launcher.json, content: "{{ QUALITY_CHECK_LAUNCHER }}"}
+  loop_control:
+    label: "{{ item.name }}"
+  register: quality_check_config
+
+- name: "🌐 Write the egress proxy site configuration of '{{ application_id }}'"
+  stack_host_template:
+    src: site.conf.j2
+    dest: "{{ [QUALITY_CHECK_CONFIG_DIR, 'site.conf'] | path_join }}"
+    mode: "0444"
+  register: quality_check_proxy_site
+
+- name: "⚖️ Copy the legal texts of '{{ application_id }}'"
+  ansible.builtin.copy: # nocheck: stack-host-consumer (compose only: the assert above refuses every other mode, so this host is the stack host)
+    src: legal/
+    dest: "{{ [QUALITY_CHECK_CONFIG_DIR, 'legal'] | path_join }}/"
+    mode: "0444"
+    directory_mode: "0555"
+  register: quality_check_legal
+
+- name: "🔐 Write the web secret of '{{ application_id }}'"
+  ansible.builtin.copy:
+    content: "{{ lookup('config', application_id, 'secrets.credentials.web_secret') }}"
+    dest: "{{ [QUALITY_CHECK_SECRETS_DIR, 'web'] | path_join }}"
+    owner: "{{ QUALITY_CHECK_WEB_UID }}"
+    mode: "0400"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  register: quality_check_secret
+
+- name: "🐳 Pull or build the images of '{{ application_id }}'"
+  include_tasks: 01_images.yml
+
+- name: "🧩 Load docker, proxy and TLS for '{{ application_id }}'"
+  include_role:
+    name: sys-stk-full
+  vars:
+    compose_handlers_flush: true
+
+- name: "♻️ Recreate '{{ application_id }}' when its staged files changed"
+  ansible.builtin.debug:
+    msg: "Staged files changed for {{ application_id }}"
+  changed_when: true
+  notify:
+    - compose-build
+    - compose-up
+  when: >-
+    quality_check_config is changed
+    or quality_check_proxy_site is changed
+    or quality_check_legal is changed
+    or quality_check_secret is changed
+    or (quality_check_build_images | bool and quality_check_build_context is changed)
+
+- name: "🚿 Flush the compose handlers of '{{ application_id }}'"
+  meta: flush_handlers
+
+- name: "⏱️ Install the launcher timer of '{{ application_id }}'"
+  include_role:
+    name: sys-service
+  vars:
+    system_service_id: "{{ application_id }}"
+    system_service_on_calendar: "*:*:0/30"
+    # Exception: the 30-second cadence is how long a submitter waits; the global 5-minute jitter would stretch it to minutes
+    RANDOMIZED_DELAY_SEC: "0"
+    system_service_timer_enabled: true
+    system_service_tpl_on_failure: "{{ SYS_SERVICE_ON_FAILURE_COMPOSE }}"
+    system_service_tpl_timeout_start_sec: "1800"
+    system_service_tpl_exec_start: "{{ system_service_script_exec }} {{ QUALITY_CHECK_LAUNCHER_CONFIG }}"

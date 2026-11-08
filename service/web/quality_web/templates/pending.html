@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Quality report pending{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block main %}
+<h1>Quality report</h1>
+<p>The scan is {{ state }}. This page reloads every five seconds. Keep its link: it is the only way back to the report.</p>
+{% endblock %}

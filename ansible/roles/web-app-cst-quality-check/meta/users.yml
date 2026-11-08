@@ -1,0 +1,5 @@
+---
+quality-check:
+  username: qualitycheck
+  description: Platform account the quality-check sandbox acts as. Non-privileged by design.
+platform_administrator: {}

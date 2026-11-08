@@ -1,0 +1,14 @@
+<h1>Privacy</h1>
+<h2>What is processed</h2>
+<ul>
+  <li>The repository URL, file or text you submit. It is scanned by static tools only and never executed. It is deleted when its job ends and is never served back.</li>
+  <li>The report: rule, path, line, severity and a fixed summary per finding, the commit of a repository and the applied exclusions. It holds no address, user name or email.</li>
+  <li>Your network address, only in process memory and only as a keyed hash that changes every day, to enforce rate limits. A restart of the service drops it.</li>
+  <li>After a login: your user name and whether you belong to the service's group, only in process memory for the session.</li>
+</ul>
+<h2>How long</h2>
+<p>Reports are deleted 48 hours after they were written. Job data lives on a memory file system and is gone after the job or a reboot.</p>
+<h2>What is not processed</h2>
+<p>The web server of this service writes no access log and no error log for it. Connection setup before the server name is known (TLS handshake errors) can still appear in the host-wide log of the web server. No tracking, no analytics, no cookie for anonymous visitors, and the captcha runs in your browser without contacting a third party.</p>
+<h2>Outbound requests</h2>
+<p>To fetch a repository, the service connects to the host you named, through a proxy that refuses private and local addresses. That host sees the service's address and a fixed user agent, not yours.</p>

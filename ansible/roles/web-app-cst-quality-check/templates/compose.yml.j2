@@ -1,0 +1,70 @@
+{% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
+
+  {% set service_name = 'quality-check' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'quality-check') }}
+    {% if quality_check_build_images | bool %}
+    build:
+      context: {{ QUALITY_CHECK_BUILD_DIR }}
+      dockerfile: service/web/Dockerfile
+    {% endif %}
+    {{ lookup('compose_only', 'container_name', QUALITY_CHECK.name) }}
+    {% if QUALITY_CHECK_PULL_POLICY %}
+    {{ lookup('compose_only', 'pull_policy', QUALITY_CHECK_PULL_POLICY) }}
+    {% endif %}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    {{ lookup('container_volumes', service_name, extra_volumes=QUALITY_CHECK_STATE_VOLUMES) | indent(4) }}
+    {{ lookup('container_ports', ['quality-check', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_networks', own_network_only=True) | indent(4) }}
+    {{ lookup('container_extra_hosts') | indent(4) }}
+
+  {% set service_name = 'proxy' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'proxy') }}
+    {% if quality_check_build_images | bool %}
+    build:
+      context: {{ QUALITY_CHECK_BUILD_DIR }}
+      dockerfile: service/nix/Dockerfile
+      target: proxy
+      args:
+        PACKAGE: proxy
+    {% endif %}
+    {{ lookup('compose_only', 'container_name', QUALITY_CHECK_PROXY.name) }}
+    {% if QUALITY_CHECK_PULL_POLICY %}
+    {{ lookup('compose_only', 'pull_policy', QUALITY_CHECK_PULL_POLICY) }}
+    {% endif %}
+    {{ lookup('compose_only', 'runtime', SANDBOX_RUNTIME) }}
+    read_only: true
+    user: "{{ QUALITY_CHECK_STEP_UID }}:{{ QUALITY_CHECK_STEP_UID }}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    networks: # nocheck: networks-literal  the egress proxy needs a fixed address on the internal fetch network, which container_networks cannot render
+      default: {}
+      {{ QUALITY_CHECK_PROXY.network }}:
+        ipv4_address: {{ QUALITY_CHECK_PROXY.address }}
+
+{{ lookup('compose_volumes') }}
+{{ lookup('compose_networks') }}
+  {{ QUALITY_CHECK_PROXY.network }}:
+    name: {{ QUALITY_CHECK_PROXY.network }}
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.inhibit_ipv4: "true"
+    ipam:
+      config:
+        - subnet: {{ QUALITY_CHECK_PROXY.subnet }}

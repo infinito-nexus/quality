@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 0 1rem;
+}
+
+header,
+footer {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem 0;
+}
+
+footer {
+  border-top: 1px solid currentcolor;
+  justify-content: flex-start;
+}
+
+.brand {
+  font-weight: bold;
+}
+
+fieldset {
+  display: grid;
+  gap: 0.5rem;
+}
+
+textarea,
+input[type="url"] {
+  font-family: ui-monospace, monospace;
+  width: 100%;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid currentcolor;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.failed {
+  font-weight: bold;
+}
+
+dl.header {
+  display: grid;
+  gap: 0.25rem 1rem;
+  grid-template-columns: max-content auto;
+}

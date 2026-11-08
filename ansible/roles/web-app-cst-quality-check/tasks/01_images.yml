@@ -1,0 +1,19 @@
+---
+- name: "🔎 Ask the registry for the images of '{{ application_id }}'"
+  ansible.builtin.command:
+    argv: ["container", "manifest", "inspect", "{{ lookup('image', application_id, item, tag_only=True) }}"]
+  loop: "{{ QUALITY_CHECK_IMAGES }}"
+  register: quality_check_image_probe
+  changed_when: false
+  failed_when: quality_check_image_probe.rc not in [0, 1]
+  when: QUALITY_CHECK_PULL_POLICY != 'never'
+
+- name: "🧮 Decide whether '{{ application_id }}' builds its images from source"
+  ansible.builtin.set_fact:
+    quality_check_build_images: >-
+      {{ QUALITY_CHECK_PULL_POLICY != 'never'
+         and (quality_check_image_probe.results | rejectattr('rc', 'eq', 0) | list | length > 0) }}
+
+- name: "🏗️ Stage the source of '{{ application_id }}' and build its scan image"
+  include_tasks: 02_build_context.yml
+  when: quality_check_build_images | bool
