@@ -186,7 +186,8 @@ flowchart TD
   - [ ] `test_upload_too_large`: through real openresty, an upload over the limit is refused, and no job or spooled body remains.
   - [ ] `test_forwarded_for_ignored`: through real openresty, a client-sent `X-Forwarded-For` or `X-Real-IP` does not change the rate limit bucket.
   - [ ] `test_no_address_on_disk`: after rate-limited submissions, an aborted report fetch and a 413, neither the web app's files nor openresty's container log holds the client address or a report id.
-  - [ ] The Playwright spec submits this repository's public URL, a file and pasted text anonymously and reads each report, submits at `/account/` as a group member beyond the per-user limit and as an account outside the group up to that limit, and finds no form at `/` in the `access.anonymous: false` variant.
+  - [ ] The Playwright spec submits this repository's public URL, a file and pasted text anonymously, submits at `/account/` as a group member beyond the per-user limit and as an account outside the group up to that limit, and finds no form at `/` in the `access.anonymous: false` variant.
+  - [ ] During a deploy each submitted job shows as queued and its report test skips with the stopped timer as reason, because core stops every timer until its stage 03 (`sys-service/tasks/02_lockdown.yml`, `sys-service-terminator/tasks/02_unlock.yml`) and Playwright runs in stage 02; after the deploy, `make compose-playwright role=web-app-cst-quality-check` reads each report (operator, 2026-11-08).
   - [ ] Playwright sees a rendered CSP that allows the widget's worker from `'self'`, the captcha solved under it, and zero cross-origin requests on `/` and on a report page.
   - [ ] Deep tier findings under `SANDBOX_RUNTIME` match the host binary's on one database digest.
   - [ ] `test_isolation_probe`, `test_stop_mid_job`, every `test_egress_*` and one URL job also pass on a host without docker-in-docker, with each runtime that host offers.
