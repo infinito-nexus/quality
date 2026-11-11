@@ -3,10 +3,8 @@
   summary: Secret in tracked content
   hard: true
   history: true
-  pending: true
-  tier: fast
   enforcer:
-    code:
+    any:
       tool: gitleaks
 - id: security.eval-exec
   severity: critical
@@ -39,6 +37,12 @@
   hard: true
   file_level: true
   enforcer: size-guard
+- id: security.binary-code
+  severity: high
+  summary: Changed code file with binary content, which no text rule can vouch for
+  hard: true
+  file_level: true
+  enforcer: binary-guard
 - id: security.temp-path
   severity: medium
   summary: Hardcoded temporary file or directory

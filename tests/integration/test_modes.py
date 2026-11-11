@@ -6,6 +6,8 @@ import pytest
 
 from quality.repo import Repo, hardened_env
 from tests.integration.support import (
+    SECRET_ENV_LINE,
+    UNTAGGED_DOCKERFILE,
     path_without,
     quality,
     raw_tool,
@@ -17,6 +19,7 @@ from tests.integration.support import (
 
 F401 = rule_for("F401")
 LONG_FILE = "".join(f"value_{index} = {index}\n" for index in range(30))
+FAST_TIER_TOOLS = ("quality: tool gitleaks:", "quality: tool hadolint:")
 
 
 def index_digest(target) -> str:
@@ -223,6 +226,25 @@ def test_missing_tool_not_required_when_language_absent(target, tmp_path):
     target.stage()
     no_ruff = path_without(tmp_path / "bin", "ruff")
     assert target.check("--staged", path_value=no_ruff).returncode == 0
+
+
+def test_staged_feeds_touched_files_only_to_gitleaks_and_hadolint(target):
+    target.write("old/Dockerfile", UNTAGGED_DOCKERFILE)
+    target.write("old.env", SECRET_ENV_LINE)
+    target.commit()
+    target.write("new/Dockerfile", UNTAGGED_DOCKERFILE)
+    target.write("new.yml", "x: 1\n")
+    target.stage()
+    result = target.check("--staged", "--verbose")
+    assert result.returncode == 1, result.stderr
+    lines = [line for line in result.stderr.splitlines() if line.startswith(FAST_TIER_TOOLS)]
+    assert sorted(lines) == [
+        "quality: tool gitleaks: exit 0, files: new.yml new/Dockerfile",
+        "quality: tool hadolint: exit 0, files: new/Dockerfile",
+    ]
+    every_file = "new.yml new/Dockerfile old.env old/Dockerfile"
+    whole = target.check("--all", "--verbose")
+    assert f"quality: tool gitleaks: exit 0, files: {every_file}" in whole.stderr
 
 
 def test_staged_on_unborn_head(target):

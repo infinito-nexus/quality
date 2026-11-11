@@ -314,18 +314,21 @@ def test_large_code_file_is_a_hard_finding(target, tmp_path):
     for name in ("logo.png", "data.json", "notes.v2"):
         target.write(name, padded)
     target.stage()
-    oversized = [(OVERSIZED, name) for name in (".bashrc", "big.py", "tool")]
+    names = (".bashrc", "big.py", "tool")
     every_large = [".bashrc", "big.py", "data.json", "logo.png", "notes.v2", "tool"]
     staged = target.check("--staged", "--json", "--rules", str(rules))
-    target.commit()
-    for result in (
-        staged,
-        target.check("--base", "main", "--json", "--rules", str(rules)),
-        target.check("--all", "--json", "--rules", str(rules)),
+    added = target.commit()
+    in_head = [(OVERSIZED, name, None) for name in names]
+    with_commit = [(OVERSIZED, name, added) for name in names]
+    for result, expected in (
+        (staged, in_head),
+        (target.check("--base", "main", "--json", "--rules", str(rules)), with_commit),
+        (target.check("--all", "--json", "--rules", str(rules)), in_head),
     ):
         assert result.returncode == 1
         document = report(result)
-        assert [(item["rule"], item["path"]) for item in document["findings"]] == oversized
+        found = [(item["rule"], item["path"], item["commit"]) for item in document["findings"]]
+        assert found == expected
         assert document["unchecked"] == every_large
     target.write("seed.py", "x = 2\n")
     target.stage()

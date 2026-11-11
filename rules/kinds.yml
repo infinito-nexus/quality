@@ -30,6 +30,22 @@ globs:
   workflow:
     - /.github/workflows/*.yml
     - /.github/workflows/*.yaml
+names:
+  dockerfile: [Dockerfile, Containerfile]
+binary_names: [.DS_Store, Thumbs.db]
+known_suffixes:
+  code: [.jsx, .mts, .cts, .cs, .cc, .cxx, .hh, .hxx, .swift, .scala, .groovy, .gradle, .kts,
+    .dart, .zig, .nim, .hs, .ml, .fs, .vb, .ex, .exs, .erl, .clj, .cljs, .elm, .coffee, .jl,
+    .r, .pl, .pm, .zsh, .ksh, .fish, .ps1, .psm1, .bat, .cmd, .vue, .svelte]
+  document: [.md, .markdown, .mdx, .rst, .txt, .adoc, .asciidoc, .org, .tex, .html, .htm,
+    .xhtml, .pdf, .doc, .docx, .odt, .rtf, .patch, .diff, .yaml, .yml, .json, .jsonc, .toml,
+    .xml, .ini, .cfg, .conf, .csv, .tsv, .sql, .properties, .env, .log, .lock, .css, .scss,
+    .sass, .less, .dockerignore, .gitignore, .bak, .orig, .old, .swp]
+  image: [.png, .jpg, .jpeg, .gif, .svg, .ico, .webp, .bmp, .tif, .tiff, .avif, .heic, .psd]
+  binary: [.zip, .gz, .tgz, .tar, .bz2, .xz, .zst, .7z, .rar, .jar, .war, .exe, .dll, .so,
+    .dylib, .a, .o, .bin, .class, .pyc, .whl, .deb, .rpm, .iso, .dmg, .wasm]
+  template: [.template, .tmpl, .tpl, .in, .j2, .jinja, .jinja2, .erb, .hbs, .handlebars,
+    .mustache, .ejs, .njk, .liquid, .twig, .gotmpl, .mako, .eex, .heex]
 code:
   - python
   - shell
@@ -60,3 +76,4 @@ comment_markers:
   cpp: "//"
   lua: "--"
   workflow: "#"
+  dockerfile: "#"

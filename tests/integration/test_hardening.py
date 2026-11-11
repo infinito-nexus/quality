@@ -2,13 +2,18 @@ import os
 import shutil
 import subprocess
 import tarfile
+import tempfile
 
 from tests.integration.support import (
     EVERY_KIND_RULES,
+    RAW_GITLEAKS,
     RULES,
+    SECRET_ENV_LINE,
+    UNTAGGED_DOCKERFILE,
     add_rules,
     branchy,
     git,
+    launcher_argv,
     path_with,
     quality,
     raw_tool,
@@ -22,6 +27,8 @@ from tests.integration.support import (
 )
 
 F401 = rule_for("F401")
+GITLEAKS_WITHOUT_RULES = 'title = "planted"\n'
+HADOLINT_IGNORING = "ignored:\n  - DL3006\n"
 
 
 def canary_script(marker) -> str:
@@ -51,15 +58,11 @@ def test_repo_config_ignored(target):
         "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
         "      - run: echo ${{ undefined.thing }}\n",
     )
+    target.write("Dockerfile", UNTAGGED_DOCKERFILE)
+    target.write(".env", SECRET_ENV_LINE)
     target.commit()
-    plain = findings_of(target.check("--all", "--json"))
-    assert {
-        "coding.unused-import",
-        "coding.shell-lint",
-        "coding.workflow-lint",
-        "clean.complexity",
-        "clean.tool-pragma",
-    } <= {item[0] for item in plain}
+    plain = findings_without_folder_size(target.check("--all", "--json"))
+    assert EVERY_KIND_RULES <= {item[0] for item in plain}
     target.write(".shellcheckrc", "disable=all\n")
     ignore_all = "paths:\n  '**':\n    ignore:\n      - '.*'\n"
     target.write(".github/actionlint.yaml", ignore_all)
@@ -70,9 +73,81 @@ def test_repo_config_ignored(target):
         "pyproject.toml",
         '[tool.ruff]\nexclude = ["*"]\n[tool.ruff.lint.per-file-ignores]\n"*" = ["ALL"]\n',
     )
+    target.write(".gitleaks.toml", GITLEAKS_WITHOUT_RULES)
+    target.write(".gitleaksignore", ".env:github-pat:1\n")
+    target.write(".hadolint.yaml", HADOLINT_IGNORING)
+    target.write(".hadolint.yml", HADOLINT_IGNORING)
     target.commit()
-    assert findings_of(target.check("--all", "--json")) == plain
+    assert findings_without_folder_size(target.check("--all", "--json")) == plain
     assert_config_changes_the_raw_tools(target)
+    assert_secret_config_changes_raw_gitleaks(target)
+
+
+def findings_without_folder_size(result) -> list:
+    # Exception: the planted files alone push the root over the folder item
+    # limit, so that finding says nothing about configuration.
+    return [item for item in findings_of(result) if item[0] != "clean.folder-items"]
+
+
+def test_tool_environment_ignored(target, tmp_path):
+    write_every_kind(target)
+    target.commit()
+    plain = findings_of(target.check("--all", "--json"))
+    assert {"coding.dockerfile", "security.secret"} <= {item[0] for item in plain}
+    planted = tmp_path / "planted"
+    planted.mkdir()
+    (planted / "gitleaks.toml").write_text(GITLEAKS_WITHOUT_RULES, encoding="utf-8")
+    (planted / "hadolint.yaml").write_text(HADOLINT_IGNORING, encoding="utf-8")
+    hostile = {
+        "GITLEAKS_CONFIG": str(planted / "gitleaks.toml"),
+        "GITLEAKS_CONFIG_TOML": GITLEAKS_WITHOUT_RULES,
+        "XDG_CONFIG_HOME": str(planted),
+        "HOME": str(planted),
+    }
+    gitleaks = ("gitleaks", "dir", *RAW_GITLEAKS, "-i", str(planted), ".env")
+    assert raw_tool(target.path, *gitleaks).stdout.strip() != "[]"
+    assert raw_tool_with(target.path, hostile, *gitleaks).stdout.strip() == "[]"
+    hadolint = ("hadolint", "--format", "json", "Dockerfile")
+    assert raw_tool(target.path, *hadolint).stdout.strip() != "[]"
+    assert raw_tool_with(target.path, hostile, *hadolint).stdout.strip() == "[]"
+    result = subprocess.run(
+        launcher_argv("check", "--all", "--json"),
+        cwd=target.path,
+        env={"PATH": os.environ["PATH"], "TMPDIR": tempfile.gettempdir(), **hostile},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert findings_of(result) == plain
+
+
+def raw_tool_with(cwd, extra: dict, *argv: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        argv,
+        cwd=cwd,
+        env={"PATH": os.environ["PATH"], **extra},
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+
+
+def assert_secret_config_changes_raw_gitleaks(target) -> None:
+    assert raw_tool(target.path, "gitleaks", "dir", *RAW_GITLEAKS, ".").stdout.strip() == "[]"
+    default = target.path.parent / "default.toml"
+    default.write_text("[extend]\nuseDefault = true\n", encoding="utf-8")
+    with_default = ("gitleaks", "dir", *RAW_GITLEAKS, "--config", str(default))
+    assert raw_tool(target.path, *with_default, ".").stdout.strip() == "[]"
+    elsewhere = target.path.parent / "no-ignore-file"
+    elsewhere.mkdir()
+    isolated = raw_tool(target.path, *with_default, "-i", str(elsewhere), ".env")
+    assert isolated.stdout.strip() != "[]"
+    assert raw_tool(target.path, "hadolint", "--format", "json", "Dockerfile").returncode == 0
+    valid = target.path.parent / "hadolint.yaml"
+    valid.write_text("ignored: []\n", encoding="utf-8")
+    plain_hadolint = raw_tool(target.path, "hadolint", "--config", str(valid), "Dockerfile")
+    assert plain_hadolint.returncode == 1
 
 
 def assert_config_changes_the_raw_tools(target) -> None:
@@ -241,8 +316,9 @@ def test_symlink_not_followed(target, tmp_path):
         for output in (("--json",), (), ("--verbose",)):
             result = target.check(*flags, *output)
             assert secret_text not in result.stdout + result.stderr
-            assert "link.py" not in result.stdout + result.stderr
-            assert "linkdir" not in result.stdout + result.stderr
+            for line in [*result.stdout.splitlines(), *result.stderr.splitlines()]:
+                if "link.py" in line or "linkdir" in line:
+                    assert line.startswith("quality: tool gitleaks:"), line
     assert rule_ids(target.check("--all", "--json")) == [F401, F401]
 
 

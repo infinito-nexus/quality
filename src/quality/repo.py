@@ -112,6 +112,29 @@ def parse_raw_diff(raw: bytes) -> list:
     return changes
 
 
+def parse_combined_diff(raw: bytes) -> list:
+    """
+    Args:
+        raw: `git diff-tree -c --raw -z` output: per record one mode and one
+            object ID for each parent and the result, the status, then the path.
+
+    Returns:
+        Entry records of the result side, deleted paths left out.
+    """
+    tokens = iter(raw.split(b"\0"))
+    entries = []
+    for header in tokens:
+        if not header:
+            continue
+        fields = header.decode("ascii").lstrip(":").split(" ")
+        sides = len(fields) // 2
+        path = os.fsdecode(next(tokens))
+        mode, oid = fields[sides - 1], fields[2 * sides - 1]
+        if mode != ZERO_MODE:
+            entries.append(Entry(mode, oid, path))
+    return entries
+
+
 def parse_index_listing(raw: bytes) -> list:
     entries = []
     for token in raw.split(b"\0"):
@@ -235,24 +258,28 @@ class Repo:
         return raw.decode("ascii").split()
 
     def commit_entries(self, commit: str) -> list:
+        """
+        Args:
+            commit: One commit.
+
+        Returns:
+            Every entry the commit holds in a version none of its parents has,
+            so a merge yields only what it resolved itself, never what it took
+            over unchanged from the merged side.
+        """
         raw = self._output(
             "diff-tree",
             "--root",
             "--no-commit-id",
             "-r",
-            "-m",
-            "--first-parent",
+            "-c",
             "--no-renames",
             "-z",
             "--raw",
             commit,
             "--",
         )
-        return [
-            Entry(change.mode, change.oid, change.path)
-            for change in parse_raw_diff(raw)
-            if change.status != "deleted"
-        ]
+        return parse_combined_diff(raw)
 
     def ignore_blob(self, rev: str, limit: int) -> bytes | None:
         entries = parse_tree_listing(self._output("ls-tree", "-z", rev, "--", IGNORE_FILE))

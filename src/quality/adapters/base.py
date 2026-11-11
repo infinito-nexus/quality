@@ -10,9 +10,22 @@ class Bound:
 
 @dataclass(frozen=True, eq=False)
 class Command:
+    """
+    Args:
+        prefix: Arguments before the files.
+        files: The files of this command.
+        bound: The bindings the files came from.
+        log: The tool's stderr once it ran, for an adapter whose findings
+            depend on what the tool logged.
+        rescan: True for the second run over the files an adapter's first
+            run could not read.
+    """
+
     prefix: list
     files: list
     bound: list
+    log: bytes = b""
+    rescan: bool = False
 
 
 def all_files(bound: list) -> list:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 NOCHECK = re.compile(r"nocheck:\s*(?P<rule>[A-Za-z0-9_.\-]+)\s+--\s+\S")
 QUOTES = "\"'`"
+BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,8 @@ def starts_comment(text: str, index: int, marker: str) -> bool:
     if not text.startswith(marker, index):
         return False
     # Exception: `$#` and `${#x}` are shell syntax, so `#` needs leading blank.
-    return marker != "#" or index == 0 or text[index - 1].isspace()
+    # A byte order mark is no blank to isspace(), yet a comment may follow it.
+    return marker != "#" or text[:index] in ("", BOM) or text[index - 1].isspace()
 
 
 def marker_comments(lines: list, marker: str) -> dict:

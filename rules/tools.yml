@@ -34,3 +34,21 @@ lizard:
     - whitelizard.txt
     - lizard_ext/__init__.py
     - lizard_languages/__init__.py
+gitleaks:
+  timeout: 300
+  exit_codes: [0]
+  config: |
+    [extend]
+    useDefault = true
+  loads:
+    - .gitleaks.toml
+    - .gitleaksignore
+hadolint:
+  timeout: 120
+  exit_codes: [0]
+  stderr_fails: true
+  config: |
+    ignored: []
+  loads:
+    - .hadolint.yaml
+    - .hadolint.yml

@@ -6,7 +6,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +14,11 @@ RULES = ROOT / "rules"
 RESERVED = ("tools.yml", "limits.yml", "kinds.yml")
 AUTHOR_NAME = "QualityAuthorCanary"
 AUTHOR_EMAIL = "quality-author-canary@example.invalid"
+# Exception: the token is split, so this repository's own secret scan passes.
+SECRET = "ghp_" + "8fK2mQ7xL4pN9sV1" + "tB6yR3wZ0cH5jD2gA7eU"
+SECRET_ENV_LINE = f"GITHUB_TOKEN={SECRET}\n"
+UNTAGGED_DOCKERFILE = "FROM debian\n"
+RAW_GITLEAKS = ("--no-banner", "--report-format", "json", "--report-path", "-")
 # Exception: -I keeps the target's directory off sys.path. `python -m quality`
 # from the target would import a planted yaml.py before any check runs.
 LAUNCHER = (
@@ -169,14 +173,6 @@ def pending_tools() -> list:
     )
 
 
-def needs_gitleaks() -> None:
-    if shutil.which("gitleaks") is None or "gitleaks" not in tools():
-        pytest.skip(
-            "needs gitleaks: decision 14 names it as the secret scanner, it is not "
-            "installed, and phase C adds its adapter and canary"
-        )
-
-
 def rules_copy(destination: Path) -> Path:
     shutil.copytree(RULES, destination)
     return destination
@@ -234,12 +230,16 @@ def write_every_kind(target: Target) -> None:
         "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
         "      - run: echo ${{ undefined.thing }}\n",
     )
+    target.write("Dockerfile", UNTAGGED_DOCKERFILE)
+    target.write(".env", SECRET_ENV_LINE)
 
 
 EVERY_KIND_RULES = {
     "coding.unused-import",
     "coding.shell-lint",
     "coding.workflow-lint",
+    "coding.dockerfile",
     "clean.complexity",
     "clean.tool-pragma",
+    "security.secret",
 }

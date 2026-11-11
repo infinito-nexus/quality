@@ -2,6 +2,7 @@ from tests.integration.support import report, rule_for, rule_ids, rules_without_
 
 F401 = rule_for("F401")
 EVAL = "security.eval-exec"
+DOCKERFILE = "coding.dockerfile"
 IGNORE = ".qualityignore.yml"
 
 
@@ -202,6 +203,19 @@ def test_nocheck_in_a_shell_comment(target):
     target.write("s.sh", '#!/bin/bash\necho $1 "# nocheck: coding.shell-lint -- fixture"\n')
     target.stage()
     assert target.check("--staged").returncode == 1
+
+
+def test_nocheck_in_a_dockerfile_comment(target):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    target.write("Dockerfile", f"FROM debian:13\nRUN echo $1  # nocheck: {DOCKERFILE} -- fixture\n")
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 0, result.stderr
+    assert report(result)["nocheck"] == [{"path": "Dockerfile", "line": 2, "rule": DOCKERFILE}]
+    target.write("Dockerfile", "FROM debian:13\nRUN echo $1\n")
+    target.stage()
+    assert rule_ids(target.check("--staged", "--json")) == [DOCKERFILE]
 
 
 def test_nocheck_applies_to_every_tool_line(target):

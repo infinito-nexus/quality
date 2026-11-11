@@ -12,6 +12,7 @@ import pytest
 from tests.integration.support import (
     ROOT,
     Target,
+    catalogue,
     git,
     pending_tools,
     report,
@@ -122,7 +123,7 @@ def test_wheel_runs_from_its_packaged_rules(wheel, target, tmp_path):
 def test_all_on_this_repository(tmp_path):
     pending = pending_tools()
     if pending:
-        pytest.skip(f"pending rules need {', '.join(pending)}: the deep tier and secret scanner are phase C")
+        pytest.skip(f"pending rules need {', '.join(pending)}: phase C adds their adapters")
     copy = Target.create(tmp_path / "self")
     copy_of_this_repository(copy.path)
     copy.commit()
@@ -137,6 +138,16 @@ def test_all_on_this_repository_reports_what_it_cannot_claim(tmp_path):
     document = report(result)
     assert document["findings"] == []
     assert result.returncode == 2
-    assert "security.secret" in document["incomplete"]
+    assert [entry for entry in document["ignored"] if entry["rule"] == "coding.dockerfile"] == []
+    assert {"path": "service/dev/Dockerfile", "line": 2, "rule": "coding.dockerfile"} in (
+        document["nocheck"]
+    )
+    pending = sorted(rule["id"] for rule in catalogue() if rule.get("pending"))
+    assert sorted(document["incomplete"]) == pending
+    assert "security.secret" not in pending
+    assert "coding.dockerfile" not in pending
     reduced = rules_without_pending(tmp_path / "rules")
-    assert copy.check("--all", "--rules", str(reduced)).returncode == 0
+    verbose = copy.check("--all", "--verbose", "--rules", str(reduced))
+    assert verbose.returncode == 0, verbose.stdout
+    for tool in ("gitleaks", "hadolint"):
+        assert f"tool {tool}: exit 0" in verbose.stderr

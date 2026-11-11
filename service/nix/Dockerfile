@@ -2,10 +2,12 @@ FROM nixos/nix:2.35.2 AS closure
 ARG PACKAGE
 WORKDIR /build
 COPY flake.nix flake.lock ./
+# Exception: cp -a per store path drops hard links shared across paths, which only an optimised store holds.
 RUN test -n "${PACKAGE}" \
  && nix --extra-experimental-features "nix-command flakes" build "path:/build#${PACKAGE}" --out-link /package \
  && mkdir -p /image/nix/store /image/bin /image/etc/ssl/certs /image/src /image/tmp \
- && cp -a $(nix-store --query --requisites /package) /image/nix/store/ \
+ && nix-store --query --requisites /package > /tmp/closure \
+ && while read -r path; do cp -a "$path" /image/nix/store/ || exit 1; done < /tmp/closure \
  && ln -s "$(readlink -f /package)"/bin/* /image/bin/ \
  && chown 65534:65534 /image/src \
  && chmod 1777 /image/tmp
@@ -26,6 +28,7 @@ ENV PATH=/bin \
     GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt
 USER 65534:65534
 WORKDIR /src
+HEALTHCHECK NONE
 
 FROM scratch AS proxy
 COPY --from=closure /image/ /
