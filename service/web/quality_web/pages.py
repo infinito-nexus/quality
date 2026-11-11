@@ -9,6 +9,7 @@ from flask import (
     current_app,
     redirect,
     render_template,
+    render_template_string,
     request,
     url_for,
 )
@@ -20,6 +21,7 @@ SESSION_COOKIE = "__Host-quality-session"
 LOGIN_COOKIE = "__Host-quality-login"
 LOGIN_COOKIE_SECONDS = 600
 LEGAL_LANGUAGES = ("en", "de")
+LEGAL_CONTEXT = ("controller", "limits", "resolvers", "host_log_days")
 
 pages = Blueprint("pages", __name__)
 
@@ -30,6 +32,12 @@ def quality():
 
 def current_user():
     return quality()["login"].identity(request.cookies.get(SESSION_COOKIE))
+
+
+@pages.before_app_request
+def sweep_memory():
+    quality()["login"].sweep()
+    quality()["limiter"].sweep()
 
 
 @pages.app_context_processor
@@ -169,9 +177,11 @@ def legal(page):
     language = request.args.get("lang", "en")
     if language not in LEGAL_LANGUAGES:
         abort(404)
-    path = os.path.join(quality()["settings"]["legal_dir"], language, f"{page}.html")
+    settings = quality()["settings"]
+    path = os.path.join(settings["legal_dir"], language, f"{page}.html")
     with open(path, encoding="utf-8") as handle:
-        return render_template("legal.html", body=Markup(handle.read()))
+        body = render_template_string(handle.read(), **{key: settings[key] for key in LEGAL_CONTEXT})
+    return render_template("legal.html", body=Markup(body))
 
 
 @pages.get("/notices")

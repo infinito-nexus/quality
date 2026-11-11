@@ -36,6 +36,14 @@ class Limiter:
         daily = hmac.new(self.secret, day, hashlib.sha256).digest()
         return kind, hmac.new(daily, identity.encode(), hashlib.sha256).hexdigest(), hour
 
+    def prune(self, hour):
+        self.counts = Counter({key: count for key, count in self.counts.items() if key[2] == hour})
+
+    def sweep(self):
+        hour = int(time.time() // 3600)
+        with self.lock:
+            self.prune(hour)
+
     def allow(self, checks):
         """
         Args:
@@ -46,7 +54,7 @@ class Limiter:
         """
         hour = int(time.time() // 3600)
         with self.lock:
-            self.counts = Counter({key: count for key, count in self.counts.items() if key[2] == hour})
+            self.prune(hour)
             keys = [(self.key(kind, identity, hour), limit) for kind, identity, limit in checks]
             if any(self.counts[key] >= limit for key, limit in keys):
                 return False

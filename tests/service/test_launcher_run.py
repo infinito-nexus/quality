@@ -308,6 +308,16 @@ def test_db_update_failure_alerts(harness):
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db,readonly" in scan
 
 
+def test_steps_keep_no_container_log(harness):
+    database(harness, 30)
+    harness.submit(1, {"kind": "url", "url": "https://example.org/a/b"})
+    harness.submit(2, text_job())
+    harness.run()
+    runs = harness.runs()
+    assert {step_of(call) for call in runs} == {"fetch", "prepare", "scan", "database"}
+    assert all("--log-driver=none" in call["argv"] for call in runs)
+
+
 def test_submission_deleted(harness):
     harness.submit(1, text_job("canary-submission = 1\n"))
     harness.run()

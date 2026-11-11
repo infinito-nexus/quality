@@ -2,29 +2,61 @@
 {% block title %}Notices{% endblock %}
 {% block main %}
 <h1>Notices</h1>
-<p>The scan image bundles these tools, pinned through the repository's <code>flake.lock</code>. The service itself is MIT licensed.</p>
-<table>
-  <thead><tr><th>Component</th><th>Licence</th></tr></thead>
+<p>The code of this service and its scan rules are MIT licensed. Their source and the build files of every image are at <a href="https://github.com/infinito-nexus/quality">github.com/infinito-nexus/quality</a>, where <code>flake.nix</code> names the packages below and <code>flake.lock</code> pins their revisions.</p>
+<h2>Scan and proxy images</h2>
+<p>The scan image bundles every package below except squid, which the proxy image bundles, each with its runtime dependencies. All of them are built from nixpkgs revision <code>1d060086d60cb76a40cf37109f979d88a5bd6396</code> (nixos-unstable), except semgrep, which is built from nixpkgs revision <code>c56a87d8e41ce69bd2af57eb35dcc117a9dfca33</code> (nixos-26.05). Each licence is the one nixpkgs declares for the package at that revision.</p>
+<table id="nix">
+  <thead><tr><th>nixpkgs attribute</th><th>Licence</th><th>Project</th></tr></thead>
   <tbody>
-    <tr><td>actionlint</td><td>MIT</td></tr>
-    <tr><td>ast-grep</td><td>MIT</td></tr>
-    <tr><td>gitleaks</td><td>MIT</td></tr>
-    <tr><td>lizard</td><td>MIT</td></tr>
-    <tr><td>ruff</td><td>MIT</td></tr>
-    <tr><td>ripgrep</td><td>Unlicense or MIT</td></tr>
-    <tr><td>osv-scanner</td><td>Apache-2.0</td></tr>
-    <tr><td>trivy</td><td>Apache-2.0</td></tr>
-    <tr><td>hadolint</td><td>GPL-3.0-only</td></tr>
-    <tr><td>ShellCheck</td><td>GPL-3.0-only</td></tr>
-    <tr><td>semgrep</td><td>LGPL-2.1-or-later</td></tr>
-    <tr><td>git</td><td>GPL-2.0-only</td></tr>
-    <tr><td>Squid (egress proxy)</td><td>GPL-2.0-or-later</td></tr>
-    <tr><td>ALTCHA widget and library</td><td>MIT</td></tr>
-    <tr><td>Flask</td><td>BSD-3-Clause</td></tr>
-    <tr><td>Authlib</td><td>BSD-3-Clause</td></tr>
-    <tr><td>gunicorn</td><td>MIT</td></tr>
-    <tr><td>requests</td><td>Apache-2.0</td></tr>
+    <tr><td><code>actionlint</code></td><td>MIT</td><td><a href="https://rhysd.github.io/actionlint/">rhysd.github.io/actionlint</a></td></tr>
+    <tr><td><code>ast-grep</code></td><td>MIT</td><td><a href="https://ast-grep.github.io/">ast-grep.github.io</a></td></tr>
+    <tr><td><code>gitleaks</code></td><td>MIT</td><td><a href="https://github.com/gitleaks/gitleaks">github.com/gitleaks/gitleaks</a></td></tr>
+    <tr><td><code>hadolint</code></td><td>GPL-3.0-only</td><td><a href="https://hackage.haskell.org/package/hadolint">hackage.haskell.org/package/hadolint</a></td></tr>
+    <tr><td><code>osv-scanner</code></td><td>Apache-2.0</td><td><a href="https://github.com/google/osv-scanner">github.com/google/osv-scanner</a></td></tr>
+    <tr><td><code>python3Packages.lizard</code></td><td>MIT</td><td><a href="http://www.lizard.ws">www.lizard.ws</a></td></tr>
+    <tr><td><code>ripgrep</code></td><td>Unlicense, MIT</td><td><a href="https://github.com/BurntSushi/ripgrep">github.com/BurntSushi/ripgrep</a></td></tr>
+    <tr><td><code>ruff</code></td><td>MIT</td><td><a href="https://github.com/astral-sh/ruff">github.com/astral-sh/ruff</a></td></tr>
+    <tr><td><code>semgrep</code></td><td>LGPL-2.1-or-later</td><td><a href="https://semgrep.dev/">semgrep.dev</a></td></tr>
+    <tr><td><code>shellcheck</code></td><td>GPL-3.0-only</td><td><a href="https://hackage.haskell.org/package/ShellCheck">hackage.haskell.org/package/ShellCheck</a></td></tr>
+    <tr><td><code>trivy</code></td><td>Apache-2.0</td><td><a href="https://github.com/aquasecurity/trivy">github.com/aquasecurity/trivy</a></td></tr>
+    <tr><td><code>python3</code></td><td>Python-2.0</td><td><a href="https://www.python.org">www.python.org</a></td></tr>
+    <tr><td><code>python3Packages.pathspec</code></td><td>MPL-2.0</td><td><a href="https://github.com/cpburnz/python-path-specification">github.com/cpburnz/python-path-specification</a></td></tr>
+    <tr><td><code>python3Packages.pyyaml</code></td><td>MIT</td><td><a href="https://github.com/yaml/pyyaml">github.com/yaml/pyyaml</a></td></tr>
+    <tr><td><code>bash</code></td><td>GPL-3.0-or-later</td><td><a href="https://www.gnu.org/software/bash/">www.gnu.org/software/bash</a></td></tr>
+    <tr><td><code>cacert</code></td><td>MPL-2.0</td><td><a href="https://firefox-source-docs.mozilla.org/security/nss/runbooks/rootstore.html">firefox-source-docs.mozilla.org</a></td></tr>
+    <tr><td><code>coreutils</code></td><td>GPL-3.0-or-later</td><td><a href="https://www.gnu.org/software/coreutils/">www.gnu.org/software/coreutils</a></td></tr>
+    <tr><td><code>git</code></td><td>GPL-2.0-only</td><td><a href="https://git-scm.com/">git-scm.com</a></td></tr>
+    <tr><td><code>squid</code></td><td>GPL-2.0-or-later</td><td><a href="http://www.squid-cache.org">www.squid-cache.org</a></td></tr>
   </tbody>
 </table>
-<p>Source of the GPL tools: <a href="https://github.com/NixOS/nixpkgs">nixpkgs</a> at the revision in <code>flake.lock</code> of <a href="https://github.com/infinito-nexus/quality">infinito-nexus/quality</a>.</p>
+<h2>Source code</h2>
+<p>nixpkgs at <a href="https://github.com/NixOS/nixpkgs">github.com/NixOS/nixpkgs</a> holds, at the revisions above, the build recipe and the patches of every package and pins its upstream source by hash. <code>nix build github:NixOS/nixpkgs/&lt;revision&gt;#&lt;attribute&gt;.src</code> fetches that upstream source, for example for the GPL licensed bash, coreutils, git, hadolint, shellcheck and squid.</p>
+<h2>Web image</h2>
+<p>The web image builds on the official Docker image <code>python:3.14-slim-trixie</code>. Its Debian packages carry their own licences, and their source is in the Debian archive at <a href="https://sources.debian.org">sources.debian.org</a>. On top of it, the image adds these Python packages from PyPI, pinned in <code>service/web/requirements.txt</code>, and the ALTCHA widget from npm. Each licence is the one the package metadata declares.</p>
+<table id="web">
+  <thead><tr><th>Package</th><th>Version</th><th>Licence</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td><code>altcha</code></td><td>2.3.0</td><td>MIT</td><td><a href="https://pypi.org/project/altcha/2.3.0/">pypi.org/project/altcha</a></td></tr>
+    <tr><td><code>authlib</code></td><td>1.9.1</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/authlib/1.9.1/">pypi.org/project/authlib</a></td></tr>
+    <tr><td><code>blinker</code></td><td>1.9.0</td><td>MIT</td><td><a href="https://pypi.org/project/blinker/1.9.0/">pypi.org/project/blinker</a></td></tr>
+    <tr><td><code>certifi</code></td><td>2026.10.23</td><td>MPL-2.0</td><td><a href="https://pypi.org/project/certifi/2026.10.23/">pypi.org/project/certifi</a></td></tr>
+    <tr><td><code>cffi</code></td><td>2.1.1</td><td>MIT-0</td><td><a href="https://pypi.org/project/cffi/2.1.1/">pypi.org/project/cffi</a></td></tr>
+    <tr><td><code>charset-normalizer</code></td><td>3.5.2</td><td>MIT</td><td><a href="https://pypi.org/project/charset-normalizer/3.5.2/">pypi.org/project/charset-normalizer</a></td></tr>
+    <tr><td><code>click</code></td><td>8.5.0</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/click/8.5.0/">pypi.org/project/click</a></td></tr>
+    <tr><td><code>cryptography</code></td><td>50.0.2</td><td>Apache-2.0 OR BSD-3-Clause</td><td><a href="https://pypi.org/project/cryptography/50.0.2/">pypi.org/project/cryptography</a></td></tr>
+    <tr><td><code>flask</code></td><td>3.1.3</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/flask/3.1.3/">pypi.org/project/flask</a></td></tr>
+    <tr><td><code>gunicorn</code></td><td>26.2.0</td><td>MIT</td><td><a href="https://pypi.org/project/gunicorn/26.2.0/">pypi.org/project/gunicorn</a></td></tr>
+    <tr><td><code>idna</code></td><td>3.20</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/idna/3.20/">pypi.org/project/idna</a></td></tr>
+    <tr><td><code>itsdangerous</code></td><td>2.2.0</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/itsdangerous/2.2.0/">pypi.org/project/itsdangerous</a></td></tr>
+    <tr><td><code>jinja2</code></td><td>3.1.6</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/jinja2/3.1.6/">pypi.org/project/jinja2</a></td></tr>
+    <tr><td><code>joserfc</code></td><td>1.7.7</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/joserfc/1.7.7/">pypi.org/project/joserfc</a></td></tr>
+    <tr><td><code>markupsafe</code></td><td>3.0.4</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/markupsafe/3.0.4/">pypi.org/project/markupsafe</a></td></tr>
+    <tr><td><code>packaging</code></td><td>25.0</td><td>Apache-2.0 OR BSD-2-Clause</td><td><a href="https://pypi.org/project/packaging/25.0/">pypi.org/project/packaging</a></td></tr>
+    <tr><td><code>pycparser</code></td><td>3.12</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/pycparser/3.12/">pypi.org/project/pycparser</a></td></tr>
+    <tr><td><code>requests</code></td><td>2.34.2</td><td>Apache-2.0</td><td><a href="https://pypi.org/project/requests/2.34.2/">pypi.org/project/requests</a></td></tr>
+    <tr><td><code>urllib3</code></td><td>2.8.0</td><td>MIT</td><td><a href="https://pypi.org/project/urllib3/2.8.0/">pypi.org/project/urllib3</a></td></tr>
+    <tr><td><code>werkzeug</code></td><td>3.1.9</td><td>BSD-3-Clause</td><td><a href="https://pypi.org/project/werkzeug/3.1.9/">pypi.org/project/werkzeug</a></td></tr>
+    <tr><td><code>altcha (widget)</code></td><td>3.5.0</td><td>MIT</td><td><a href="https://github.com/altcha-org/altcha">github.com/altcha-org/altcha</a></td></tr>
+  </tbody>
+</table>
 {% endblock %}

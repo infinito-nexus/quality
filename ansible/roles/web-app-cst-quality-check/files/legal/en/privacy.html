@@ -1,14 +1,33 @@
 <h1>Privacy</h1>
-<h2>What is processed</h2>
+<h2>Controller</h2>
+<p>
+  {{ controller.name }}<br>
+  {{ controller.street }}<br>
+  {{ controller.postal_code }} {{ controller.city }}<br>
+  {{ controller.country }}<br>
+  Email: <a href="mailto:{{ controller.email }}">{{ controller.email }}</a>
+</p>
+<h2>What is processed, why, and on which legal basis</h2>
 <ul>
-  <li>The repository URL, file or text you submit. It is scanned by static tools only and never executed. It is deleted when its job ends and is never served back.</li>
-  <li>The report: rule, path, line, severity and a fixed summary per finding, the commit of a repository and the applied exclusions. It holds no address, user name or email.</li>
-  <li>Your network address, only in process memory and only as a keyed hash that changes every day, to enforce rate limits. A restart of the service drops it.</li>
-  <li>After a login: your user name and whether you belong to the service's group, only in process memory for the session.</li>
+  <li>The repository URL, file or text you submit, to scan it as you ask. It is scanned by static tools only and never executed. It is deleted when its job ends, for an anonymous URL submission except for the keyed hash of the host name described below, and is never served back. Legal basis: Art. 6(1)(b) GDPR, providing the service you use.</li>
+  <li>The report: rule, path, line, severity and a fixed summary per finding, the commit of a repository and the applied exclusions. It holds no address, user name or email. Legal basis: Art. 6(1)(b) GDPR, providing the service you use.</li>
+  <li>Your network address, to limit submissions and to protect the service against abuse. It is processed in process memory only. The rate limit counters keep only a keyed hash of it, of its /64 prefix for IPv6, with a key that changes every day. Legal basis: Art. 6(1)(f) GDPR. The legitimate interest is to keep the service available to everyone and to stop abuse.</li>
+  <li>The host name of a repository URL submitted without login, to limit how often the service fetches from one host. The rate limit keeps only a keyed hash of it, in process memory for the current hour. Legal basis: Art. 6(1)(f) GDPR. The legitimate interest is to keep the service from being turned against one host.</li>
+  <li>After an optional login, to grant the limits of your account: the controller's own Keycloak sends the service tokens with your user ID, your user name, the profile details of your account, such as your full name, and the paths of all groups you belong to. The service checks the tokens and keeps only your user name and whether you belong to its member group, in process memory for the session. It stores nothing else from the tokens. The rate limit of your account counts a keyed hash of the user name. Legal basis: Art. 6(1)(b) GDPR, providing the service you use.</li>
 </ul>
+<h2>Recipients</h2>
+<p>Apart from the two below, there are no recipients outside the controller. To fetch a repository, the service connects to the host you named, which receives the host name, the repository path, the service's address and a fixed user agent, but not your address. Before that, the proxy asks the DNS resolvers it is configured with ({{ resolvers | join(', ') }}) for the address of that host, and their operator receives the host name and the service's address. Legal basis for both: Art. 6(1)(b) GDPR, providing the service you use.{% if resolvers | sort == ['149.112.112.112', '9.9.9.9'] %} These are the resolvers of Quad9, based in Switzerland, a third country. The transfer rests on the Commission's adequacy decision for Switzerland (Decision 2000/518/EC), which remains in force under Art. 45(9) GDPR.{% endif %} The controller also runs the Keycloak login. Whoever you give a report link to can open that report until it is deleted.</p>
 <h2>How long</h2>
-<p>Reports are deleted 48 hours after they were written. Job data lives on a memory file system and is gone after the job or a reboot.</p>
+<p>Reports are deleted {{ limits.retention_hours }} hours after they were written. Job data lives on a memory file system and is gone after the job or a reboot. Rate limit counters cover the current hour. A session ends at logout, which removes it at once, or after {{ limits.session_hours }} hours. Expired sessions and the counters of past hours are removed from memory with the next request the service handles. A restart of the service drops all counters and sessions.</p>
 <h2>What is not processed</h2>
-<p>The web server of this service writes no access log and no error log for it. Connection setup before the server name is known (TLS handshake errors) can still appear in the host-wide log of the web server. No tracking, no analytics, no cookie for anonymous visitors, and the captcha runs in your browser without contacting a third party.</p>
+<p>The web server writes no access log and no error log for this service. Other parts of the platform still write lines to the host's system journal, each with the client's network address: TLS handshake errors that occur before the browser names the server (SNI); requests over plain HTTP, to the www. variant or to an alias domain of the service, which the web server only redirects, with path and user agent; and, when you log in or out, access lines of the controller's Keycloak with path and user agent, and Keycloak event lines with the service's client ID. If the platform runs its central log store (Loki), the journal lines are copied there, possibly to another host of the controller. These lines are kept for at most {{ host_log_days }} days. Legal basis for that: Art. 6(1)(f) GDPR, the secure operation of the platform. The containers that fetch and scan a submission keep no container log. No tracking, no analytics, no cookie for anonymous visitors, and the captcha runs in your browser without contacting a third party.</p>
 <h2>Outbound requests</h2>
 <p>To fetch a repository, the service connects to the host you named, through a proxy that refuses private and local addresses. That host sees the service's address and a fixed user agent, not yours.</p>
+<h2>Your rights</h2>
+<p>Under Art. 15 to 21 GDPR you have the right of access, rectification, erasure, restriction of processing and data portability, and the right to object. To use them, write to the controller's email address above.</p>
+<p>Right to object: on grounds relating to your particular situation, you can object at any time to processing based on Art. 6(1)(f) GDPR (Art. 21 GDPR).</p>
+<p>You also have the right to lodge a complaint with a supervisory authority (Art. 77 GDPR), in particular in the member state of your habitual residence, your place of work or the place of the alleged infringement.</p>
+<h2>Automated decisions</h2>
+<p>There is no automated decision-making, including profiling, within the meaning of Art. 22 GDPR.</p>
+<h2>Obligation to provide data</h2>
+<p>You are not obliged to provide any data. Without your network address the service cannot answer, and without a submission there is nothing to scan.</p>

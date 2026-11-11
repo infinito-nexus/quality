@@ -3,6 +3,16 @@
   "legal_dir": "/legal",
   "secret_file": "/run/secrets/web",
   "public_url": "http://localhost:18098",
+  "controller": {
+    "name": "Local inspection",
+    "street": "Example Street 1",
+    "postal_code": "00000",
+    "city": "Example City",
+    "country": "Example Country",
+    "email": "privacy@example.org"
+  },
+  "resolvers": ["127.0.0.11"],
+  "host_log_days": 38,
   "access": {"anonymous": true, "captcha": true},
   "rate_limits": {
     "anonymous_per_ip_hour": 30,

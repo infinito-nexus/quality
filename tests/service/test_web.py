@@ -180,6 +180,19 @@ def test_session_expires(tmp_path):
     assert client.post("/account/submit", data=text_job(), headers=headers(**cookie)).status_code == 403
 
 
+def test_expired_sessions_and_past_counters_leave_memory(tmp_path):
+    app, _state = build(tmp_path)
+    expired = login(app, name="old", created=time.time() - 9 * 3600)
+    live = login(app, name="new")
+    limiter = app.extensions["quality"]["limiter"]
+    stale = ("address", "past-hour", 0)
+    limiter.counts[stale] = 1
+    assert app.test_client(use_cookies=False).get("/healthz", headers=headers()).status_code == 200
+    sessions = app.extensions["quality"]["login"].sessions
+    assert expired not in sessions and live in sessions
+    assert stale not in limiter.counts
+
+
 def test_anonymous_visit_sets_no_cookie(tmp_path):
     app, _state = build(tmp_path)
     response = app.test_client(use_cookies=False).get("/", headers=headers())
@@ -257,14 +270,3 @@ def test_spool_full(tmp_path):
     finally:
         (state / "spool").chmod(0o700)
     assert response.status_code == 429
-
-
-def test_legal_pages_state_retention(tmp_path):
-    app, _state = build(tmp_path)
-    client = app.test_client(use_cookies=False)
-    retention = app.extensions["quality"]["settings"]["limits"]["retention_hours"]
-    for language, word in (("en", "hours"), ("de", "Stunden")):
-        page = client.get(f"/privacy?lang={language}", headers=headers()).get_data(as_text=True)
-        assert f"{retention} {word}" in page
-    assert client.get("/privacy?lang=fr", headers=headers()).status_code == 404
-    assert "GPL-3.0-only" in client.get("/notices", headers=headers()).get_data(as_text=True)

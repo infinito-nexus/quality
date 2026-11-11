@@ -1,14 +1,33 @@
 <h1>Datenschutz</h1>
-<h2>Was verarbeitet wird</h2>
+<h2>Verantwortlicher</h2>
+<p>
+  {{ controller.name }}<br>
+  {{ controller.street }}<br>
+  {{ controller.postal_code }} {{ controller.city }}<br>
+  {{ controller.country }}<br>
+  E-Mail: <a href="mailto:{{ controller.email }}">{{ controller.email }}</a>
+</p>
+<h2>Was verarbeitet wird, wozu und auf welcher Rechtsgrundlage</h2>
 <ul>
-  <li>Die eingereichte Repository-URL, Datei oder der eingefügte Text. Sie werden nur von statischen Werkzeugen geprüft und nie ausgeführt, am Ende des Auftrags gelöscht und nie wieder ausgeliefert.</li>
-  <li>Der Bericht: je Befund Regel, Pfad, Zeile, Schweregrad und eine feste Zusammenfassung, bei Repositories der Commit, dazu die angewandten Ausnahmen. Er enthält keine Adresse, keinen Benutzernamen und keine E-Mail.</li>
-  <li>Ihre Netzwerkadresse, nur im Arbeitsspeicher und nur als täglich wechselnder Schlüssel-Hash, um Ratenlimits durchzusetzen. Ein Neustart des Dienstes verwirft sie.</li>
-  <li>Nach einer Anmeldung: Ihr Benutzername und ob Sie zur Gruppe des Dienstes gehören, nur im Arbeitsspeicher für die Sitzung.</li>
+  <li>Die eingereichte Repository-URL, Datei oder der eingefügte Text, um sie wie gewünscht zu prüfen. Sie werden nur von statischen Werkzeugen geprüft und nie ausgeführt. Sie werden am Ende des Auftrags gelöscht, bei einer anonymen URL-Einreichung bis auf den unten beschriebenen Schlüssel-Hash des Hostnamens, und nie wieder ausgeliefert. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO, die Bereitstellung des Dienstes, den Sie nutzen.</li>
+  <li>Der Bericht: je Befund Regel, Pfad, Zeile, Schweregrad und eine feste Zusammenfassung, bei Repositories der Commit, dazu die angewandten Ausnahmen. Er enthält keine Adresse, keinen Benutzernamen und keine E-Mail. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO, die Bereitstellung des Dienstes, den Sie nutzen.</li>
+  <li>Ihre Netzwerkadresse, um Einreichungen zu begrenzen und den Dienst vor Missbrauch zu schützen. Sie wird nur im Arbeitsspeicher des Prozesses verarbeitet. Die Zähler der Ratenlimits halten nur einen Schlüssel-Hash davon, bei IPv6 von ihrem /64-Präfix, mit einem Schlüssel, der täglich wechselt. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse ist, den Dienst für alle verfügbar zu halten und Missbrauch zu stoppen.</li>
+  <li>Der Hostname einer ohne Anmeldung eingereichten Repository-URL, um zu begrenzen, wie oft der Dienst von einem Host holt. Das Ratenlimit hält nur einen Schlüssel-Hash davon, im Arbeitsspeicher des Prozesses für die laufende Stunde. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse ist, zu verhindern, dass der Dienst gegen einen Host gerichtet wird.</li>
+  <li>Nach einer freiwilligen Anmeldung, um die Limits Ihres Kontos zu gewähren: Das eigene Keycloak des Verantwortlichen sendet dem Dienst Tokens mit Ihrer Benutzer-ID, Ihrem Benutzernamen, den Profilangaben Ihres Kontos, etwa Ihrem vollen Namen, und den Pfaden aller Gruppen, denen Sie angehören. Der Dienst prüft die Tokens und behält nur Ihren Benutzernamen und ob Sie zu seiner Mitgliedergruppe gehören, im Arbeitsspeicher des Prozesses für die Sitzung. Sonst speichert er nichts aus den Tokens. Das Ratenlimit Ihres Kontos zählt einen Schlüssel-Hash des Benutzernamens. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO, die Bereitstellung des Dienstes, den Sie nutzen.</li>
 </ul>
+<h2>Empfänger</h2>
+<p>Abgesehen von den beiden folgenden gibt es keine Empfänger außerhalb des Verantwortlichen. Um ein Repository zu holen, verbindet sich der Dienst mit dem genannten Host, der den Hostnamen, den Pfad des Repositorys, die Adresse des Dienstes und eine feste Kennung erhält, aber nicht Ihre Adresse. Zuvor fragt der Proxy die DNS-Resolver, mit denen er eingerichtet ist ({{ resolvers | join(', ') }}), nach der Adresse dieses Hosts, und ihr Betreiber erhält den Hostnamen und die Adresse des Dienstes. Rechtsgrundlage für beides: Art. 6 Abs. 1 lit. b DSGVO, die Bereitstellung des Dienstes, den Sie nutzen.{% if resolvers | sort == ['149.112.112.112', '9.9.9.9'] %} Dies sind die Resolver von Quad9 mit Sitz in der Schweiz, einem Drittland. Die Übermittlung stützt sich auf den Angemessenheitsbeschluss der Kommission für die Schweiz (Entscheidung 2000/518/EG), der nach Art. 45 Abs. 9 DSGVO in Kraft bleibt.{% endif %} Der Verantwortliche betreibt auch die Keycloak-Anmeldung. Wem Sie einen Berichtslink geben, kann diesen Bericht öffnen, bis er gelöscht wird.</p>
 <h2>Wie lange</h2>
-<p>Berichte werden 48 Stunden nach ihrer Erstellung gelöscht. Auftragsdaten liegen in einem Dateisystem im Arbeitsspeicher und sind nach dem Auftrag oder einem Neustart weg.</p>
+<p>Berichte werden {{ limits.retention_hours }} Stunden nach ihrer Erstellung gelöscht. Auftragsdaten liegen in einem Dateisystem im Arbeitsspeicher und sind nach dem Auftrag oder einem Neustart weg. Die Zähler der Ratenlimits gelten für die laufende Stunde. Eine Sitzung endet mit der Abmeldung, die sie sofort entfernt, oder nach {{ limits.session_hours }} Stunden. Abgelaufene Sitzungen und die Zähler vergangener Stunden entfernt der Dienst mit der nächsten Anfrage, die er bearbeitet, aus dem Arbeitsspeicher. Ein Neustart des Dienstes verwirft alle Zähler und Sitzungen.</p>
 <h2>Was nicht verarbeitet wird</h2>
-<p>Der Webserver dieses Dienstes schreibt dafür kein Zugriffs- und kein Fehlerprotokoll. Der Verbindungsaufbau vor Bekanntwerden des Servernamens (Fehler im TLS-Handshake) kann weiterhin im hostweiten Protokoll des Webservers erscheinen. Kein Tracking, keine Analyse, kein Cookie für anonyme Besuche, und das Captcha läuft in Ihrem Browser, ohne einen Dritten zu kontaktieren.</p>
+<p>Der Webserver schreibt für diesen Dienst kein Zugriffs- und kein Fehlerprotokoll. Andere Teile der Plattform schreiben trotzdem Zeilen in das Systemjournal des Hosts, jeweils mit der Netzwerkadresse des Clients: Fehler im TLS-Handshake, bevor der Browser den Servernamen nennt (SNI); Anfragen über unverschlüsseltes HTTP, an die www.-Variante oder an eine Alias-Domain des Dienstes, die der Webserver nur umleitet, mit Pfad und Browserkennung; und wenn Sie sich an- oder abmelden, Zugriffszeilen des Keycloak des Verantwortlichen mit Pfad und Browserkennung sowie Ereigniszeilen von Keycloak mit der Client-ID des Dienstes. Betreibt die Plattform ihren zentralen Protokollspeicher (Loki), werden die Zeilen des Journals dorthin kopiert, womöglich auf einen anderen Host des Verantwortlichen. Diese Zeilen bleiben höchstens {{ host_log_days }} Tage erhalten. Rechtsgrundlage dafür: Art. 6 Abs. 1 lit. f DSGVO, der sichere Betrieb der Plattform. Die Container, die eine Einreichung holen und prüfen, führen kein Container-Protokoll. Kein Tracking, keine Analyse, kein Cookie für anonyme Besuche, und das Captcha läuft in Ihrem Browser, ohne einen Dritten zu kontaktieren.</p>
 <h2>Ausgehende Anfragen</h2>
 <p>Um ein Repository zu holen, verbindet sich der Dienst über einen Proxy, der private und lokale Adressen ablehnt, mit dem genannten Host. Dieser sieht die Adresse des Dienstes und eine feste Kennung, nicht Ihre.</p>
+<h2>Ihre Rechte</h2>
+<p>Nach Art. 15 bis 21 DSGVO haben Sie das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit sowie das Recht auf Widerspruch. Schreiben Sie dazu an die E-Mail-Adresse des Verantwortlichen oben.</p>
+<p>Widerspruchsrecht: Aus Gründen, die sich aus Ihrer besonderen Situation ergeben, können Sie der Verarbeitung auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO jederzeit widersprechen (Art. 21 DSGVO).</p>
+<p>Sie haben außerdem das Recht, sich bei einer Aufsichtsbehörde zu beschweren (Art. 77 DSGVO), insbesondere im Mitgliedstaat Ihres Aufenthaltsorts, Ihres Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes.</p>
+<h2>Automatisierte Entscheidungen</h2>
+<p>Eine automatisierte Entscheidungsfindung einschließlich Profiling im Sinne von Art. 22 DSGVO findet nicht statt.</p>
+<h2>Pflicht zur Bereitstellung</h2>
+<p>Sie sind nicht verpflichtet, Daten bereitzustellen. Ohne Ihre Netzwerkadresse kann der Dienst nicht antworten, und ohne Einreichung gibt es nichts zu prüfen.</p>

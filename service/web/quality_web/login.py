@@ -108,6 +108,11 @@ class Login:
             return None
         return token.claims
 
+    def sweep(self):
+        cutoff = time.time() - self.session_seconds
+        with self.lock:
+            self.sessions = {token: session for token, session in self.sessions.items() if session["created"] >= cutoff}
+
     def identity(self, token):
         """
         Args:

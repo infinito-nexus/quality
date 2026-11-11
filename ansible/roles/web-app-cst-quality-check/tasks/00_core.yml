@@ -7,6 +7,17 @@
     fail_msg: "{{ application_id }} deploys in compose mode only, not in {{ DEPLOYMENT_MODE }} mode: swarm drops the per-service runtime and the launcher runs per node"
     quiet: true
 
+- name: "⚖️ Refuse core's demo controller on the privacy pages of '{{ application_id }}'"
+  ansible.builtin.assert:
+    that: QUALITY_CHECK_CONTROLLER_DEMO_FIELDS | length == 0
+    fail_msg: >-
+      {{ application_id }} would name core's demo data as the GDPR controller on its privacy pages
+      ({{ QUALITY_CHECK_CONTROLLER_DEMO_FIELDS | join(', ') }}). Set them in the inventory under service_provider:
+      company.titel, company.address.street, company.address.postal_code, company.address.city,
+      company.address.country and contact.email. Only ENVIRONMENT development deploys keep the demo data.
+    quiet: true
+  when: (ENVIRONMENT | lower) != 'development'
+
 - name: "💾 Mount the state tmpfs of '{{ application_id }}' through fstab"
   ansible.posix.mount:
     path: "{{ QUALITY_CHECK_STATE_DIR }}"
@@ -80,6 +91,7 @@
     name: sys-stk-full
   vars:
     compose_handlers_flush: true
+    webserver_extra_configuration: "{{ lookup('template', 'nginx/server.conf.j2') }}"
 
 - name: "♻️ Recreate '{{ application_id }}' when its staged files changed"
   ansible.builtin.debug:

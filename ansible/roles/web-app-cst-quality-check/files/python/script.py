@@ -318,7 +318,7 @@ class Launcher:
             "--security-opt=no-new-privileges", f"--pids-limit={step['pids']}",
             f"--memory={step['memory']}", f"--memory-swap={step['memory']}", f"--cpus={step['cpus']}",
             f"--tmpfs=/tmp:size={step['tmp_bytes']}", f"--runtime={self.config['runtime']}",
-            f"--network={network}", "--env=HOME=/tmp", "--env=XDG_CACHE_HOME=/tmp",
+            f"--network={network}", "--env=HOME=/tmp", "--env=XDG_CACHE_HOME=/tmp", "--log-driver=none",
         ]
 
     def step(self, storage, step_name, command, stdin=None):
