@@ -1,3 +1,4 @@
+import codecs
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,10 +9,41 @@ from quality.ruledata import KindMap
 from quality.suppress import marker_comments, python_comments
 
 REGULAR_MODES = ("100644", "100755", "100664")
+LINK_MODE = "120000"
+GITLINK_MODE = "160000"
+READABLE_MODES = (*REGULAR_MODES, LINK_MODE)
+OVER_LIMIT = "is over the size limit"
+SUBMODULE = "is a submodule, whose content no rule reads"
+BINARY = "holds binary content, which no text rule can vouch for"
 LINE_BREAK = re.compile(rb"\r\n|\r|\n")
 BLANKS = re.compile(r"\s+")
 FIRST_LINE_BYTES = 256
 PYTHON_KIND = "python"
+WIDE_ENCODINGS = (
+    (codecs.BOM_UTF32_LE, "utf-32"),
+    (codecs.BOM_UTF32_BE, "utf-32"),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
+
+
+def textual(data: bytes) -> bytes | None:
+    """
+    Args:
+        data: Content of one blob.
+
+    Returns:
+        The bytes a text rule reads: UTF-16 or UTF-32 behind a byte order mark
+        as UTF-8, anything else unchanged, so Latin-1 stays text. None when
+        those bytes hold a NUL, which marks the blob as binary.
+    """
+    encoding = next((name for bom, name in WIDE_ENCODINGS if data.startswith(bom)), None)
+    if encoding is not None:
+        try:
+            data = data.decode(encoding).encode("utf-8")
+        except UnicodeDecodeError:
+            return None
+    return None if b"\0" in data else data
 
 
 def safe_path(path: str) -> str:
@@ -32,6 +64,8 @@ class Snapshot:
     unchecked: list
     irregular: set
     kind_map: KindMap
+    links: set
+    unread: dict
     line_cache: dict = field(default_factory=dict)
     comment_cache: dict = field(default_factory=dict)
 
@@ -40,6 +74,9 @@ class Snapshot:
 
     def data(self, path: str) -> bytes:
         return (self.root / path).read_bytes()
+
+    def text(self, path: str) -> bytes | None:
+        return textual(self.data(path))
 
     def lines(self, path: str) -> list:
         if path not in self.line_cache:
@@ -59,6 +96,8 @@ class Snapshot:
         return BLANKS.sub("", lines[row - 1]) if 0 < row <= len(lines) else ""
 
     def kinds_of(self, path: str) -> frozenset:
+        if path in self.links:
+            return frozenset()
         first_line = b""
         if self.kind_map.needs_first_line(path):
             with (self.root / path).open("rb") as stream:
@@ -102,16 +141,22 @@ def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: Kind
         kind_map: File kind classification.
 
     Returns:
-        The snapshot. Symlinks and gitlinks are recorded as irregular, never written.
+        The snapshot. Symlinks and gitlinks are recorded as irregular and never
+        followed. A symlink's target text is written as a kindless file, so
+        only rules binding every file read it; a gitlink is named unread.
     """
     root.mkdir(mode=0o700)
-    regular = [entry for entry in entries if entry.mode in REGULAR_MODES]
-    sizes = repo.sizes({entry.oid for entry in regular})
-    kept, unchecked = split_by_size(regular, sizes, blob_limit)
+    readable = [entry for entry in entries if entry.mode in READABLE_MODES]
+    sizes = repo.sizes({entry.oid for entry in readable})
+    kept, unchecked = split_by_size(readable, sizes, blob_limit)
     targets = blob_targets(kept, root)
     if targets:
         repo.export_blobs(targets, root.with_name(f"{root.name}.request"))
-    return Snapshot(root, kept, unchecked, irregular_paths(entries), kind_map)
+    links = {entry.path for entry in kept.values() if entry.mode == LINK_MODE}
+    unread = {path: OVER_LIMIT for path in unchecked}
+    unread |= {entry.path: SUBMODULE for entry in entries if entry.mode == GITLINK_MODE}
+    irregular = irregular_paths(entries)
+    return Snapshot(root, kept, unchecked, irregular, kind_map, links, unread)
 
 
 def irregular_paths(entries: list) -> set:

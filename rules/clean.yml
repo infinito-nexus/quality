@@ -64,10 +64,11 @@
   severity: medium
   summary: Tool pragma added; use a nocheck comment with a reason
   enforcer:
-    code:
+    code: &tool-pragma
       tool: rg
       comment_only: true
-      pattern: '(?i)(#|//)\s*((ruff:\s*|flake8:\s*)?noqa\b|ruff:\s*disable\b|shellcheck\s+disable|ast-grep-ignore)|#\s*lizard\s+forgive'
+      pattern: '(?i)(#|//)\s*((ruff:\s*|flake8:\s*)?noqa\b|ruff:\s*disable\b|shellcheck\s+disable|ast-grep-ignore|hadolint\s+(global\s+)?(ignore|shell)\s*=)|#\s*lizard\s+forgive|gitleaks:allow'
+    dockerfile: *tool-pragma
 - id: clean.clones
   severity: medium
   summary: Duplicated code block

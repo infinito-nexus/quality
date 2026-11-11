@@ -8,6 +8,28 @@ EXIT_FINDINGS = 1
 EXIT_ERROR = 2
 
 
+@dataclass(frozen=True, order=True)
+class Unchecked:
+    path: str
+    reason: str
+
+
+def unchecked_of(snapshot, wanted: set | None) -> list:
+    """
+    Args:
+        snapshot: Snapshot whose rules have run.
+        wanted: Paths to report, or None for every path.
+
+    Returns:
+        One entry per path no rule could fully read, with the reason.
+    """
+    return [
+        Unchecked(path, reason)
+        for path, reason in sorted(snapshot.unread.items())
+        if wanted is None or path in wanted
+    ]
+
+
 @dataclass(frozen=True, repr=False)
 class Outcome:
     findings: list
@@ -59,7 +81,7 @@ def render_json(outcome: Outcome) -> str:
         "nocheck": [
             {"path": item.path, "line": item.line, "rule": item.rule} for item in outcome.nocheck
         ],
-        "unchecked": outcome.unchecked,
+        "unchecked": sorted({item.path for item in outcome.unchecked}),
         "notes": outcome.notes,
         "incomplete": outcome.incomplete,
     }
@@ -80,7 +102,7 @@ def text_line(hit) -> str:
 
 def render_text(outcome: Outcome) -> str:
     lines = [text_line(hit) for hit in sorted_hits(outcome.findings)]
-    lines += [f"unchecked: {path} is over the size limit" for path in outcome.unchecked]
+    lines += [f"unchecked: {item.path} {item.reason}" for item in sorted(set(outcome.unchecked))]
     lines += outcome.notes
     if outcome.incomplete:
         lines.append(f"incomplete: pending rules {', '.join(outcome.incomplete)}")

@@ -10,11 +10,13 @@ from quality import QualityError
 RESERVED_FILES = ("tools.yml", "limits.yml", "kinds.yml")
 VERSION_SUFFIX = re.compile(r"[0-9.]+$")
 CODE_KIND = "code"
+ANY_KIND = "any"
 BUILTIN = "builtin"
 SIZE_GUARD = "size-guard"
+BINARY_GUARD = "binary-guard"
 FOLDER_ITEMS = "folder-items"
 PREFIX_GROUPS = "prefix-groups"
-RUNNER_CHECKS = (SIZE_GUARD, FOLDER_ITEMS, PREFIX_GROUPS)
+RUNNER_CHECKS = (SIZE_GUARD, BINARY_GUARD, FOLDER_ITEMS, PREFIX_GROUPS)
 
 
 def require(mapping: dict, key: str, where: str):
@@ -59,12 +61,26 @@ class Binding:
     settings: dict
     kinds: frozenset
 
+    def binds(self, path_kinds: frozenset) -> bool:
+        """
+        Args:
+            path_kinds: Every kind of one file, possibly none.
+
+        Returns:
+            True when the file shares a kind with the binding, or the binding
+            names the `any` kind, which holds every file, kindless ones included.
+        """
+        return ANY_KIND in self.kinds or bool(path_kinds & self.kinds)
+
 
 @dataclass(frozen=True, eq=False)
 class KindMap:
     extensions: dict
     shebangs: dict
     globs: dict
+    names: dict
+    known: dict
+    binary_names: list
     code: tuple
     markers: dict
 
@@ -75,17 +91,38 @@ class KindMap:
             first_line: Start of the file, read only without a known extension.
 
         Returns:
-            Every kind the file belongs to.
+            Every kind the file belongs to. Extensions, globs and names match
+            case-insensitively. A name never claims a known extension, so
+            `Dockerfile.PY` is Python only, while globs always apply.
         """
-        found = {kind for kind, spec in self.globs.items() if spec.match_file(path)}
-        suffix = PurePosixPath(path).suffix
-        if suffix in self.extensions:
-            found.add(self.extensions[suffix])
-        else:
-            kind = self.shebang_kind(first_line)
-            if kind is not None:
-                found.add(kind)
+        suffix = lower_suffix(path)
+        found = {kind for kind, spec in self.globs.items() if spec.match_file(path.lower())}
+        found |= {kind for kind, stems in self.names.items() if self.named(path, stems)}
+        kind = self.extensions.get(suffix) or self.shebang_kind(first_line)
+        if kind is not None:
+            found.add(kind)
         return frozenset(found)
+
+    def named(self, path: str, stems: list) -> bool:
+        """
+        Args:
+            path: Path of a file; only its base name counts.
+            stems: Lowercase names of one kind, such as dockerfile.
+
+        Returns:
+            True for a stem itself, `<x>.<stem>`, or `<stem>.<variant>` whose
+            suffix names no kind and no known file type, so `Dockerfile.prod`
+            counts and `Dockerfile.png` or `Dockerfile.erb` does not.
+        """
+        name = PurePosixPath(path).name.lower()
+        suffix = PurePosixPath(name).suffix
+        known = suffix in self.extensions or any(suffix in listed for listed in self.known.values())
+        return any(
+            name == stem
+            or name.endswith(f".{stem}")
+            or (name.startswith(f"{stem}.") and not known)
+            for stem in stems
+        )
 
     def shebang_kind(self, first_line: bytes) -> str | None:
         """
@@ -103,11 +140,28 @@ class KindMap:
         return next((self.shebangs[name] for name in candidates if name in self.shebangs), None)
 
     def needs_first_line(self, path: str) -> bool:
-        return PurePosixPath(path).suffix not in self.extensions
+        return lower_suffix(path) not in self.extensions
 
     def code_name(self, path: str) -> bool:
-        suffix = PurePosixPath(path).suffix
-        return not suffix or self.extensions.get(suffix) in self.code
+        """
+        Args:
+            path: Path of a file.
+
+        Returns:
+            True for a name without extension, other than a known binary name
+            such as .DS_Store, for a code extension, and for a name of a kind
+            such as Dockerfile.prod.
+        """
+        suffix = lower_suffix(path)
+        if PurePosixPath(path).name.lower() in self.binary_names:
+            return False
+        code = not suffix or self.extensions.get(suffix) in self.code
+        named = any(self.named(path, stems) for stems in self.names.values())
+        return code or suffix in self.known[CODE_KIND] or named
+
+
+def lower_suffix(path: str) -> str:
+    return PurePosixPath(path).suffix.lower()
 
 
 @dataclass(frozen=True, eq=False)
@@ -221,14 +275,25 @@ def read_yaml(path: Path):
         raise QualityError(f"rule data: {path.name} is not valid YAML") from None
 
 
+def lowered(listing: dict) -> dict:
+    return {key: [value.lower() for value in values] for key, values in listing.items()}
+
+
 def load_kinds(raw: dict) -> KindMap:
+    known = lowered(require(raw, "known_suffixes", "kinds.yml"))
+    require(known, CODE_KIND, "kinds.yml known_suffixes")
     return KindMap(
-        extensions=require(raw, "extensions", "kinds.yml"),
+        extensions={
+            suffix.lower(): kind for suffix, kind in require(raw, "extensions", "kinds.yml").items()
+        },
         shebangs=require(raw, "shebangs", "kinds.yml"),
         globs={
             kind: gitignore_spec(patterns)
-            for kind, patterns in require(raw, "globs", "kinds.yml").items()
+            for kind, patterns in lowered(require(raw, "globs", "kinds.yml")).items()
         },
+        names=lowered(require(raw, "names", "kinds.yml")),
+        known=known,
+        binary_names=[name.lower() for name in require(raw, "binary_names", "kinds.yml")],
         code=tuple(require(raw, "code", "kinds.yml")),
         markers=require(raw, "comment_markers", "kinds.yml"),
     )

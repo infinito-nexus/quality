@@ -58,8 +58,10 @@
 - id: coding.dockerfile
   severity: medium
   summary: Dockerfile violates a hadolint check
-  pending: true
-  tier: fast
+  exclude:
+    - "*.j2"
+    - "*.jinja"
+    - "*.jinja2"
   enforcer:
     dockerfile:
       tool: hadolint

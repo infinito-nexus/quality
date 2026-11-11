@@ -1,15 +1,53 @@
 import re
 
+from quality.ruledata import load
 from tests.integration.support import (
     ROOT,
+    UNTAGGED_DOCKERFILE,
     add_rules,
     branchy,
     catalogue,
+    edit_yaml,
+    raw_tool,
     report,
     rules_copy,
 )
 
 PREFIXES = ("security.", "coding.", "clean.")
+DOCKERFILE_RULE = "coding.dockerfile"
+DOCKERFILE_KIND = "dockerfile"
+DOCKERFILE_NAMES = [
+    "Containerfile",
+    "Containerfile.prod",
+    "Dockerfile",
+    "Dockerfile.dev",
+    "app.Containerfile",
+    "app.Dockerfile",
+    "lower/app.containerfile",
+    "lower/dockerfile",
+    "sub/Dockerfile",
+]
+NOT_DOCKERFILES = [
+    "Dockerfile.PY",
+    "Dockerfile.d/config",
+    "Dockerfile.dockerignore",
+    "Dockerfile.erb",
+    "Dockerfile.hbs",
+    "Dockerfile.in",
+    "Dockerfile.j2",
+    "Dockerfile.markdown",
+    "Dockerfile.md",
+    "Dockerfile.patch",
+    "Dockerfile.png",
+    "Dockerfile.py",
+    "Dockerfile.sh",
+    "Dockerfile.template",
+    "Dockerfile.yaml",
+    "Models/Dockerfile.cs",
+    "src/Dockerfile.jsx",
+    "templates/Dockerfile.frontend.j2",
+    "notes.txt",
+]
 LIMIT_LEAK = re.compile(r"500|MAX_")
 CORE_COUPLING = re.compile(r"utils\.cache|PROJECT_ROOT")
 
@@ -49,6 +87,73 @@ def test_no_limit_or_core_coupling_in_runner():
         assert not CORE_COUPLING.search(text), path
     for path in sorted((ROOT / "rules").glob("*.yml")):
         assert not CORE_COUPLING.search(path.read_text(encoding="utf-8")), path
+
+
+def test_dockerfile_kind_gets_hadolint(target):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    for name in (*DOCKERFILE_NAMES, *NOT_DOCKERFILES):
+        target.write(name, UNTAGGED_DOCKERFILE)
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1, result.stderr
+    found = sorted(
+        (item["rule"], item["path"], item["line"])
+        for item in report(result)["findings"]
+        if item["rule"] == DOCKERFILE_RULE
+    )
+    assert found == [(DOCKERFILE_RULE, name, 1) for name in DOCKERFILE_NAMES]
+    for name in NOT_DOCKERFILES:
+        control = raw_tool(target.path, "hadolint", "--format", "json", name)
+        assert '"DL3006"' in control.stdout
+
+
+def test_dockerfile_kind_leaves_out_other_kinds_and_templates():
+    kinds = load(ROOT / "rules").kinds
+    names = DOCKERFILE_NAMES + NOT_DOCKERFILES
+    found = [name for name in names if DOCKERFILE_KIND in kinds.kinds_of(name, b"")]
+    assert found == DOCKERFILE_NAMES
+
+
+def test_kinds_match_names_case_insensitively():
+    kinds = load(ROOT / "rules").kinds
+    assert kinds.kinds_of(".GITHUB/WORKFLOWS/CI.YML", b"") == {"workflow"}
+    assert kinds.kinds_of("Dockerfile.PY", b"") == {"python"}
+    assert kinds.kinds_of("install.SH", b"") == {"shell"}
+    assert [kinds.code_name(name) for name in ("install.SH", "deploy.zsh", "a.CS", "a.md")] == [
+        True,
+        True,
+        True,
+        False,
+    ]
+
+
+def test_code_names_cover_dockerfiles_and_spare_known_binaries():
+    kinds = load(ROOT / "rules").kinds
+    names = ("Dockerfile.prod", "app.Dockerfile", "bin/tool", ".DS_Store", "sub/THUMBS.DB")
+    assert [kinds.code_name(name) for name in names] == [True, True, True, False, False]
+
+
+def test_custom_glob_applies_to_a_known_extension(tmp_path):
+    rules = rules_copy(tmp_path / "rules")
+    edit_yaml(rules / "kinds.yml", lambda document: document["globs"].update(pyglob=["tools/*.py"]))
+    kinds = load(rules).kinds
+    assert kinds.kinds_of("tools/a.py", b"") == {"python", "pyglob"}
+    assert kinds.kinds_of("lib/a.py", b"") == {"python"}
+
+
+def test_hadolint_never_reads_a_template(target, tmp_path):
+    rules = rules_copy(tmp_path / "rules")
+    edit_yaml(rules / "kinds.yml", lambda document: document["globs"].update(dockerfile=["*.j2"]))
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    for name in ("Dockerfile.j2", "templates/Dockerfile.frontend.j2", "Dockerfile"):
+        target.write(name, "FROM {{ image }}\n" if name.endswith(".j2") else UNTAGGED_DOCKERFILE)
+    target.stage()
+    result = target.check("--staged", "--json", "--verbose", "--rules", str(rules))
+    assert result.returncode == 1, result.stderr
+    assert "quality: tool hadolint: exit 0, files: Dockerfile\n" in result.stderr
+    assert [item["path"] for item in report(result)["findings"]] == ["Dockerfile"]
 
 
 def test_size_limits(target, mode):

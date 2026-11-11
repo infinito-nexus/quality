@@ -3,7 +3,8 @@ import pytest
 from tests.integration.support import (
     AUTHOR_EMAIL,
     AUTHOR_NAME,
-    needs_gitleaks,
+    RAW_GITLEAKS,
+    SECRET,
     raw_tool,
     report,
 )
@@ -45,18 +46,21 @@ def test_redaction_canary(target, case):
 
 
 def test_redaction_canary_on_secret_line(target):
-    needs_gitleaks()
     target.write("seed.py", "x = 1\n")
     target.commit()
-    secret = "ghp_" + "8fK2mQ7xL4pN9sV1" + "tB6yR3wZ0cH5jD2gA7eU"
-    target.write("a.py", f'TOKEN = "{secret}"  # {CANARY}\n')
+    target.write("a.py", f'TOKEN = "{SECRET}"  # {CANARY}\n')
+    target.write(".env", f"GITHUB_TOKEN={SECRET} {CANARY}\n")
     target.stage()
-    for output_flags in OUTPUT_FLAGS:
-        result = target.check("--staged", *output_flags)
-        assert result.returncode == 1
-        combined = result.stdout + result.stderr
-        assert CANARY not in combined
-        assert secret not in combined
+    unprotected = raw_tool(target.path, "gitleaks", "dir", *RAW_GITLEAKS, ".")
+    assert SECRET in unprotected.stdout
+    for mode_flags in (("--staged",), ("--all",)):
+        for output_flags in OUTPUT_FLAGS:
+            result = target.check(*mode_flags, *output_flags)
+            assert result.returncode == 1
+            assert result.stdout.count("security.secret") == 2
+            combined = result.stdout + result.stderr
+            assert CANARY not in combined
+            assert SECRET not in combined
 
 
 def test_redaction_of_entity_and_metric_names(target):
@@ -140,18 +144,21 @@ def test_finding_fields(target):
 
 
 def test_no_author_data(target):
-    needs_gitleaks()
     target.write("a.py", "x = 1\n")
     target.commit()
     target.git("checkout", "-q", "-b", "feature")
-    secret = "ghp_" + "8fK2mQ7xL4pN9sV1" + "tB6yR3wZ0cH5jD2gA7eU"
-    target.write("a.py", f'TOKEN = "{secret}"\n')
+    target.write("a.py", f'TOKEN = "{SECRET}"\n')
     added = target.commit("QualityMessageCanary")
-    result = target.check("--base", "main", "--json")
-    combined = result.stdout + result.stderr
-    assert added in combined
+    unprotected = raw_tool(target.path, "gitleaks", "git", *RAW_GITLEAKS, ".")
     for canary in (AUTHOR_NAME, AUTHOR_EMAIL, "QualityMessageCanary"):
-        assert canary not in combined
+        assert canary in unprotected.stdout
+    for flags in (("--json",), (), ("--verbose",)):
+        result = target.check("--base", "main", *flags)
+        assert result.returncode == 1
+        combined = result.stdout + result.stderr
+        assert added in combined
+        for canary in (AUTHOR_NAME, AUTHOR_EMAIL, "QualityMessageCanary", SECRET):
+            assert canary not in combined
 
 
 def test_json_lists_exclusions(target):

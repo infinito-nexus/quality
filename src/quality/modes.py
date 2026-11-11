@@ -17,8 +17,9 @@ from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.ignorefile import audit_lines, describe, split_ignored
 from quality.ignorefile import parse as parse_ignore
 from quality.repo import Repo, hardened_env
-from quality.report import Outcome
+from quality.report import Outcome, unchecked_of
 from quality.ruledata import (
+    BINARY_GUARD,
     FOLDER_ITEMS,
     PREFIX_GROUPS,
     SIZE_GUARD,
@@ -26,7 +27,7 @@ from quality.ruledata import (
     load,
     locate,
 )
-from quality.snapshot import Snapshot, materialize
+from quality.snapshot import BINARY, Snapshot, materialize
 from quality.suppress import split_nocheck
 
 FAST_TIER = ("fast",)
@@ -69,7 +70,23 @@ class Session:
             One finding per path named like code, since a padded file would
             otherwise pass every rule unread.
         """
-        rule = self.data.runner_rule(SIZE_GUARD)
+        return self.unread_code(SIZE_GUARD, snapshot, paths)
+
+    def binary_code(self, snapshot: Snapshot) -> list:
+        """
+        Args:
+            snapshot: Snapshot the secret scanner ran on.
+
+        Returns:
+            One finding per path named like code whose content the secret
+            scanner skipped as binary, since a magic prefix would otherwise
+            let a file pass it unread.
+        """
+        paths = sorted(path for path, reason in snapshot.unread.items() if reason == BINARY)
+        return self.unread_code(BINARY_GUARD, snapshot, paths)
+
+    def unread_code(self, enforcer: str, snapshot: Snapshot, paths: list) -> list:
+        rule = self.data.runner_rule(enforcer)
         return [
             code_hit(rule, path, None, "", snapshot)
             for path in paths
@@ -219,9 +236,9 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
         Hard findings absolute, all other findings through the differential gate.
     """
     changed = {change.path for change in plan.changes}
-    unchecked = [path for path in plan.head.unchecked if path in changed]
+    oversize = [path for path in plan.head.unchecked if path in changed]
     hits = session.collector.collect(plan.head, touched_paths(plan), every_rule)
-    hits += session.oversized(plan.head, unchecked)
+    hits += session.oversized(plan.head, oversize) + session.binary_code(plan.head)
     hits += session.structure(plan.head, plan_folders(plan))
     kept, ignored = split_ignored(hits, plan.soft_entries, plan.hard_entries)
     kept, nocheck = split_nocheck(kept, plan.head)
@@ -229,7 +246,7 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
     soft = [hit for hit in kept if not hit.rule.hard]
     if soft:
         findings += new_hits(soft, plan_baseline(session, plan))
-    return Outcome(findings, ignored, nocheck, unchecked, notes, [])
+    return Outcome(findings, ignored, nocheck, unchecked_of(plan.head, changed), notes, [])
 
 
 def touched_paths(plan: Plan) -> list:
@@ -251,7 +268,7 @@ def check_all(session: Session, _options: Options) -> Outcome:
     if not head.files and not head.unchecked:
         raise QualityError("--all found zero files in the index")
     hits = session.collector.collect(head, head.paths(), every_rule)
-    hits += session.oversized(head, head.unchecked)
+    hits += session.oversized(head, head.unchecked) + session.binary_code(head)
     hits += session.structure(head, None)
     entries = parse_ignore(head.ignore_data(), session.data)
     kept, ignored = split_ignored(hits, entries, entries)
@@ -263,7 +280,7 @@ def check_all(session: Session, _options: Options) -> Outcome:
     if session.repo.is_shallow():
         notes.append(HEAD_ONLY_NOTE)
     pending = [rule.id for rule in session.data.pending_rules(ALL_TIERS)]
-    return Outcome(findings, ignored, nocheck, head.unchecked, notes, pending)
+    return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending)
 
 
 def check_staged(session: Session, _options: Options) -> Outcome:
@@ -291,40 +308,67 @@ def base_side_entries(session: Session, base: str) -> list:
         return []
 
 
-def history_hits(session: Session, base: str, entries: list) -> tuple:
+@dataclass(frozen=True, eq=False)
+class History:
+    found: list
+    ignored: list
+    unchecked: list
+    at_head: set
+
+
+def finding_key(hit) -> tuple:
+    return (hit.rule.id, hit.path, hit.line)
+
+
+def history_hits(session: Session, base: str, entries: list, head_blobs: set) -> History:
     """
     Args:
         session: The running check.
         base: Merge base.
         entries: Base side ignore entries.
+        head_blobs: Path and object ID of every HEAD entry.
 
     Returns:
-        Findings of the rules marked history over every commit of the range,
-        each carrying its commit SHA, then applied entries and unchecked paths.
+        Findings of the rules marked history over every blob the range adds,
+        each carrying its commit SHA. A blob the merge base already holds at
+        that path is legacy and skipped, and a merge adds only the blobs it
+        resolved itself, never one it took over from either side. The keys of
+        findings on blobs still at HEAD are kept to replace HEAD's copy.
     """
     if not session.data.has_history_rules():
-        return [], [], []
-    seen = set()
+        return History([], [], [], set())
+    seen = {(entry.path, entry.oid) for entry in session.repo.tree_entries(base)}
     found = []
     unchecked = []
+    at_head = set()
     for commit in session.repo.commits(base):
         fresh = [e for e in session.repo.commit_entries(commit) if (e.path, e.oid) not in seen]
         seen.update((entry.path, entry.oid) for entry in fresh)
-        snapshot = session.snapshot(fresh, f"history-{commit}")
-        hits = session.collector.collect(snapshot, snapshot.paths(), history_rule)
-        hits += session.oversized(snapshot, snapshot.unchecked)
-        found += [replace(hit, commit=commit) for hit in hits]
-        unchecked += snapshot.unchecked
-        shutil.rmtree(snapshot.root)
+        scanned = scan_commit(session, commit, fresh, head_blobs)
+        found += scanned.found
+        unchecked += scanned.unchecked
+        at_head |= scanned.at_head
     kept, ignored = split_ignored(found, [], entries)
-    return kept, ignored, unchecked
+    return History(kept, ignored, unchecked, at_head)
+
+
+def scan_commit(session: Session, commit: str, fresh: list, head_blobs: set) -> History:
+    snapshot = session.snapshot(fresh, f"history-{commit}")
+    hits = session.collector.collect(snapshot, snapshot.paths(), history_rule)
+    hits += session.oversized(snapshot, snapshot.unchecked) + session.binary_code(snapshot)
+    blobs = {entry.path: entry.oid for entry in fresh}
+    at_head = {finding_key(hit) for hit in hits if (hit.path, blobs[hit.path]) in head_blobs}
+    unchecked = unchecked_of(snapshot, None)
+    shutil.rmtree(snapshot.root)
+    return History([replace(hit, commit=commit) for hit in hits], [], unchecked, at_head)
 
 
 def check_base(session: Session, options: Options) -> Outcome:
     repo = session.repo
     base = repo.merge_base(options.ref)
     changes = repo.range_changes(base, "HEAD")
-    head = session.snapshot(repo.tree_entries("HEAD"), "head")
+    head_tree = repo.tree_entries("HEAD")
+    head = session.snapshot(head_tree, "head")
     head_entries = parse_ignore(head.ignore_data(), session.data)
     base_entries = base_side_entries(session, base)
     notes = audit_lines(base_entries, head_entries) + session.pending_notes(ALL_TIERS)
@@ -334,12 +378,14 @@ def check_base(session: Session, options: Options) -> Outcome:
 
     plan = Plan(head, changes, [base], diff, head_entries, base_entries)
     outcome = judged(session, plan, notes)
-    found, ignored, unchecked = history_hits(session, base, base_entries)
+    head_blobs = {(entry.path, entry.oid) for entry in head_tree}
+    history = history_hits(session, base, base_entries, head_blobs)
+    findings = [hit for hit in outcome.findings if finding_key(hit) not in history.at_head]
     return replace(
         outcome,
-        findings=outcome.findings + found,
-        ignored=outcome.ignored + [item for item in ignored if item not in outcome.ignored],
-        unchecked=sorted({*outcome.unchecked, *unchecked}),
+        findings=findings + history.found,
+        ignored=outcome.ignored + [item for item in history.ignored if item not in outcome.ignored],
+        unchecked=sorted({*outcome.unchecked, *history.unchecked}),
     )
 
 
