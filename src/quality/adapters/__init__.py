@@ -80,8 +80,9 @@ class Runtime:
             raw: A tool's entry in tools.yml.
 
         Returns:
-            The entry plus the paths of this run: rules_dir, database (the
-            bundle or None), work_dir and empty_json. The run's values win.
+            The entry plus the values of this run: rules_dir, database (the
+            bundle or None), work_dir, empty_json and threads (the --threads
+            cap or None). The run's values win.
         """
         return {**raw, **self.resources}
 

@@ -1,3 +1,5 @@
+import atexit
+import functools
 import json
 import os
 import shutil
@@ -8,6 +10,8 @@ from pathlib import Path
 
 import yaml
 
+from quality.adapters.base import thread_environment
+
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 RULES = ROOT / "rules"
@@ -15,6 +19,7 @@ RESERVED = ("tools.yml", "limits.yml", "kinds.yml", "comments.yml")
 TEST_CACHE = Path(tempfile.gettempdir()) / "quality-test-cache"
 TEST_DB = TEST_CACHE / "quality" / "db"
 NO_BUNDLE_CACHE = Path(tempfile.gettempdir()) / "quality-test-no-bundle"
+TOOL_THREADS = 1
 DEEP_TOOLS = ("jscpd", "osv-scanner", "semgrep", "trivy")
 VULNERABLE_PIN = "requests==2.19.0\n"
 AUTHOR_NAME = "QualityAuthorCanary"
@@ -63,7 +68,12 @@ def raw_tool(cwd: Path, *argv: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         argv,
         cwd=cwd,
-        env={**git_env(), "RUFF_NO_CACHE": "true", "PYTHONDONTWRITEBYTECODE": "1"},
+        env={
+            **git_env(),
+            **thread_environment(TOOL_THREADS),
+            "RUFF_NO_CACHE": "true",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
         capture_output=True,
         text=True,
         errors="replace",
@@ -130,10 +140,7 @@ class Target:
     def rule_args(self, args: tuple) -> tuple:
         if self.deep or "--rules" in args:
             return ()
-        fast = self.path.with_name(f"{self.path.name}-fast-rules")
-        if not fast.exists():
-            rules_copy(fast)
-        return ("--rules", str(fast))
+        return ("--rules", str(fast_rules()))
 
     def write(self, relative: str, text: str) -> None:
         destination = self.path / relative
@@ -156,7 +163,7 @@ class Target:
     ) -> subprocess.CompletedProcess:
         cache = TEST_CACHE if self.deep else NO_BUNDLE_CACHE
         env = {"XDG_CACHE_HOME": str(cache), **(extra_env or {})}
-        argv = ("check", *args, *self.rule_args(args))
+        argv = ("check", *args, "--threads", str(TOOL_THREADS), *self.rule_args(args))
         return quality(self.path, *argv, path_value=path_value, extra_env=env)
 
     def judge(self, mode: str, *args: str) -> subprocess.CompletedProcess:
@@ -235,6 +242,18 @@ def rules_copy(destination: Path, deep: bool = False) -> Path:
     if not deep:
         keep_rules(destination, lambda rule: rule.get("tier") != "deep")
     return destination
+
+
+@functools.cache
+def fast_rules() -> Path:
+    """
+    Returns:
+        The one copy of the fast-tier rule data of this test process, which
+        every target without --rules of its own reads and no test writes.
+    """
+    scratch = Path(tempfile.mkdtemp(prefix="quality-fast-rules-"))
+    atexit.register(shutil.rmtree, scratch, True)
+    return rules_copy(scratch / "rules")
 
 
 def rules_without_pending(destination: Path, deep: bool = False) -> Path:

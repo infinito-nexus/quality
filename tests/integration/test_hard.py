@@ -8,7 +8,7 @@ import zipfile
 import pytest
 
 from quality.adapters import Collector, Runtime
-from quality.adapters.base import Bound
+from quality.adapters.base import Bound, thread_environment
 from quality.environment import tool_environment
 from quality.ruledata import load
 from quality.snapshot import Snapshot
@@ -19,6 +19,7 @@ from tests.integration.support import (
     RULES,
     SECRET,
     SECRET_ENV_LINE,
+    TOOL_THREADS,
     add_rules,
     catalogue,
     edit_yaml,
@@ -331,7 +332,7 @@ def adapter_findings(target, tmp_path, names) -> list:
     empty = tmp_path / "empty.yaml"
     empty.touch()
     path_value = os.environ["PATH"]
-    environment = tool_environment(path_value, home, None)
+    environment = {**tool_environment(path_value, home, None), **thread_environment(TOOL_THREADS)}
     runtime = Runtime(path_value, environment, empty, target.path, False, {"work_dir": tmp_path})
     snapshot = Snapshot(target.path, dict.fromkeys(names), [], set(), data.kinds, set(), {})
     kinds = {name: snapshot.kinds_of(name) for name in names}

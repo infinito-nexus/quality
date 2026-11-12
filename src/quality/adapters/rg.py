@@ -3,29 +3,30 @@ import json
 import os
 import re
 
-from quality.adapters.base import Command, known_path
+from quality.adapters.base import Command, known_path, thread_args
 from quality.gate import code_hit
 from quality.ruledata import require
 from quality.shellview import code_view
 
 
-def commands(bound: list, _settings: dict, _empty_file) -> list:
+def commands(bound: list, settings: dict, _empty_file) -> list:
     """
     Args:
         bound: Rules with their files.
-        _settings: Unused tool entry.
+        settings: The tool's entry in tools.yml with the values of this run.
         _empty_file: Unused; ripgrep needs no empty configuration.
 
     Returns:
         One command per rule. A rule setting `multiline` lets its pattern span
         lines, such as a pipe continued after a backslash; a rule setting
         `pcre2` gets look-around, which its pattern needs to skip permitted
-        values and comments.
+        values and comments. --threads carries the run's thread cap.
     """
     return [
         Command(
             [
                 "--no-config",
+                *thread_args(settings, "--threads"),
                 "--no-ignore",
                 "--hidden",
                 "--json",

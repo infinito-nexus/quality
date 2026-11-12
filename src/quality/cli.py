@@ -5,6 +5,25 @@ import sys
 from quality import QualityError, __version__, printable
 
 
+def thread_count(text: str) -> int:
+    """
+    Args:
+        text: The --threads value.
+
+    Returns:
+        The number of threads each tool may run, from 1 to the host's cores.
+
+    Raises:
+        argparse.ArgumentTypeError: The value is not a whole number in that
+            range; a larger cap would cap nothing, and Go ignores a
+            GOMAXPROCS it cannot parse, so those tools would run uncapped.
+    """
+    cores = os.cpu_count()
+    if not (text.isascii() and text.isdigit()) or int(text) < 1 or (cores is not None and int(text) > cores):
+        raise argparse.ArgumentTypeError(f"must be a whole number from 1 to the host's {cores} cores")
+    return int(text)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="quality", allow_abbrev=False)
     parser.add_argument("--version", action="version", version=f"quality {__version__}")
@@ -18,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--verbose", action="store_true")
     check.add_argument("--rules", metavar="DIR")
     check.add_argument("--db", metavar="DIR")
+    check.add_argument("--threads", metavar="N", type=thread_count)
     database = commands.add_parser("db", allow_abbrev=False)
     actions = database.add_subparsers(dest="action", required=True)
     update = actions.add_parser("update", allow_abbrev=False)
@@ -45,7 +65,7 @@ def execute(args: argparse.Namespace) -> int:
         print(printable(update_database(args.db, args.rules).note()))
         return 0
     mode = selected_mode(args)
-    options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd())
+    options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd(), args.threads)
     outcome = check(options)
     print(render_json(outcome) if args.as_json else render_text(outcome))
     return exit_code(outcome)
@@ -61,7 +81,7 @@ def execute_coverage(args: argparse.Namespace) -> int:
 
     scratch = Path(tempfile.mkdtemp(prefix="quality-")).resolve()
     try:
-        session = open_session(Options(COVERAGE, None, args.rules, None, False, os.getcwd()), scratch)
+        session = open_session(Options(COVERAGE, None, args.rules, None, False, os.getcwd(), None), scratch)
         snapshot = session.snapshot(session.repo.index_entries(), "head")
         counted = snapshot.census()
         files = {path: snapshot.kinds_of(path) for path in snapshot.paths()}

@@ -12,6 +12,8 @@ from quality.db import NETWORK_VARIABLES, open_bundle
 from tests.integration.support import RULES, TEST_CACHE, TEST_DB, Target, quality
 
 WRITE_BITS = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+RUN = os.environ.get("PYTEST_XDIST_TESTRUNUID")
+RUN_STAMP = TEST_CACHE.parent / "quality-test-cache.run"
 
 
 def max_age_days() -> int:
@@ -45,12 +47,15 @@ def vulnerability_database():
     TEST_CACHE.mkdir(exist_ok=True)
     with (TEST_CACHE.parent / "quality-test-cache.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if not fresh(TEST_DB):
+        decided = RUN is not None and RUN_STAMP.is_file() and RUN_STAMP.read_text(encoding="utf-8") == RUN
+        if not decided and not fresh(TEST_DB):
             set_writable(TEST_DB, True)
             network = {name: os.environ[name] for name in NETWORK_VARIABLES if name in os.environ}
             result = quality(TEST_CACHE, "db", "update", "--db", str(TEST_DB), extra_env=network)
             assert result.returncode == 0, result.stderr
         set_writable(TEST_DB, False)
+        if RUN is not None:
+            RUN_STAMP.write_text(RUN, encoding="utf-8")
     return TEST_DB
 
 
