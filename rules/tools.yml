@@ -9,6 +9,8 @@ ruff:
 rg:
   timeout: 60
   exit_codes: [0, 1]
+  templates: true
+  reports_lines: true
   loads:
     - .ignore
     - .rgignore
@@ -26,6 +28,16 @@ actionlint:
     - .github/actionlint.yaml
     - .github/actionlint.yml
     - actionlint.yaml
+ast-grep:
+  timeout: 120
+  exit_codes: [0, 1]
+  stderr_fails: true
+  rule_dir: ast-grep
+  loads:
+    - sgconfig.yml
+    - sgconfig.yaml
+    - .ignore
+    - .gitignore
 lizard:
   timeout: 300
   exit_codes: [0]

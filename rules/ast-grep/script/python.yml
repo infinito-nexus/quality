@@ -1,0 +1,199 @@
+id: coding.structural/bare-except
+language: python
+severity: warning
+message: bare except catches SystemExit and KeyboardInterrupt
+rule:
+  kind: except_clause
+  regex: '^except\s*:'
+---
+id: coding.structural/debugger
+language: python
+severity: warning
+message: debugger entry point left in code
+rule:
+  any:
+    - pattern: breakpoint($$$)
+    - pattern: pdb.set_trace($$$)
+    - pattern: ipdb.set_trace($$$)
+---
+id: coding.structural/assert-tuple
+language: python
+severity: warning
+message: assert on a tuple is always true
+rule:
+  kind: assert_statement
+  has:
+    kind: tuple
+    nthChild: 1
+---
+id: clean.default-value/parameter
+language: python
+severity: warning
+message: parameter default; fail early, make it required, or None with a branch for a mutable value
+utils:
+  empty-string:
+    kind: string
+    not:
+      has:
+        any:
+          - kind: string_content
+          - kind: interpolation
+rule:
+  any:
+    - kind: default_parameter
+    - kind: typed_default_parameter
+  not:
+    has:
+      field: value
+      any:
+        - kind: none
+        - kind: "false"
+        - matches: empty-string
+        - regex: '^\(\s*\)$'
+        - regex: '^(?:tuple|frozenset|str|bytes)\(\s*\)$'
+---
+id: clean.default-value/fallback
+language: python
+severity: warning
+message: fallback value; fail early, read the key and raise an error that names the missing key and where to set it
+utils:
+  absent:
+    any:
+      - kind: none
+      - kind: "false"
+      - regex: '^[bBrRuU]{0,2}(?:""|'''')$'
+      - regex: '^[\[({]\s*[\])}]$'
+      - regex: '^(?:list|dict|set|tuple|frozenset|str|bytes)\(\s*\)$'
+  positional:
+    not:
+      any:
+        - kind: keyword_argument
+        - kind: dictionary_splat
+        - kind: comment
+  getter:
+    any:
+      - kind: identifier
+        regex: '^getenv$'
+      - kind: attribute
+        has:
+          field: attribute
+          regex: '^(?:get|getenv)$'
+  second-of-two:
+    matches: positional
+    all:
+      - nthChild:
+          position: 2
+          ofRule:
+            matches: positional
+      - nthChild:
+          position: 1
+          reverse: true
+          ofRule:
+            matches: positional
+  third-of-three:
+    matches: positional
+    all:
+      - nthChild:
+          position: 3
+          ofRule:
+            matches: positional
+      - nthChild:
+          position: 1
+          reverse: true
+          ofRule:
+            matches: positional
+rule:
+  any:
+    - kind: identifier
+    - kind: attribute
+    - kind: subscript
+    - kind: call
+    - kind: string
+    - kind: concatenated_string
+    - kind: integer
+    - kind: float
+    - kind: "true"
+    - kind: list
+    - kind: tuple
+    - kind: set
+    - kind: dictionary
+    - kind: list_comprehension
+    - kind: dictionary_comprehension
+    - kind: set_comprehension
+    - kind: generator_expression
+    - kind: parenthesized_expression
+    - kind: unary_operator
+    - kind: binary_operator
+    - kind: boolean_operator
+    - kind: not_operator
+    - kind: comparison_operator
+    - kind: conditional_expression
+    - kind: lambda
+    - kind: await
+    - kind: list_splat
+  not:
+    matches: absent
+  all:
+    - any:
+        - matches: second-of-two
+          inside:
+            kind: argument_list
+            inside:
+              kind: call
+              has:
+                field: function
+                matches: getter
+        - matches: third-of-three
+          inside:
+            kind: argument_list
+            inside:
+              kind: call
+              has:
+                field: function
+                kind: identifier
+                regex: '^getattr$'
+        - inside:
+            kind: keyword_argument
+            field: value
+            has:
+              field: name
+              regex: '^default$'
+            inside:
+              kind: argument_list
+              inside:
+                kind: call
+                has:
+                  field: function
+                  any:
+                    - matches: getter
+                    - kind: attribute
+                      has:
+                        field: attribute
+                        regex: '^add_argument$'
+---
+id: clean.default-value/or-literal
+language: python
+severity: warning
+message: literal after or; often a default, fail early, raise an error that names the missing key and where to set it
+rule:
+  any:
+    - kind: integer
+    - kind: float
+    - kind: string
+    - kind: concatenated_string
+    - kind: "true"
+    - kind: list
+    - kind: tuple
+    - kind: set
+    - kind: dictionary
+  not:
+    any:
+      - regex: '^[bBrRuU]{0,2}(?:""|'''')$'
+      - regex: '^[\[({]\s*[\])}]$'
+  inside:
+    pattern: $LEFT or $RIGHT
+    field: right
+    not:
+      inside:
+        pattern: $OUTER or $OTHER
+        field: left

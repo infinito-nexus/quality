@@ -1,0 +1,6 @@
+id: coding.structural/search-path
+language: nix
+severity: warning
+message: an angle-bracket path reads NIX_PATH, so the result depends on the host
+rule:
+  kind: spath_expression

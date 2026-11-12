@@ -1,0 +1,6 @@
+id: coding.structural/loadstring
+language: lua
+severity: warning
+message: loadstring was removed in Lua 5.2; use load
+rule:
+  pattern: loadstring($$$)

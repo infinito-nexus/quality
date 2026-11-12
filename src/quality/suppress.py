@@ -3,9 +3,126 @@ import re
 import tokenize
 from dataclasses import dataclass
 
+from quality import QualityError
+
 NOCHECK = re.compile(r"nocheck:\s*(?P<rule>[A-Za-z0-9_.\-]+)\s+--\s+\S")
 QUOTES = "\"'`"
 BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
+COMMENTS_FILE = "comments.yml"
+
+
+def spellings(raw: dict, key: str):
+    if not isinstance(raw, dict) or key not in raw:
+        raise QualityError(f"rule data: {COMMENTS_FILE} is missing key {key!r}")
+    return raw[key]
+
+
+def alternatives(groups: dict) -> str:
+    return "|".join(spelling for found in groups.values() for spelling in found)
+
+
+def comment_patterns(raw: dict) -> dict:
+    """
+    Args:
+        raw: Content of comments.yml: the comment marker, each tool's pragma
+            spellings, the parameter-doc sections and doc tags.
+
+    Returns:
+        Placeholder to pattern for every language alike. Every pattern
+        compiles for Rust's regex crate, which ast-grep and ripgrep use, and
+        for Python; `@docstring` alone needs Python's lookahead and
+        backreferences and runs in the runner.
+    """
+    marker = spellings(raw, "marker")
+    sections = "|".join(spellings(raw, "sections"))
+    tag = f"@(?:{'|'.join(spellings(raw, 'doc_tags'))})"
+    suppressing = alternatives(spellings(raw, "pragmas"))
+    entries = "(?:(?P=i)[ \\t]+\\S[^\\n]*\\n|[ \\t]*\\n)*"
+    return {
+        "@pragma": f"(?i)(?:(?:^|\\s){marker}\\s*(?:{suppressing})|{alternatives(spellings(raw, 'pragmas_anywhere'))})",
+        "@doc-block": (
+            f"^(?:/\\*\\*[ \\t]*{tag}[^\\n]*?\\*/|/\\*\\*[ \\t]*(?:{tag}[^\\n]*\\n"
+            f"|\\n(?:[ \\t]*\\*[ \\t]*\\n)*[ \\t]*\\*[ \\t]+{tag}[^\\n]*\\n)"
+            f"(?:[ \\t]*\\*[^\\n]*\\n)*[ \\t]*\\*/)$"
+        ),
+        "@block-sections": (
+            f"^/\\*+[ \\t]*\\n(?:[ \\t]*\\*[ \\t]*\\n)*(?:[ \\t]*\\*[ \\t]?(?:{sections}):[ \\t]*\\n"
+            f"(?:[ \\t]*\\*(?:[ \\t]{{2,}}\\S[^\\n]*|[ \\t]*)\\n)*)+[ \\t]*\\*/$"
+        ),
+        "@docstring": (
+            f"[rRuU]{{0,2}}(?P<q>\"\"\"|''')(?:\\s*Exception:[\\s\\S]*"
+            f"|(?=[\\s\\S]*\\n(?P<i>[ \\t]*)(?P=q)\\Z)(?:[ \\t]*\\n(?:[ \\t]*\\n)*(?P=i))?"
+            f"(?:{sections}):[ \\t]*\\n{entries}(?:(?P=i)(?:{sections}):[ \\t]*\\n{entries})*(?P=i)(?P=q))"
+        ),
+    }
+
+
+def nocheck_names(rule_ids: list) -> list:
+    """
+    Args:
+        rule_ids: Every rule id of the catalogue.
+
+    Returns:
+        The names a nocheck may carry: each id and each of its dotted groups.
+    """
+    names = set()
+    for rule_id in rule_ids:
+        parts = rule_id.split(".")
+        names.update(".".join(parts[:index]) for index in range(1, len(parts) + 1))
+    return sorted(names)
+
+
+def directive_form(marker: str, group: dict) -> str:
+    own = group["marker"] if "marker" in group else marker
+    gap = "" if group.get("tight") else "\\s*"
+    return f"{own}{gap}(?:{'|'.join(group['spellings'])})\\s*(?:\\*/|-->)?\\s*"
+
+
+def language_patterns(raw: dict, names: list, language: str) -> dict:
+    """
+    Args:
+        raw: Content of comments.yml.
+        names: Rule ids and groups a nocheck may name.
+        language: ast-grep language the patterns are for.
+
+    Returns:
+        `@directive`, the directives a tool of this language reads, a nocheck
+        naming a catalogue rule among them; `@positional`, the directives a
+        tool reads only at a place in the file, as pattern and position for
+        the runner; `@starter`, the first line of an exception or parameter
+        doc; `@prose-starter`, the starters whose next lines may be prose;
+        and `@entry`, an indented line, the only kind a section line such as
+        `Returns:` carries.
+    """
+    marker = spellings(raw, "marker")
+    sections = "|".join(spellings(raw, "sections"))
+    groups = [
+        group
+        for group in spellings(raw, "directives")
+        if "languages" not in group or language in group["languages"]
+    ]
+    nocheck = f"{marker}\\s*nocheck:\\s*(?:{'|'.join(re.escape(name) for name in names)})\\s+--\\s+\\S.*"
+    free = [directive_form(marker, group) for group in groups if "position" not in group]
+    headings = spellings(raw, "headings")
+    heading = [f"{headings[language]}\\s*#\\s+(?:{sections})\\s*"] if language in headings else []
+    prose = [
+        f"{marker}\\s*(?:Exception:[\\s\\S]*"
+        f"|Param:\\s+\\S+(?:\\s+\\([^)\\n]*\\))?\\s+-\\s+\\S[\\s\\S]*"
+        f"|Param\\s+[^\\s:]+:\\s+\\S[\\s\\S]*)",
+        *heading,
+    ]
+    section = f"{marker}\\s*(?:{sections}):\\s*"
+    return {
+        "@directive": f"^(?:{'|'.join([nocheck, *free])})$",
+        "@positional": [
+            {"pattern": f"^{directive_form(marker, group)}$", "position": group["position"]}
+            for group in groups
+            if "position" in group
+        ],
+        "@starter": f"^(?:{'|'.join([section, *prose])})$",
+        "@prose-starter": f"^(?:{'|'.join(prose)})$",
+        "@entry": f"^{marker}(?:(?:\\t|[ \\t]{{2,}})\\S[\\s\\S]*|[ \\t]*)$",
+    }
 
 
 @dataclass(frozen=True)
@@ -92,6 +209,26 @@ def nocheck_rule(comment: str) -> str | None:
 
 def rule_matches(rule_id: str, name: str) -> bool:
     return rule_id == name or rule_id.startswith(f"{name}.")
+
+
+def idle(name: str | None, ran: set, able: set) -> bool:
+    """
+    Args:
+        name: Rule or group a nocheck that waived nothing names, or None
+            for a comment without a nocheck.
+        ran: Ids of the rules this run applied to the file.
+        able: Ids of every rule with a tool that applies to the file in some
+            run, pending rules and every tier included.
+
+    Returns:
+        True when every rule of that name that can fire on the file ran,
+        which holds trivially when none can; a nocheck naming a rule, or a
+        group holding a rule, that is pending or of a tier this run skips is
+        never judged.
+    """
+    if name is None:
+        return False
+    return all(rule_id in ran for rule_id in able if rule_matches(rule_id, name))
 
 
 def split_nocheck(hits: list, snapshot) -> tuple:

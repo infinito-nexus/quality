@@ -1,0 +1,154 @@
+languages:
+  bash: {comments: [comment], root: program, empty: [heredoc_body, heredoc_content]}
+  c: {comments: [comment], root: translation_unit, empty: []}
+  cpp: {comments: [comment], root: translation_unit, empty: []}
+  csharp: {comments: [comment], root: compilation_unit, empty: []}
+  css: {comments: [comment], root: stylesheet, empty: []}
+  go: {comments: [comment], root: source_file, empty: [raw_string_literal_content]}
+  hcl: {comments: [comment], root: config_file, empty: []}
+  html: {comments: [comment], root: document, empty: [raw_text]}
+  java: {comments: [line_comment, block_comment], root: program, empty: []}
+  javascript: {comments: [comment], root: program, empty: []}
+  json: {comments: [comment], root: document, empty: []}
+  kotlin: {comments: [line_comment, multiline_comment], root: source_file, empty: []}
+  lua: {comments: [comment], root: chunk, empty: [string_content]}
+  nix: {comments: [comment], root: source_code, empty: []}
+  php: {comments: [comment], root: program, empty: []}
+  python: {comments: [comment], root: module, empty: []}
+  ruby: {comments: [comment], root: program, empty: []}
+  rust: {comments: [line_comment, block_comment], root: source_file, empty: [string_content]}
+  tsx: {comments: [comment], root: program, empty: []}
+  typescript: {comments: [comment], root: program, empty: []}
+  yaml: {comments: [comment], root: stream, empty: []}
+documents:
+  - id: coding.parse-incomplete/error
+    severity: warning
+    message: the parser could not read this code
+    rule:
+      kind: ERROR
+      not:
+        inside:
+          kind: ERROR
+          stopBy: end
+  - id: coding.parse-incomplete/missing
+    severity: warning
+    message: the parser inserted a token the code lacks
+    utils:
+      missing:
+        regex: '^$'
+        not:
+          any: '@empty'
+        pattern: $$AT
+    rule:
+      kind: '@root'
+      any:
+        - has:
+            pattern: $$TOP
+            has:
+              stopBy: end
+              matches: missing
+        - has:
+            matches: missing
+  - id: clean.tool-pragma/comment
+    severity: warning
+    message: tool pragma in a comment
+    utils:
+      comment:
+        any: '@comment'
+    rule:
+      matches: comment
+      regex: '@pragma'
+  - id: clean.comment/narration
+    severity: warning
+    message: comment is neither a tool directive, a parameter doc nor an exception
+    metadata:
+      positional: '@positional'
+    utils: &comment-utils
+      comment:
+        any: '@comment'
+      allowed:
+        any:
+          - regex: '@pragma'
+          - regex: '@directive'
+          - regex: '@starter'
+          - regex: '@doc-block'
+          - regex: '@block-sections'
+      opener:
+        all:
+          - matches: comment
+          - regex: '@starter'
+      prose-opener:
+        all:
+          - matches: comment
+          - regex: '@prose-starter'
+      carried:
+        any:
+          - follows:
+              matches: prose-opener
+              stopBy:
+                not:
+                  matches: comment
+          - all:
+              - regex: '@entry'
+              - follows:
+                  matches: opener
+                  stopBy:
+                    not:
+                      matches: comment
+    rule:
+      matches: comment
+      not:
+        any:
+          - matches: allowed
+          - matches: carried
+  - id: clean.comment/continuation
+    severity: warning
+    message: comment is cut off from its exception or parameter doc by a blank line or code
+    metadata:
+      positional: '@positional'
+    utils: *comment-utils
+    rule:
+      matches: comment
+      not:
+        matches: allowed
+      any:
+        - follows:
+            all:
+              - matches: prose-opener
+              - pattern: $ABOVE
+            stopBy:
+              not:
+                matches: comment
+        - all:
+            - regex: '@entry'
+            - follows:
+                all:
+                  - matches: opener
+                  - pattern: $ABOVE
+                stopBy:
+                  not:
+                    matches: comment
+  - id: clean.comment/docstring
+    languages: [python]
+    severity: warning
+    message: docstring is neither a parameter doc nor an exception
+    metadata:
+      unless: '@docstring'
+    rule:
+      kind: string
+      inside:
+        kind: expression_statement
+        nthChild:
+          position: 1
+          ofRule:
+            not:
+              kind: comment
+        inside:
+          any:
+            - kind: module
+            - kind: block
+              inside:
+                field: body
+                any:
+                  - kind: function_definition
+                  - kind: class_definition

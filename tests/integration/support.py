@@ -11,7 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 RULES = ROOT / "rules"
-RESERVED = ("tools.yml", "limits.yml", "kinds.yml")
+RESERVED = ("tools.yml", "limits.yml", "kinds.yml", "comments.yml")
 TEST_CACHE = Path(tempfile.gettempdir()) / "quality-test-cache"
 TEST_DB = TEST_CACHE / "quality" / "db"
 NO_BUNDLE_CACHE = Path(tempfile.gettempdir()) / "quality-test-no-bundle"
@@ -243,6 +243,25 @@ def rules_without_pending(destination: Path, deep: bool = False) -> Path:
     return destination
 
 
+def rules_without_tool(destination: Path, tool: str) -> Path:
+    rules_copy(destination)
+    for path in sorted(destination.glob("*.yml")):
+        if path.name not in RESERVED:
+            kept = []
+            for rule in yaml.safe_load(path.read_text()):
+                enforcer = rule["enforcer"]
+                if isinstance(enforcer, dict):
+                    rule["enforcer"] = {
+                        kind: settings
+                        for kind, settings in enforcer.items()
+                        if settings.get("tool") != tool
+                    }
+                if rule["enforcer"]:
+                    kept.append(rule)
+            path.write_text(yaml.safe_dump(kept), encoding="utf-8")
+    return destination
+
+
 def edit_yaml(path: Path, change) -> None:
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     change(document)
@@ -317,7 +336,7 @@ def branchy(name: str, count: int) -> str:
 
 def write_every_kind(target: Target) -> None:
     target.write("pkg/__init__.py", "")
-    target.write("pkg/code.py", "import os  # noqa\n\n\n" + branchy("branchy", 12))
+    target.write("pkg/code.py", "import os  # noqa\n\nbreakpoint()\n\n\n" + branchy("branchy", 12))
     target.write("pkg/copy.py", branchy("copied", 12))
     target.write("run.sh", "#!/bin/bash\necho $1\n")
     target.write("web/app.js", "new Function(location.hash)();\n")
@@ -336,6 +355,7 @@ EVERY_KIND_RULES = {
     "coding.shell-lint",
     "coding.workflow-lint",
     "coding.dockerfile",
+    "coding.structural",
     "clean.complexity",
     "clean.tool-pragma",
     "security.secret",
@@ -345,3 +365,15 @@ DEEP_KIND_RULES = {
     "security.static-analysis",
     "security.vulnerable-dependency",
 }
+
+
+def coverage(cwd: Path, *args: str, path_value: str | None = None) -> dict:
+    result = quality(cwd, "coverage", "--json", *args, path_value=path_value)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def findings_of_rule(result: subprocess.CompletedProcess, rule: str) -> list:
+    return sorted(
+        (item["path"], item["line"]) for item in report(result)["findings"] if item["rule"] == rule
+    )

@@ -8,7 +8,7 @@ from quality.snapshot import safe_path
 
 
 def outcome(findings: list, incomplete: list) -> Outcome:
-    return Outcome(findings, [], [], [], [], incomplete)
+    return Outcome(findings, [], [], [], [], incomplete, [])
 
 
 def test_clean_exits_0():

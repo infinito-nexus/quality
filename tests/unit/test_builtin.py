@@ -8,17 +8,19 @@ JOB = "    runs-on: ubuntu-latest\n    steps:\n      - &step\n        name: s\n 
 REFERENCES = 200
 
 
+def counting(calls: Counter, name: str, original):
+    def counted(node):
+        calls[name] += 1
+        return original(node)
+
+    return counted
+
+
 @pytest.fixture
 def scans(monkeypatch):
     calls = Counter()
     for name in ("mapping_items", "sequence_items"):
-        original = getattr(builtin, name)
-
-        def counted(node, name=name, original=original):
-            calls[name] += 1
-            return original(node)
-
-        monkeypatch.setattr(builtin, name, counted)
+        monkeypatch.setattr(builtin, name, counting(calls, name, getattr(builtin, name)))
     return calls
 
 

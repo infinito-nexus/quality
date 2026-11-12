@@ -14,9 +14,10 @@ from quality.adapters.builtin import (
     prefix_groups,
     tree_children,
 )
+from quality.environment import enclosing_roots, tool_environment, validated_path
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.history import finding_key, history_hits
-from quality.ignorefile import audit_lines, refuse_stale, split_ignored, stale_names
+from quality.ignorefile import audit_lines, refuse_stale, stale_names
 from quality.ignorefile import parse as parse_ignore
 from quality.repo import Repo, hardened_env
 from quality.report import Outcome, unchecked_of
@@ -36,12 +37,13 @@ from quality.snapshot import (
     materialize,
     refuse_control_names,
 )
-from quality.suppress import split_nocheck
+from quality.waivers import suppressed
 
 FAST = "fast"
 FAST_TIER = (FAST,)
 ALL_TIERS = (FAST, "deep")
-MODE_TIERS = {"staged": FAST_TIER, "base": ALL_TIERS, "all": ALL_TIERS}
+COVERAGE = "coverage"
+MODE_TIERS = {"staged": FAST_TIER, "base": ALL_TIERS, "all": ALL_TIERS, COVERAGE: ()}
 HEAD_ONLY_NOTE = "HEAD only: history not scanned"
 
 
@@ -98,8 +100,8 @@ class Session:
     def database_notes(self) -> list:
         return [] if self.bundle is None else [self.bundle.note()]
 
-    def changed_only_rules(self) -> set:
-        return {rule.id for rule in self.data.rules if rule.changed_only and tier_of(rule) in self.tiers}
+    def file_gap_rules(self) -> set:
+        return {rule.id for rule in self.data.rules if rule.file_gap() and tier_of(rule) in self.tiers}
 
     def snapshot(self, entries: list, label: str) -> Snapshot:
         return materialize(
@@ -187,56 +189,6 @@ def every_rule(_rule) -> bool:
     return True
 
 
-def soft_rule(rule) -> bool:
-    return not rule.hard
-
-
-def validated_path(environ: dict) -> str:
-    """
-    Args:
-        environ: The caller's environment.
-
-    Returns:
-        PATH with absolute entries only, so it never resolves a tool relative to the target.
-
-    Raises:
-        QualityError: PATH is not set.
-    """
-    raw = environ.get("PATH")
-    if raw is None:
-        raise QualityError("environment is missing key 'PATH'")
-    return os.pathsep.join(entry for entry in raw.split(os.pathsep) if os.path.isabs(entry))
-
-
-def tool_environment(path_value: str, home: Path, bundle: db.Bundle | None) -> dict:
-    """
-    Args:
-        path_value: Validated PATH.
-        home: Scratch directory every tool gets as HOME and cache.
-        bundle: Vulnerability database of the deep tier, or None.
-
-    Returns:
-        The only environment tools see: Semgrep without metrics and version
-        check, osv-scanner on the bundle, no proxy, so no tool reaches the network.
-    """
-    env = {
-        "PATH": path_value,
-        "HOME": str(home),
-        "XDG_CONFIG_HOME": str(home),
-        "XDG_CACHE_HOME": str(home),
-        "LC_ALL": "C.UTF-8",
-        "PYTHONSAFEPATH": "1",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "RUFF_NO_CACHE": "true",
-        "SEMGREP_ENABLE_VERSION_CHECK": "0",
-        "SEMGREP_SEND_METRICS": "off",
-        "EIO_BACKEND": "posix",
-    }
-    if bundle is not None:
-        env["OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY"] = str(bundle.osv_cache())
-    return env
-
-
 def needs_database(data: RuleData, tiers: tuple) -> bool:
     return any(
         data.tools.get(tool, {}).get("database")
@@ -253,20 +205,6 @@ def open_database(options: Options, data: RuleData, tiers: tuple) -> db.Bundle |
         data.limit("db_max_age_days"),
         datetime.now(timezone.utc),
     )
-
-
-def enclosing_roots(cwd: str) -> list:
-    """
-    Args:
-        cwd: Directory the check runs in.
-
-    Returns:
-        That directory and the nearest ancestor holding `.git`, found without
-        git, because git itself must be vetted before it runs.
-    """
-    start = Path(cwd).resolve()
-    marked = [path for path in (start, *start.parents) if (path / ".git").exists()]
-    return [start, *marked[:1]]
 
 
 def open_session(options: Options, scratch: Path) -> Session:
@@ -324,18 +262,46 @@ def parent_baseline(session: Session, plan: Plan, parent: str, index: int):
         change.path: change.old_path for change in plan.diff(parent) if change.status == "renamed"
     }
     wanted = {
-        renames_back.get(change.path, change.path)
+        renames_back.get(change.path, change.path)  # nocheck: clean.default-value -- a path that was not renamed keeps its name
         for change in plan.changes
         if change.status != "deleted"
     }
     wanted |= {change.old_path for change in plan.changes if change.old_path}
     paths = sorted(path for path in wanted if path in snapshot.files)
-    hits = without_changed_only(session.collect(snapshot, paths, soft_rule, True))
-    hits += session.structure(snapshot, plan_folders(plan))
+    hits = baseline_hits(session, snapshot, paths, plan) + session.structure(snapshot, plan_folders(plan))
     return baseline_of(hits, {old: new for new, old in renames_back.items()})
 
 
+def baseline_hits(session: Session, snapshot: Snapshot, paths: list, plan: Plan) -> list:
+    """
+    Args:
+        session: The running check.
+        snapshot: Snapshot of one parent.
+        paths: Its files the plan touches.
+        plan: The plan with the ignore entries the head side applies.
+
+    Returns:
+        The parent's soft findings without changed_only ones, plus its unused
+        nochecks judged under the same ignore entries as the head side's.
+        Every rule runs, hard ones included, so a nocheck naming one is
+        judged as on the head side.
+    """
+    hits = session.collect(snapshot, paths, every_rule, True)
+    unused = suppressed(session.data, snapshot, paths, hits, (plan.soft_entries, plan.hard_entries))[1]
+    return without_changed_only([hit for hit in hits if not hit.rule.hard]) + unused
+
+
 def without_changed_only(hits: list) -> list:
+    """
+    Args:
+        hits: Findings of one side.
+
+    Returns:
+        The findings without those of rules marked changed_only. Such a rule
+        judges only changed files, absolutely, so it has no baseline, and
+        `--all` names the files elsewhere in the report instead: ast-grep's
+        under parse_incomplete, a file-level gap's in the notes.
+    """
     return [hit for hit in hits if not hit.rule.changed_only]
 
 
@@ -361,17 +327,18 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
     changed = {change.path for change in plan.changes}
     notes = notes + control_notes(plan.head, plan.changes)
     oversize = [path for path in plan.head.unchecked if path in changed]
-    hits = session.collect(plan.head, touched_paths(plan), every_rule, False)
+    paths = touched_paths(plan)
+    hits = session.collect(plan.head, paths, every_rule, False)
     hits += session.oversized(plan.head, oversize) + session.binary_code(plan.head)
     hits += session.structure(plan.head, plan_folders(plan))
-    refuse_stale(stale_names(plan.soft_entries, hits, set(touched_paths(plan)), session.changed_only_rules()))
-    kept, ignored = split_ignored(hits, plan.soft_entries, plan.hard_entries)
-    kept, nocheck = split_nocheck(kept, plan.head)
+    refuse_stale(stale_names(plan.soft_entries, hits, set(paths), session.file_gap_rules()))
+    kept, unused, ignored, nocheck = suppressed(session.data, plan.head, paths, hits, (plan.soft_entries, plan.hard_entries))
+    kept += unused
     findings = [hit for hit in kept if ungated(hit)]
     soft = [hit for hit in kept if not ungated(hit)]
     if soft:
         findings += new_hits(soft, plan_baseline(session, plan))
-    return Outcome(findings, ignored, nocheck, unchecked_of(plan.head, changed), notes, [])
+    return Outcome(findings, ignored, nocheck, unchecked_of(plan.head, changed), notes, [], sorted(plan.head.unparsed))
 
 
 def touched_paths(plan: Plan) -> list:
@@ -397,18 +364,18 @@ def check_all(session: Session, _options: Options) -> Outcome:
     hits += session.oversized(head, head.unchecked) + session.binary_code(head)
     hits += session.structure(head, None)
     entries = parse_ignore(head.ignore_data(), session.data)
-    kept, ignored = split_ignored(hits, entries, entries)
+    kept, unused, ignored, nocheck = suppressed(session.data, head, head.paths(), hits, (entries, entries))
     refuse_stale([entry for entry in entries if entry not in ignored])
-    findings, nocheck = split_nocheck(without_changed_only(kept), head)
+    findings = without_changed_only(kept + unused)
     notes = session.database_notes() + session.pending_notes(ALL_TIERS) + unparsed_notes(kept)
     if session.repo.is_shallow():
         notes.append(HEAD_ONLY_NOTE)
     pending = [rule.id for rule in session.data.pending_rules(ALL_TIERS)]
-    return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending)
+    return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending, sorted(head.unparsed))
 
 
 def unparsed_notes(kept: list) -> list:
-    return [f"parse incomplete: {path}" for path in sorted({hit.path for hit in kept if hit.rule.changed_only})]
+    return [f"parse incomplete: {path}" for path in sorted({hit.path for hit in kept if hit.rule.file_gap()})]
 
 
 def check_staged(session: Session, _options: Options) -> Outcome:
@@ -417,7 +384,7 @@ def check_staged(session: Session, _options: Options) -> Outcome:
     changes = repo.staged_changes(first_parent)
     notes = session.pending_notes(FAST_TIER)
     if not changes:
-        return Outcome([], [], [], [], notes, [])
+        return Outcome([], [], [], [], notes, [], [])
     head = session.snapshot(repo.index_entries(), "head")
     merge_head = repo.merge_head()
     parents = [first_parent, merge_head] if merge_head else [first_parent]

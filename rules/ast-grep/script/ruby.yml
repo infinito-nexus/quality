@@ -1,0 +1,9 @@
+id: coding.structural/debugger
+language: ruby
+severity: warning
+message: debugger entry point left in code
+rule:
+  any:
+    - pattern: binding.pry
+    - pattern: binding.irb
+    - pattern: byebug

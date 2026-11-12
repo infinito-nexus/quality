@@ -38,6 +38,7 @@ class Outcome:
     unchecked: list
     notes: list
     incomplete: list
+    unparsed: list
 
 
 def public_finding(hit) -> dict:
@@ -84,12 +85,13 @@ def render_json(outcome: Outcome) -> str:
         "unchecked": sorted({item.path for item in outcome.unchecked}),
         "notes": outcome.notes,
         "incomplete": outcome.incomplete,
+        "parse_incomplete": outcome.unparsed,
     }
     return json.dumps(document, indent=2, sort_keys=True)
 
 
 def sorted_hits(hits: list) -> list:
-    return sorted(hits, key=lambda hit: (hit.path, hit.line or 0, hit.rule.id))
+    return sorted(hits, key=lambda hit: (hit.path, hit.line or 0, hit.rule.id))  # nocheck: clean.default-value -- a finding without a line sorts as line 0
 
 
 def text_line(hit) -> str:
@@ -103,6 +105,8 @@ def text_line(hit) -> str:
 def render_text(outcome: Outcome) -> str:
     lines = [text_line(hit) for hit in sorted_hits(outcome.findings)]
     lines += [f"unchecked: {item.path} {item.reason}" for item in sorted(set(outcome.unchecked))]
+    unparsed = [f"parse incomplete: {path}" for path in outcome.unparsed]
+    lines += [line for line in unparsed if line not in outcome.notes]
     lines += outcome.notes
     if outcome.incomplete:
         lines.append(f"incomplete: pending rules {', '.join(outcome.incomplete)}")

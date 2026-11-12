@@ -118,6 +118,13 @@ def test_split_ignored_consults_the_side_of_each_rule():
     assert applied == hard_only
 
 
+def test_split_ignored_reads_a_parse_gap_entry_from_the_base_side():
+    entries = parse(b"- rule: coding.parse-incomplete\n  reason: why\n  paths: [src/]\n", DATA)
+    hits = [hit("coding.parse-incomplete", "src/gap.js")]
+    assert split_ignored(hits, entries, []) == (hits, [])
+    assert split_ignored(hits, [], entries) == ([], entries)
+
+
 GAP = "security.partial-scan"
 STATIC = "security.static-analysis"
 

@@ -1,0 +1,123 @@
+marker: '(?:#|//[/!]?|/\*+!?|--|<!--)'
+pragmas:
+  ruff: ['noqa\b', 'ruff:\s*(?:noqa|disable|enable)\b', 'fmt:\s*(?:off|on|skip)\b']
+  flake8: ['flake8:\s*noqa\b']
+  mypy: ['type:\s*ignore\b', 'mypy:\s*(?:ignore-errors|disable-error-code)\b']
+  pyright: ['pyright:\s*ignore\b']
+  pyre: ['pyre-(?:ignore|fixme)\b']
+  pylint: ['pylint:\s*(?:disable|skip-file)\b']
+  isort: ['isort:\s*(?:skip_file|skip|off|on)\b']
+  bandit: ['nosec\b']
+  coverage: ['pragma:\s*no\s*(?:cover|branch)\b']
+  detect-secrets: ['pragma:\s*allowlist\b']
+  semgrep: ['nosemgrep\b']
+  trivy: ['trivy:ignore\b']
+  shellcheck: ['shellcheck\s+disable=']
+  lizard: ['lizard\s+forgives?\b']
+  eslint: ['eslint-(?:disable|enable)\b', 'eslint\s+[\w@/-]+\s*:']
+  tslint: ['tslint:(?:disable|enable)\b']
+  biome: ['biome-ignore\b']
+  deno: ['deno-lint-ignore\b']
+  jshint: ['jshint\s+ignore\b']
+  typescript: ['@ts-(?:ignore|nocheck|expect-error)\b']
+  istanbul: ['istanbul\s+ignore\b']
+  c8: ['c8\s+ignore\b']
+  v8: ['v8\s+ignore\b']
+  vite: ['@vite-ignore\b']
+  prettier: ['prettier-ignore\b']
+  intellij: ['noinspection\b', '@formatter:(?:off|on)\b']
+  resharper: ['ReSharper\s+(?:disable|restore)\b']
+  sonar: ['nosonar\b']
+  pmd: ['NOPMD\b']
+  checkstyle: ['CHECKSTYLE\s*:\s*(?:OFF|ON)\b']
+  golangci-lint: ['nolint\b']
+  clang-tidy: ['nolint(?:nextline|begin|end)\b']
+  cppcheck: ['cppcheck-suppress\b']
+  staticcheck: ['lint:(?:file-)?ignore\b']
+  rubocop: ['rubocop:\s*(?:disable|todo)\b']
+  standard: ['standard:\s*disable\b']
+  phpcs: ['phpcs:\s*(?:ignore|disable)\b']
+  phpstan: ['@phpstan-ignore']
+  psalm: ['@psalm-suppress\b']
+  stylelint: ['stylelint-(?:disable|enable)\b']
+  markdownlint: ['markdownlint-(?:disable|capture)\b']
+  jscpd: ['jscpd:ignore']
+  luacheck: ['luacheck:\s*(?:ignore|push\s+ignore)\b']
+  ktlint: ['ktlint-disable\b']
+  hadolint: ['hadolint\s+(?:global\s+)?(?:ignore|shell)\s*=']
+  yamllint: ['yamllint\s+disable']
+  checkov: ['checkov:skip\b']
+  tfsec: ['tfsec:ignore\b']
+  tflint: ['tflint-ignore\b']
+  kics: ['kics-scan\s+ignore\b']
+pragmas_anywhere:
+  ast-grep: ['ast[-_]grep[-_]ignore']
+  gitleaks: ['gitleaks:allow\b']
+directives:
+  - tool: python type comment
+    languages: [python]
+    position: trailing
+    spellings: ['type:\s*[\w.]+(?:\[[^\]\n]*\])?']
+  - tool: python signature type comment
+    languages: [python]
+    spellings: ['type:\s*\([^)\n]*\)\s*->\s*[\w.]+(?:\[[^\]\n]*\])?']
+  - tool: pep263 encoding
+    languages: [python, ruby]
+    position: {first: 2, last: 0}
+    spellings: ['(?:-\*-\s*)?(?:en)?coding[:=]\s*[-\w.]+(?:\s*-\*-)?']
+  - tool: emacs file variables
+    position: {first: 2, last: 0}
+    spellings: ['-\*-\s*[\w+-]+\s*-\*-', '-\*-\s*(?:[\w-]+\s*:\s*[^;\n]+?\s*;\s*)*[\w-]+\s*:\s*[^;\n]+?\s*;?\s*-\*-']
+  - tool: vim modeline
+    position: {first: 5, last: 5}
+    spellings: ['(?:vim?|Vim|ex):\s*(?:set?\s+)?(?:no)?(?:ts|tabstop|sw|shiftwidth|sts|softtabstop|et|expandtab|tw|textwidth|ft|filetype|syn|syntax|fenc|fileencoding|ff|fileformat|ai|autoindent|si|smartindent|ci|cindent|fdm|foldmethod|fdl|foldlevel|fmr|foldmarker|spell|spl|spelllang|wrap|list|nu|number|ro|readonly|bomb|eol|fixeol|cc|colorcolumn|lbr|linebreak|cms|commentstring)(?:=[^\s:\\]+)?(?:[ \t:]+(?:no)?(?:ts|tabstop|sw|shiftwidth|sts|softtabstop|et|expandtab|tw|textwidth|ft|filetype|syn|syntax|fenc|fileencoding|ff|fileformat|ai|autoindent|si|smartindent|ci|cindent|fdm|foldmethod|fdl|foldlevel|fmr|foldmarker|spell|spl|spelllang|wrap|list|nu|number|ro|readonly|bomb|eol|fixeol|cc|colorcolumn|lbr|linebreak|cms|commentstring)(?:=[^\s:\\]+)?)*:?']
+  - tool: shellcheck
+    languages: [bash]
+    spellings: ['shellcheck\s+(?:shell|source|source-path|external-sources|enable)=\S+(?:\s+(?:shell|source|source-path|external-sources|enable)=\S+)*']
+  - tool: eslint
+    languages: [javascript, typescript, tsx]
+    marker: '/\*+'
+    spellings: ['eslint-env\s+[\w-]+(?:\s*,\s*[\w-]+)*', 'globals?\s+[\w$]+(?:\s*:\s*(?:readonly|writable|off|true|false))?(?:\s*,\s*[\w$]+(?:\s*:\s*(?:readonly|writable|off|true|false))?)*', 'exported\s+[\w$]+(?:\s*,\s*[\w$]+)*']
+  - tool: webpack magic comments
+    languages: [javascript, typescript, tsx]
+    marker: '/\*+'
+    spellings: ['webpack(?:ChunkName|Mode|Prefetch|Preload|Include|Exclude|Ignore|Exports|FetchPriority)\s*:\s*(?:"[^"\n]*"|''[^''\n]*''|true|false|-?\d+|/[^/\n]+/\w*|\[[^\]\n]*\])(?:\s*,\s*webpack(?:ChunkName|Mode|Prefetch|Preload|Include|Exclude|Ignore|Exports|FetchPriority)\s*:\s*(?:"[^"\n]*"|''[^''\n]*''|true|false|-?\d+|/[^/\n]+/\w*|\[[^\]\n]*\]))*']
+  - tool: bundler annotations
+    languages: [javascript, typescript, tsx]
+    marker: '/\*+'
+    spellings: ['[#@]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE|KEY|MANGLE_PROP)__']
+  - tool: typescript
+    languages: [javascript, typescript, tsx]
+    spellings: ['@ts-check', '<reference\s+(?:path|types|lib|no-default-lib)="[^"\n]*"\s*/>']
+  - tool: flow
+    languages: [javascript, typescript, tsx]
+    spellings: ['@flow(?:\s+strict(?:-local)?)?', '@noflow']
+  - tool: jsx pragma
+    languages: [javascript, typescript, tsx]
+    spellings: ['@jsx(?:Frag|ImportSource|Runtime)?\s+[\w.@/-]+']
+  - tool: source map
+    languages: [javascript, typescript, tsx, css]
+    spellings: ['[#@]\s*source(?:Mapping)?URL=\S+']
+  - tool: ruby magic comments
+    languages: [ruby]
+    spellings: ['frozen_string_literal:\s*(?:true|false)', 'warn_indent:\s*(?:true|false)', 'shareable_constant_value:\s*(?:none|literal|experimental_everything|experimental_copy)']
+  - tool: licence
+    spellings: ['SPDX-License-Identifier:\s*\(?(?:MIT|ISC|Unlicense|Zlib|WTFPL|0BSD|LicenseRef-[\w.-]+|[A-Z][A-Za-z0-9]*(?:-[A-Za-z]+)*-\d[\w.+-]*)(?:\s+(?:AND|OR|WITH)\s+\(?(?:MIT|ISC|Unlicense|Zlib|WTFPL|0BSD|LicenseRef-[\w.-]+|[A-Z][A-Za-z0-9]*(?:-[A-Za-z]+)*-\d[\w.+-]*)\)?)*\)?', '@license\s+(?:MIT|ISC|Unlicense|Zlib|WTFPL|0BSD|[A-Z][A-Za-z0-9]*(?:-[A-Za-z]+)*-\d[\w.+-]*)', '@preserve']
+  - tool: intellij language injection
+    spellings: ['language=(?:SQL|[A-Za-z]+SQL|SQLite|HTML|XML|XHTML|JSON|JSON5|JSONPath|YAML|TOML|CSS|SCSS|Sass|LESS|JavaScript|ECMAScript\s6|JS|TypeScript|TSX|JSX|RegExp|Markdown|GraphQL|Python|Shell\s?Script|Bash|Groovy|Kotlin|Java|HTTP|Dockerfile|Vue)(?:\s+(?:prefix|suffix)=\S+)*']
+  - tool: pyright
+    languages: [python]
+    spellings: ['pyright:\s*(?:basic|standard|strict)']
+  - tool: go compiler directives
+    languages: [go]
+    marker: '//'
+    tight: true
+    spellings: ['go:(?:build|generate|embed|linkname|noinline|nosplit|noescape|norace|nocheckptr|uintptrescapes|wasmimport|wasmexport)\b.*']
+  - tool: go build constraints
+    languages: [go]
+    marker: '//'
+    spellings: ['\+build\s+\S.*']
+headings:
+  rust: '//[/!]'
+sections: ['Args', 'Arguments', 'Params', 'Parameters', 'Returns', 'Yields', 'Raises', 'Throws', 'Attributes', 'Inputs?', 'Outputs?', 'Exit codes', 'Environment', 'Errors', 'Panics', 'Safety']
+doc_tags: ['param\b', 'arg\b', 'argument\b', 'returns\b', 'return\b', 'throws\b', 'exception\b', 'property\b', 'prop\b', 'typedef\b', 'template\b', 'yields\b', 'yield\b', 'callback\b', 'type\s*\{[^}\n]*\}']

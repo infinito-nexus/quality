@@ -36,6 +36,7 @@ def create_app(config_path):
     """
     settings = load(config_path)
     app = Flask(__name__)
+    app.jinja_env.autoescape = True
     upload = settings["limits"]["upload_bytes"]
     app.config.update(MAX_CONTENT_LENGTH=upload * 2 + FORM_OVERHEAD_BYTES, MAX_FORM_MEMORY_SIZE=upload + FORM_OVERHEAD_BYTES)
     app.extensions["quality"] = {
@@ -66,4 +67,4 @@ def secure(response):
 
 
 def message(error):
-    return render_template("message.html", text=MESSAGES[error.code]), error.code
+    return render_template("message.html.j2", text=MESSAGES[error.code]), error.code

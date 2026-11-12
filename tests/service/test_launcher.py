@@ -92,6 +92,7 @@ def test_parse_job_deep_nesting_raises():
 def report(**changes):
     finding = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None}
     document = {"findings": [finding], "ignored": [], "nocheck": [], "unchecked": [], "notes": [], "incomplete": []}
+    document["parse_incomplete"] = []
     document.update(changes)
     return document
 

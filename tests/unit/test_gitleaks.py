@@ -17,6 +17,7 @@ RULE = build_rule(
         "enforcer": {ANY_KIND: {"tool": "gitleaks"}},
     },
     "fixture",
+    {},
 )
 BINDING = Binding(RULE, "gitleaks", {"tool": "gitleaks"}, frozenset({ANY_KIND}))
 FILES = {

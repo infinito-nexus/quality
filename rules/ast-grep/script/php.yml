@@ -1,0 +1,8 @@
+id: coding.structural/debug-output
+language: php
+severity: warning
+message: debug dump left in code
+rule:
+  any:
+    - pattern: var_dump($$$)
+    - pattern: var_export($VALUE)

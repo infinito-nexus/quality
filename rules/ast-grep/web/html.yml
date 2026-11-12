@@ -1,0 +1,17 @@
+id: coding.structural/inline-handler
+language: html
+severity: warning
+message: an inline event handler needs unsafe-inline in the content security policy
+rule:
+  kind: attribute
+  has:
+    kind: attribute_name
+    regex: '^(?i:on[a-z]+)$'
+---
+id: coding.structural/javascript-url
+language: html
+severity: warning
+message: a javascript URL needs unsafe-inline in the content security policy
+rule:
+  kind: attribute_value
+  regex: '^\s*(?i:javascript):'

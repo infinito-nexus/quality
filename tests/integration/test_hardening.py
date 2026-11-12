@@ -55,6 +55,7 @@ def test_repo_config_ignored(target):
         "import os  # noqa\n\n\n" + branchy("branchy", 12),
     )
     target.write("b.py", "import sys\n")
+    target.write("c.py", "breakpoint()\n")
     target.write("s.sh", "#!/bin/bash\necho $1\n")
     target.write(
         ".github/workflows/w.yml",
@@ -80,6 +81,7 @@ def test_repo_config_ignored(target):
     target.write(".gitleaksignore", ".env:github-pat:1\n")
     target.write(".hadolint.yaml", HADOLINT_IGNORING)
     target.write(".hadolint.yml", HADOLINT_IGNORING)
+    target.write("sgconfig.yml", 'ruleDirs: []\nlanguageGlobs:\n  rust: ["*.py"]\n')
     target.commit()
     assert findings_without_folder_size(target.check("--all", "--json")) == plain
     assert_config_changes_the_raw_tools(target)
@@ -170,6 +172,12 @@ def assert_config_changes_the_raw_tools(target) -> None:
     assert "branchy" in plain_lizard.stdout
     assert raw_tool(target.path, "rg", "--no-config", "noqa").stdout == ""
     assert "noqa" in raw_tool(target.path, "rg", "--no-config", "--no-ignore", "noqa").stdout
+    scan = ("ast-grep", "scan", "--rule", str(RULES / "ast-grep" / "script" / "python.yml"), "--json=stream")
+    assert raw_tool(target.path, *scan, "--no-ignore", "dot", "c.py").stdout == ""
+    config = target.path.parent / "own-sgconfig.yml"
+    config.write_text('{"languageGlobs": {"python": ["*"]}}', encoding="utf-8")
+    own = ("--config", str(config))
+    assert "breakpoint" in raw_tool(target.path, *scan, *own, "--no-ignore", "dot", "c.py").stdout
 
 
 PLANTED_SEMGREP = (
@@ -566,7 +574,7 @@ def test_dash_prefixed_file_names_reach_every_tool(target):
 
 
 def test_non_utf8_path_never_passes_silently(target):
-    body = "import os  # noqa\n\n\n" + branchy("branchy", 12)
+    body = "import os  # noqa\nbreakpoint()\n\n\n" + branchy("branchy", 12)
     (target.path / os.fsdecode(b"caf\xe9.py")).write_text(body, encoding="utf-8")
     (target.path / os.fsdecode(b"caf\xe9.sh")).write_text(
         "#!/bin/bash\necho $1\n", encoding="utf-8"
@@ -576,6 +584,7 @@ def test_non_utf8_path_never_passes_silently(target):
     assert result.returncode == 1, result.stderr
     assert {
         "coding.unused-import",
+        "coding.structural",
         "clean.tool-pragma",
         "clean.complexity",
         "coding.shell-lint",

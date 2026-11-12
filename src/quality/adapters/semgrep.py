@@ -144,7 +144,7 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
             such as a rule timeout that would leave a file unchecked.
     """
     document = json.loads(stdout)
-    rule = (checked_rules(command) or [command.bound[0].binding.rule])[0]
+    rule = (checked_rules(command) or [command.bound[0].binding.rule])[0]  # nocheck: clean.default-value -- the bound rule when no checked rule ran
     unread, partial = read_errors(document["errors"], snapshot)
     scanned = {reported_path(path, snapshot) for path in document["paths"].get("scanned", [])}
     partial |= {path for path in command.files if path not in scanned}

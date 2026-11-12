@@ -17,8 +17,10 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
         _empty_file: Unused; ripgrep needs no empty configuration.
 
     Returns:
-        One command per rule; a rule setting `multiline` lets its pattern span
-        lines, such as a pipe continued after a backslash.
+        One command per rule. A rule setting `multiline` lets its pattern span
+        lines, such as a pipe continued after a backslash; a rule setting
+        `pcre2` gets look-around, which its pattern needs to skip permitted
+        values and comments.
     """
     return [
         Command(
@@ -28,6 +30,7 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
                 "--hidden",
                 "--json",
                 *(["--multiline"] if item.binding.settings.get("multiline") else []),
+                *(["--pcre2"] if item.binding.settings.get("pcre2") else []),
                 "--regexp",
                 require(item.binding.settings, "pattern", f"enforcer of {item.binding.rule.id}"),
                 "--",
@@ -85,7 +88,7 @@ def match_rows(data: dict) -> list:
     """
     text = reported_bytes(data["lines"])
     first = data["line_number"]
-    return sorted({first + text[: item["start"]].count(b"\n") for item in data["submatches"]} or {first})
+    return sorted({first + text[: item["start"]].count(b"\n") for item in data["submatches"]} or {first})  # nocheck: clean.default-value -- an event without submatches starts on its first line
 
 
 def inside_comment(pattern: str, snapshot, path: str, row: int) -> bool:

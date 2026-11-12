@@ -1,0 +1,47 @@
+id: coding.structural/placeholder-macro
+language: rust
+severity: warning
+message: todo, unimplemented or dbg macro left in code
+rule:
+  kind: macro_invocation
+  has:
+    field: macro
+    regex: '^(?:todo|unimplemented|dbg)$'
+---
+id: clean.default-value/unwrap-or
+language: rust
+severity: warning
+message: unwrap_or with a value; fail early, return an error that names the missing key and where to set it
+rule:
+  kind: field_identifier
+  regex: '^unwrap_or(?:_default)?$'
+  inside:
+    kind: field_expression
+    field: field
+    inside:
+      kind: call_expression
+      field: function
+      not:
+        all:
+          - has:
+              field: function
+              has:
+                field: field
+                regex: '^unwrap_or$'
+          - has:
+              field: arguments
+              has:
+                regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined|string::new\(\)|vec::new\(\)|vec!\[\])|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+                all:
+                  - nthChild: 1
+                  - nthChild:
+                      position: 1
+                      reverse: true
+---
+id: clean.default-value/serde-default
+language: rust
+severity: warning
+message: serde default; fail early, make the field required and deny unknown fields
+rule:
+  kind: attribute_item
+  regex: '^#\[serde\([^\]]*\bdefault\b'

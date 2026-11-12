@@ -1,0 +1,9 @@
+id: coding.structural/gets
+language: c
+severity: warning
+message: gets cannot bound its input and was removed in C11
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: '^gets$'

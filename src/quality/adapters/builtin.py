@@ -1,15 +1,17 @@
+import json
 import re
 from collections import Counter
 
 import yaml
 
 from quality import QualityError
-from quality.gate import metric_hit
+from quality.gate import code_hit, metric_hit
 from quality.ruledata import require
 
 ROOT_FOLDER = "."
 SEPARATOR = re.compile(r"[_-]")
 CONTINUATION = "\\"
+YAML_LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
 
 
 def file_lines(item, snapshot) -> list:
@@ -210,7 +212,111 @@ def name_prefix(name: str, exempt: list) -> str | None:
     return prefix
 
 
-BUILTINS = {"file-lines": file_lines, "inline-script": inline_scripts}
+def json_error(data: bytes) -> tuple:
+    """
+    Args:
+        data: File content.
+
+    Returns:
+        (broken, line) from the standard library's JSON parser; the line is
+        None where the bytes are no valid Unicode.
+    """
+    try:
+        json.loads(data)
+    except UnicodeDecodeError:
+        return True, None
+    except json.JSONDecodeError as error:
+        return True, error.lineno
+    except RecursionError:
+        raise QualityError("a JSON file nests too deep to parse") from None
+    return False, None
+
+
+def yaml_error(data: bytes) -> tuple:
+    """
+    Args:
+        data: File content.
+
+    Returns:
+        (broken, line) from composing every document, which covers syntax and
+        aliases but constructs nothing, so custom tags such as `!vault` pass.
+    """
+    try:
+        for _ in yaml.compose_all(data, Loader=YAML_LOADER):
+            pass
+    except yaml.MarkedYAMLError as error:
+        return True, None if error.problem_mark is None else error.problem_mark.line + 1
+    except yaml.YAMLError:
+        return True, None
+    return False, None
+
+
+def utf8_error(data: bytes) -> tuple:
+    """
+    Args:
+        data: File content.
+
+    Returns:
+        (broken, None) where the bytes are no UTF-8, which ast-grep skips
+        without a word, so no structural rule would see the file.
+    """
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return True, None
+    return False, None
+
+
+def uncounted_line_breaks(item, snapshot) -> list:
+    """
+    Args:
+        item: Bound rule with its files. Its settings list under `breaks`
+            the pattern of each line break, with the `kinds` whose language
+            ends a line there, or every bound kind where it names none.
+        snapshot: Snapshot holding the files.
+
+    Returns:
+        One finding per file whose text holds such a break, on the
+        LF-counted line of the first one: ast-grep, ripgrep and the nocheck
+        lookup count no line there, so code after it shares the line of a
+        comment.
+    """
+    breaks = require(item.binding.settings, "breaks", f"enforcer of {item.binding.rule.id}")
+    hits = []
+    for path in item.files:
+        data = snapshot.text(path)
+        text = "" if data is None else data.decode("utf-8", "replace")
+        found = break_pattern(breaks, snapshot.kinds_of(path)).search(text)
+        if found is not None:
+            row = text.count("\n", 0, found.start()) + 1
+            hits.append(code_hit(item.binding.rule, path, row, "", snapshot))
+    return hits
+
+
+def break_pattern(breaks: list, kinds: frozenset) -> re.Pattern:
+    return re.compile("|".join(entry["pattern"] for entry in breaks if "kinds" not in entry or kinds & set(entry["kinds"])))
+
+
+def syntax(parser):
+    def check(item, snapshot) -> list:
+        hits = []
+        for path in item.files:
+            broken, line = parser(snapshot.data(path))
+            if broken:
+                hits.append(code_hit(item.binding.rule, path, line, parser.__name__, snapshot))
+        return hits
+
+    return check
+
+
+BUILTINS = {
+    "file-lines": file_lines,
+    "inline-script": inline_scripts,
+    "uncounted-line-break": uncounted_line_breaks,
+    "json-syntax": syntax(json_error),
+    "yaml-syntax": syntax(yaml_error),
+    "utf-8": syntax(utf8_error),
+}
 
 
 def run_builtin(item, snapshot) -> list:

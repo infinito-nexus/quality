@@ -3,13 +3,19 @@ extensions:
   .pyi: python
   .sh: shell
   .bash: shell
+  .zsh: shell
   .js: javascript
   .mjs: javascript
   .cjs: javascript
+  .jsx: javascript
   .ts: typescript
+  .mts: typescript
+  .cts: typescript
   .tsx: tsx
   .java: java
   .kt: kotlin
+  .kts: kotlin
+  .cs: csharp
   .rs: rust
   .go: go
   .rb: ruby
@@ -18,18 +24,64 @@ extensions:
   .c: c
   .h: c
   .cpp: cpp
+  .cc: cpp
   .hpp: cpp
+  .yml: yaml
+  .yaml: yaml
+  .json: json
+  .md: markdown
+  .html: html
+  .htm: html
+  .css: css
+  .sql: sql
+  .toml: toml
+  .xml: xml
+  .nix: nix
+  .tex: tex
+  .tf: hcl
+  .hcl: hcl
+  .ini: ini
+  .cfg: ini
+  .conf: conf
+  .env: env
+  .mk: make
+  .service: systemd
+  .socket: systemd
+  .timer: systemd
+  .mount: systemd
+  .j2: jinja
+  .jinja: jinja
+  .jinja2: jinja
 shebangs:
   bash: shell
   sh: shell
   dash: shell
+  zsh: shell
+  ksh: shell
   python: python
   pypy: python
   node: javascript
+  ruby: ruby
+  php: php
+  lua: lua
+templates:
+  - jinja
 globs:
   workflow:
     - /.github/workflows/*.yml
     - /.github/workflows/*.yaml
+  make:
+    - Makefile
+    - makefile
+    - GNUmakefile
+  env:
+    - .env
+    - .env.*
+  nginx:
+    - nginx.conf
+    - "*.nginx.conf"
+    - "**/nginx/**/*.conf"
+    - "**/conf.d/*.conf"
 names:
   dockerfile: [Dockerfile, Containerfile]
 binary_names: [.DS_Store, Thumbs.db]
@@ -54,6 +106,7 @@ code:
   - tsx
   - java
   - kotlin
+  - csharp
   - rust
   - go
   - ruby
@@ -69,6 +122,7 @@ comment_markers:
   tsx: "//"
   java: "//"
   kotlin: "//"
+  csharp: "//"
   rust: "//"
   go: "//"
   php: "//"
@@ -76,4 +130,18 @@ comment_markers:
   cpp: "//"
   lua: "--"
   workflow: "#"
+  yaml: "#"
+  toml: "#"
+  make: "#"
+  env: "#"
+  conf: "#"
+  ini: "#"
+  nginx: "#"
   dockerfile: "#"
+  systemd: "#"
+  nix: "#"
+  hcl: "#"
+  sql: "--"
+  tex: "%"
+  css: "/*"
+  html: "<!--"

@@ -31,7 +31,7 @@ class IgnoreEntry:
         return rule_matches(rule_id, self.rule) and path in self.literal_paths()
 
     def waives(self, hit) -> bool:
-        if hit.rule.changed_only:
+        if hit.rule.file_gap():
             return self.names(hit.rule.id, hit.path)
         return self.covers(hit.rule.id, hit.path)
 
@@ -86,9 +86,9 @@ def check_hard(rule: str, paths: tuple, position: int, data: RuleData) -> None:
 
 
 def check_literal(rule: str, paths: tuple, position: int, data: RuleData) -> None:
-    if not any(member.id == rule and member.changed_only for member in data.rules):
+    if not any(member.id == rule and member.file_gap() for member in data.rules):
         return
-    for pattern in paths or ("",):
+    for pattern in paths or ("",):  # nocheck: clean.default-value -- an entry without paths is rejected like an empty path
         if not pattern or pattern.startswith("!") or pattern.endswith("/") or GLOB_CHARACTERS.search(pattern):
             raise QualityError(
                 f"{IGNORE_FILE}: entry {position} names {rule}, which only a list of literal file paths waives, "
@@ -141,9 +141,9 @@ def split_ignored(hits: list, soft_entries: list, hard_entries: list) -> tuple:
     Args:
         hits: Findings on the head side.
         soft_entries: Entries consulted for the other rules.
-        hard_entries: Entries consulted for hard and changed_only rules, which
-            `--base` reads from the base side, so a pull request cannot waive
-            its own finding.
+        hard_entries: Entries consulted for hard and changed_only rules,
+            which `--base` reads from the base side, so a pull request
+            cannot waive its own finding or parse gap.
 
     Returns:
         The remaining findings and the entries that applied.
@@ -151,7 +151,7 @@ def split_ignored(hits: list, soft_entries: list, hard_entries: list) -> tuple:
     kept = []
     applied = []
     for hit in hits:
-        entries = hard_entries if hit.rule.hard or hit.rule.changed_only else soft_entries
+        entries = hard_entries if hit.rule.waived_from_base() else soft_entries
         entry = next((item for item in entries if item.waives(hit)), None)
         if entry is None:
             kept.append(hit)
@@ -171,7 +171,7 @@ def stale_names(entries: list, hits: list, checked: set, rule_ids: set) -> list:
         entries: Head side entries.
         hits: Findings before any entry applied.
         checked: Files this run checked.
-        rule_ids: changed_only rules of the running tiers.
+        rule_ids: File-level changed_only rules of the running tiers.
 
     Returns:
         The entries naming one of those rules and a checked file that rule

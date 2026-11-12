@@ -13,7 +13,15 @@ launcher = load_launcher()
 FAKE = Path(__file__).with_name("fake_container.py")
 DEV_CONFIG = ROOT / "service" / "dev" / "config.json"
 FINDING = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None}
-REPORT = {"findings": [FINDING], "ignored": [], "nocheck": [], "unchecked": [], "notes": [], "incomplete": []}
+REPORT = {
+    "findings": [FINDING],
+    "ignored": [],
+    "nocheck": [],
+    "unchecked": [],
+    "notes": [],
+    "incomplete": [],
+    "parse_incomplete": [],
+}
 SANDBOX_FLAGS = {
     "--read-only",
     "--user=65534:65534",
@@ -31,7 +39,7 @@ def ident(number):
     return f"{number:032x}"
 
 
-def text_job(content="import os\n", **extra):
+def text_job(content="import os\n", **extra):  # nocheck: clean.default-value -- the one-line upload every job test starts from
     """
     Args:
         content: Python source of the job; an unused import by default, the smallest text that yields a finding.
@@ -47,7 +55,7 @@ class Harness:
         for name in ("spool", "reports", "claimed"):
             (self.state / name).mkdir(parents=True)
         self.calls = tmp_path / "calls.jsonl"
-        self.behaviour = {"runtimes": {"runc": {}}, "containers": [], "steps": {}}
+        self.behaviour = {"info": json.dumps({"runc": {}}) + "\n", "containers": [], "steps": {}}
         self.step(fetch=(0, "0123abc\n"), prepare=(0, ""), scan=(0, json.dumps(REPORT)), database=(0, ""))
         self.config = json.loads(DEV_CONFIG.read_text(encoding="utf-8"))
         behaviour = str(tmp_path / "behaviour.json")
@@ -59,7 +67,7 @@ class Harness:
         for name, (code, stdout) in steps.items():
             self.behaviour["steps"][name] = {"exit": code, "stdout": stdout}
 
-    def submit(self, number, job, tier=2, age=0):
+    def submit(self, number, job, tier=2, age=0):  # nocheck: clean.default-value -- a fresh job of the lowest tier unless a queue test varies them
         """
         Args:
             number: Job number, turned into its 32-digit id.
@@ -107,6 +115,16 @@ def test_no_runtime_no_job(harness):
     assert stopped.value.code == 2
     assert harness.runs() == []
     assert harness.report(1) is None
+
+
+@pytest.mark.parametrize("printed", ["null\n", "{}\n", "", "[]\n", "{oops\n", '"runc"\n'])
+def test_no_runtime_map_no_job(harness, printed):
+    harness.behaviour["info"] = printed
+    harness.submit(1, text_job())
+    with pytest.raises(SystemExit) as stopped:
+        harness.run()
+    assert stopped.value.code == 2
+    assert harness.runs() == []
 
 
 def test_member_first(harness):

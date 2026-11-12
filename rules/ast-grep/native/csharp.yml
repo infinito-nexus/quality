@@ -1,0 +1,52 @@
+id: clean.default-value/parameter
+language: csharp
+severity: warning
+message: optional parameter; fail early, make it required
+rule:
+  kind: parameter
+  regex: '='
+  not:
+    regex: '=\s*(?:""|''''|``|(?i:false|none|null|nil|undefined|string\.empty)|\[\s*\]|\{\s*\}|\(\s*\))\s*$'
+---
+id: clean.default-value/nullish
+language: csharp
+severity: warning
+message: fallback after ??; fail early, check for null and throw an error that names the missing key and where to set it
+rule:
+  any:
+    - pattern:
+        context: x = $LEFT ?? $RIGHT;
+        selector: binary_expression
+    - pattern:
+        context: $LEFT ??= $RIGHT;
+        selector: assignment_expression
+  has:
+    field: right
+    not:
+      any:
+        - kind: throw_expression
+        - regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined|string\.empty)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+---
+id: clean.default-value/get-or-default
+language: csharp
+severity: warning
+message: lookup with a fallback; fail early, check for the missing key and throw an error that names the missing key and where to set it
+rule:
+  kind: identifier
+  regex: '^(?:getOrDefault|GetValueOrDefault)$'
+  inside:
+    kind: member_access_expression
+    field: name
+    inside:
+      kind: invocation_expression
+      field: function
+      not:
+        has:
+          field: arguments
+          has:
+            regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined|string\.empty)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+            all:
+              - nthChild: 2
+              - nthChild:
+                  position: 1
+                  reverse: true

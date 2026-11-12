@@ -43,6 +43,34 @@
   hard: true
   file_level: true
   enforcer: binary-guard
+- id: security.uncounted-line-break
+  severity: high
+  summary: Changed file holds a line break its language ends a line at but the line numbering does not count (a CR outside CRLF; U+2028 or U+2029 in JavaScript, TypeScript, C# or YAML; U+0085 in C# or YAML; a form feed in CSS; a unicode escape of LF or CR in Java), so code could hide on the line of a comment or nocheck; end lines with LF or CRLF and escape the character inside a string
+  hard: true
+  enforcer:
+    code: &line-break
+      builtin: uncounted-line-break
+      breaks:
+        - pattern: '\r(?!\n)'
+        - pattern: '[\u2028\u2029]'
+          kinds: [javascript, typescript, tsx, csharp, yaml]
+        - pattern: '\x85'
+          kinds: [csharp, yaml]
+        - pattern: '\f'
+          kinds: [css]
+        - pattern: '(?<!\\)(?:\\\\)*\\u+000[aAdD]'
+          kinds: [java]
+    yaml: *line-break
+    html: *line-break
+    css: *line-break
+    nix: *line-break
+    hcl: *line-break
+    jinja: *line-break
+    make: *line-break
+    dockerfile: *line-break
+    env: *line-break
+    sql: *line-break
+    workflow: *line-break
 - id: security.temp-path
   severity: medium
   summary: Hardcoded temporary file or directory

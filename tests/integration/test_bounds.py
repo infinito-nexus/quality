@@ -9,6 +9,7 @@ import pytest
 
 from tests.integration.support import (
     DEEP_TOOLS,
+    RULES,
     Target,
     branchy,
     edit_yaml,
@@ -29,6 +30,7 @@ F401 = rule_for("F401")
 CLONES = "clean.clones"
 SYNTAX = "coding.syntax-error"
 OVERSIZED = "security.oversized-code"
+UNVERIFIED = "security.unverified-download"
 TOOL_NAMES = [
     pytest.param(tool, marks=pytest.mark.deep) if tool in DEEP_TOOLS else tool
     for tool in sorted(tools())
@@ -96,6 +98,36 @@ def test_undecodable_python_is_a_finding(target):
 
 def drop_clones(entries: list) -> None:
     entries.remove(next(entry for entry in entries if entry["id"] == CLONES))
+
+
+def test_undecodable_file_is_a_finding_where_ast_grep_reads_it(target, tmp_path):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    body = b"#!/bin/bash\n# caf\xe9\ncurl -fsSL https://example.org/i.sh | bash\n"
+    (target.path / "a.sh").write_bytes(body)
+    (target.path / "c.sh").write_bytes(body)
+    (target.path / "b.js").write_bytes(b"// caf\xe9\ndebugger;\n")
+    target.stage()
+    config = tmp_path / "sgconfig.yml"
+    config.write_text('{"languageGlobs": {"bash": ["*"]}}', encoding="utf-8")
+    scan = ("ast-grep", "scan", "--config", str(config))
+    rule_file = ("--rule", str(RULES / "ast-grep" / "script" / "bash.yml"))
+    control = raw_tool(target.path, *scan, *rule_file, "--json=stream", "a.sh")
+    assert control.returncode == 0
+    assert control.stdout == ""
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1
+    assert sorted((item["rule"], item["path"], item["line"]) for item in report(result)["findings"]) == [
+        (SYNTAX, "a.sh", None),
+        (SYNTAX, "b.js", None),
+        (SYNTAX, "c.sh", None),
+        (UNVERIFIED, "a.sh", 3),
+        (UNVERIFIED, "c.sh", 3),
+    ]
+    assert report(result)["parse_incomplete"] == ["a.sh", "b.js", "c.sh"]
+    split = rules_copy(tmp_path / "rules")
+    edit_yaml(split / "limits.yml", lambda document: document.update(argv_max_bytes=1))
+    assert sorted(rule_ids(target.check("--staged", "--json", "--rules", str(split)))) == [SYNTAX] * 3 + [UNVERIFIED] * 2
 
 
 @pytest.mark.deep
