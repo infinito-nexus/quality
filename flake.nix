@@ -51,7 +51,7 @@
       proxy = pkgs.buildEnv { name = "quality-proxy"; paths = [ squid ]; };
     };
     devShells.${system}.default = pkgs.mkShell {
-      packages = tools ++ [ (pkgs.python3.withPackages (ps: [ ps.pathspec ps.pytest ps.pyyaml ])) ];
+      packages = tools ++ [ (pkgs.python3.withPackages (ps: [ ps.pathspec ps.pytest ps.pytest-xdist ps.pyyaml ])) ];
     };
   };
 }

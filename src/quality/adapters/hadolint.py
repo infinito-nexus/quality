@@ -4,25 +4,30 @@ from pathlib import PurePosixPath
 
 from quality.adapters.base import Command, all_files
 from quality.gate import code_hit
+from quality.ruledata import require
 
 PRAGMA = re.compile(
     rb"^(?:\xef\xbb\xbf)?[ \t\r]*#[ \t]*hadolint\b[^\r\n]*", re.IGNORECASE | re.MULTILINE
 )
 
 
-def commands(bound: list, _settings: dict, config_file) -> list:
+def commands(bound: list, settings: dict, config_file) -> list:
     """
     Args:
         bound: The rule with its files.
-        _settings: Unused tool entry.
+        settings: The tool's entry in tools.yml with the values of this run.
         config_file: Replaces .hadolint.yaml, .hadolint.yml and
             $XDG_CONFIG_HOME/hadolint.yaml.
 
     Returns:
         One command that ignores `# hadolint ignore=` pragmas. --no-fail
-        leaves exit 1 to errors, so it fails closed.
+        leaves exit 1 to errors, so it fails closed. The run's --threads
+        value goes to hadolint's own runtime as +RTS -N.
     """
+    threads = require(settings, "threads", "runtime")
+    runtime = [] if threads is None else ["+RTS", f"-N{threads}", "-RTS"]
     prefix = [
+        *runtime,
         "--config",
         str(config_file),
         "--no-fail",

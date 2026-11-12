@@ -2,8 +2,39 @@ import os
 from dataclasses import dataclass
 
 from quality import QualityError
+from quality.ruledata import require
 
 PARTIAL_SCAN = "security.partial-scan"
+THREAD_VARIABLES = ("GOMAXPROCS", "RAYON_NUM_THREADS")
+
+
+def thread_environment(threads: int | None) -> dict:
+    """
+    Args:
+        threads: Most threads each tool may run, from --threads, or None.
+
+    Returns:
+        The variables through which the Go tools (gitleaks, trivy,
+        osv-scanner, actionlint) and ruff take the cap; none without a cap,
+        so every tool keeps its default of about one thread per core.
+    """
+    if threads is None:
+        return {}
+    return {name: str(threads) for name in THREAD_VARIABLES}
+
+
+def thread_args(settings: dict, flag: str) -> list:
+    """
+    Args:
+        settings: The tool's entry in tools.yml with the values of this run.
+        flag: The tool's own option for its thread count, for a tool that
+            reads none of THREAD_VARIABLES.
+
+    Returns:
+        The option with the run's --threads value, or nothing without a cap.
+    """
+    threads = require(settings, "threads", "runtime")
+    return [] if threads is None else [flag, str(threads)]
 
 
 @dataclass(frozen=True, eq=False)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from quality import QualityError, db
 from quality.adapters import Collector, Runtime, reads_by_name, refuse_inside
+from quality.adapters.base import thread_environment
 from quality.adapters.builtin import (
     changed_folders,
     folder_items,
@@ -55,6 +56,7 @@ class Options:
     db: str | None
     verbose: bool
     cwd: str
+    threads: int | None
 
 
 def tier_of(rule) -> str:
@@ -231,10 +233,11 @@ def open_session(options: Options, scratch: Path) -> Session:
         "database": bundle,
         "work_dir": scratch,
         "empty_json": empty_json,
+        "threads": options.threads,
     }
     runtime = Runtime(
         path_value,
-        tool_environment(path_value, home, bundle),
+        {**tool_environment(path_value, home, bundle), **thread_environment(options.threads)},
         empty_file,
         Path(repo.root).resolve(),
         options.verbose,

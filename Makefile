@@ -5,14 +5,16 @@ VERIFY_APPS := web-app-keycloak,web-app-cst-quality-check
 VERIFY_DISABLE :=
 VERIFY_VARIANT := 0
 SERVICE_VENV := .venv/service
+TEST_WORKERS := 4
 
 .PHONY: test-unit test-integration test-service test-egress up down verify-test verify-compose
 
 test-unit:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit
 
+# Param: TEST_WORKERS - pytest-xdist workers; with each tool's parallel work capped at TOOL_THREADS of tests/integration/support.py, the run stays near this many cores on a shared host
 test-integration:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration -n $(TEST_WORKERS) --dist worksteal
 
 $(SERVICE_VENV)/bin/pytest: service/web/requirements.txt
 	python3 -m venv $(SERVICE_VENV)

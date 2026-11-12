@@ -51,7 +51,7 @@ def snapshot_of(root: Path, files: dict) -> Snapshot:
 def resources(tmp_path: Path, bundle) -> dict:
     empty_json = tmp_path / "empty.json"
     empty_json.write_text("{}\n", encoding="utf-8")
-    return {"rules_dir": RULES, "database": bundle, "work_dir": tmp_path, "empty_json": empty_json}
+    return {"rules_dir": RULES, "database": bundle, "work_dir": tmp_path, "empty_json": empty_json, "threads": None}
 
 
 def test_semgrep_reads_scripts_but_never_shell_without_metrics(tmp_path):

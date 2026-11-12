@@ -6,7 +6,7 @@ import yaml
 
 from quality import QualityError
 from quality.adapters import phpmode
-from quality.adapters.base import Command, all_files
+from quality.adapters.base import Command, all_files, thread_args
 from quality.gate import code_hit
 from quality.ruledata import (
     COMMENTS,
@@ -67,7 +67,7 @@ def commands(bound: list, settings: dict, empty_file: Path) -> list:
         documents = [doc for doc in composed(rule_dir, language, settings) if prefix(doc["id"]) in wanted]
         target = empty_file.with_name(f"ast-grep-{language}.yml")
         target.write_text("\n---\n".join(json.dumps(doc) for doc in documents), encoding="utf-8")
-        argv = ["scan", "--config", CONFIG_NAME, "--rule", str(target), *FLAGS, "--"]
+        argv = ["scan", "--config", CONFIG_NAME, "--rule", str(target), *FLAGS, *thread_args(settings, "--threads"), "--"]
         found.append(Command(argv, all_files(items), items))
     return found
 

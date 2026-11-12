@@ -8,6 +8,7 @@ from quality.adapters.base import (
     gap_rule,
     known_path,
     refuse_non_utf8,
+    thread_args,
 )
 from quality.gate import code_hit, unread_hit
 from quality.ruledata import require
@@ -49,7 +50,7 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         --scan-unknown-extensions, because Semgrep skips a script named on the
         command line whose name has no known extension, such as bin/app. The
         environment turns metrics and the version check off, and HOME is a
-        scratch directory.
+        scratch directory. --jobs carries the run's thread cap.
     """
     rules_dir = require(settings, "rules_dir", "runtime")
     grouped = files_per_config(bound, require(settings, "configs", "tools.yml semgrep"))
@@ -58,6 +59,7 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         refuse_non_utf8("semgrep", files)
         prefix = [
             "scan",
+            *thread_args(settings, "--jobs"),
             "--config",
             str(rules_dir / config),
             "--scan-unknown-extensions",

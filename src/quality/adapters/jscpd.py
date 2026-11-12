@@ -8,6 +8,7 @@ from quality.adapters.base import (
     all_files,
     known_path,
     relative,
+    thread_args,
     utf8_name,
 )
 from quality.gate import code_hit
@@ -29,12 +30,14 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         One command per rule, with the rule's token minimum, over the files whose
         names are UTF-8, since jscpd aborts on any other; parse() names the rest.
         The report lands in a fresh scratch directory outside the snapshot.
+        --workers carries the run's thread cap.
     """
     found = []
     for item in bound:
         enforcer = item.binding.settings
         output = tempfile.mkdtemp(prefix="jscpd-", dir=require(settings, "work_dir", "runtime"))
         prefix = [
+            *thread_args(settings, "--workers"),
             "--config",
             str(require(settings, "empty_json", "runtime")),
             "--min-tokens",
