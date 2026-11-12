@@ -34,8 +34,7 @@ def parser_for(item, path: str) -> str | None:
         path: One of those lockfiles.
 
     Returns:
-        The parser the enforcer's parse_as names for a lockfile osv-scanner
-        would not recognise by its name, such as requirements/base.txt, or None.
+        The parser the enforcer's parse_as names, or None.
     """
     for pattern, parser in item.binding.settings.get("parse_as", {}).items():
         if gitignore_spec([pattern]).match_file(path):
@@ -47,13 +46,13 @@ def commands(bound: list, _settings: dict, empty_file) -> list:
     """
     Args:
         bound: The rule with its lockfiles.
-        _settings: Unused tool entry; the environment points osv-scanner at the bundle.
-        empty_file: Replaces the osv-scanner.toml osv-scanner would read beside a lockfile.
+        _settings: Unused tool entry.
+        empty_file: Replaces the osv-scanner.toml.
 
     Returns:
         Offline commands: no resolution, no deps.dev, local databases only. One
         for every lockfile osv-scanner knows by name, one per lockfile it is told
-        how to parse; operands() adds the files and their flags.
+        how to parse.
     """
     prefix = [
         "scan",
@@ -88,15 +87,13 @@ def operands(command: Command, snapshot, _work) -> list:
     Args:
         command: One chunk.
         snapshot: Snapshot holding its files.
-        _work: Unused working directory; every path is absolute.
+        _work: Unused working directory.
 
     Returns:
         A `--lockfile` flag for each file of the chunk osv-scanner is told how
-        to parse, which is also named after `--`, so it never runs empty and
-        parse() merges a file read twice, and one for every file its
-        requirements files include, so osv-scanner must confirm that one too;
-        then `--` and the files. A flag names a file whose path holds a comma
-        by a copy, see staged().
+        to parse, which is also named after `--`, and one for every file its
+        requirements files include; then `--` and the files. A flag names a
+        file whose path holds a comma by a copy, see staged().
     """
     forced = [f"--lockfile={parser}:{flag_path(snapshot, path)}" for path in command.files if (parser := parsed_as(command, path))]
     included = passed(command, snapshot, includes_of(command, snapshot))
@@ -108,13 +105,11 @@ def staged(snapshot, path: str):
     """
     Args:
         snapshot: Snapshot holding the file.
-        path: A lockfile whose path holds a comma, at which osv-scanner splits
-            the value of `--lockfile`.
+        path: A lockfile whose path holds a comma.
 
     Returns:
         Where its copy goes: a name without a comma in a directory beside the
-        snapshot root, so no tool reading the root sees it and the scratch
-        directory of the run removes it.
+        snapshot root.
     """
     digest = hashlib.sha256(os.fsencode(path)).hexdigest()
     return snapshot.root.with_name(f"{snapshot.root.name}.osv") / f"{digest}.txt"
@@ -157,8 +152,7 @@ def includes_of(command: Command, snapshot) -> dict:
         include, resolved against the including file's name as pip does and
         through symlinks as the system does, mapped to the files of the chunk
         that reach it. A path outside the snapshot root starts with `../` or
-        `/`; it, a missing file and a link that stays one are never passed,
-        so their including files are the gap.
+        `/`.
     """
     graph = {}
     for path in requirements_files(command):
@@ -245,9 +239,7 @@ def own_openings(command: Command, snapshot, graph: dict) -> set:
         Every file osv-scanner opens itself for a `-r` line of a requirements
         file it reads, the rest of the line, placed as placed() does, beside
         that file and, for one it reads from a copy, see staged(), beside the
-        copy. Where that differs from what pip reads, as for a quoted name, a
-        copy or a directory symlink, the file pip reads is passed as its own
-        lockfile, so a failure to open this one tells nothing.
+        copy.
     """
     openings = set()
     for path in [*requirements_files(command), *graph]:
@@ -296,10 +288,9 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
 
     Returns:
         One file-level finding per vulnerable package and lockfile, carrying its
-        name and vulnerability ids, since osv-scanner names no line; a package
-        of an included file counts for every file of the command including it.
-        None when only security.partial-scan is bound, which judges parsing,
-        not packages.
+        name and vulnerability ids; a package of an included file counts for
+        every file of the command including it. None when only
+        security.partial-scan is bound.
     """
     rules = checked_rules(command)
     if not rules:
@@ -351,22 +342,21 @@ def unparsed(result, command: Command, _settings: dict, snapshot) -> list:
     Args:
         result: The finished run of one command.
         command: The command naming the lockfiles.
-        _settings: Unused; osv-scanner names such a lockfile in its own error line.
+        _settings: Unused.
         snapshot: Snapshot the lockfiles came from.
 
     Returns:
         The lockfiles of the command osv-scanner did not confirm as scanned,
         or named in an extraction error, together with every file including a
         file it did not confirm or named, such as an include that is missing or
-        outside the snapshot root, on any exit code: it exits 127 with nothing
-        else to report, but 1 when another lockfile holds a vulnerability.
+        outside the snapshot root, on any exit code.
 
     Raises:
         QualityError: An extraction error names neither a file of the command
             under the snapshot root nor one of its includes, nor a file
             osv-scanner opens itself in place of an include passed, see
             own_openings(), or osv-scanner neither confirmed nor named any of
-            them, as when it crashes, so the report cannot be trusted.
+            them, as when it crashes.
     """
     graph = includes_of(command, snapshot)
     paths = {*command.files, *graph}

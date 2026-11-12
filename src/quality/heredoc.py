@@ -32,8 +32,7 @@ def terminators(lines: list) -> dict:
         with tabs and whether the delimiter ends it instead of standing
         before a closing quote, backtick or `)`, the lines it stands on, in
         order, each with the length of the line up to the delimiter's end;
-        an empty line or one starting with a blank ends no heredoc, since
-        only a quoted delimiter could start with one.
+        an empty line or one starting with a blank ends no heredoc.
     """
     found = {}
     for place, line in enumerate(lines):
@@ -56,13 +55,13 @@ def ends_of(ends: dict, index: int, heredocs: list, limit: int, enclosed: bool) 
         index: The line holding the heredocs.
         heredocs: Their `-` flag and delimiter, in order, see opened().
         limit: The first line no body may reach, the end of the body around.
-        enclosed: Whether that line ends inside a quote or substitution, so
-            a delimiter may end a body before what closes them, as `EOF)`.
+        enclosed: Whether that line ends inside a quote or substitution;
+            True lets a delimiter end a body before what closes them, as `EOF)`.
 
     Returns:
         Line and delimiter length of the end of each heredoc, in order, one
         whose delimiter line does not follow skipped as no heredoc, as the
-        `<<` of `$(( 1 << n ))`, so no body runs on to the end of the file.
+        `<<` of `$(( 1 << n ))`.
     """
     found, start = [], index + 1
     for dash, delimiter in heredocs:

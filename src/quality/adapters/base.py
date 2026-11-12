@@ -15,8 +15,7 @@ def thread_environment(threads: int | None) -> dict:
 
     Returns:
         The variables through which the Go tools (gitleaks, trivy,
-        osv-scanner, actionlint) and ruff take the cap; none without a cap,
-        so every tool keeps its default of about one thread per core.
+        osv-scanner, actionlint) and ruff take the cap; none without a cap.
     """
     if threads is None:
         return {}
@@ -27,8 +26,7 @@ def thread_args(settings: dict, flag: str) -> list:
     """
     Args:
         settings: The tool's entry in tools.yml with the values of this run.
-        flag: The tool's own option for its thread count, for a tool that
-            reads none of THREAD_VARIABLES.
+        flag: The tool's own option for its thread count.
 
     Returns:
         The option with the run's --threads value, or nothing without a cap.
@@ -58,8 +56,7 @@ class Command:
         prefix: Arguments before the files.
         files: The files of this command.
         bound: The bindings the files came from.
-        log: The tool's stderr once it ran, for an adapter whose findings
-            depend on what the tool logged.
+        log: The tool's stderr once it ran.
         rescan: True for the second run over the files an adapter's first
             run could not read.
     """
@@ -86,8 +83,7 @@ def gap_rule(command: Command, path: str):
         path: File the tool read only in part or not at all.
 
     Returns:
-        The security.partial-scan rule bound to the file, or None, when the gap
-        would pass unseen and the caller must fail closed.
+        The security.partial-scan rule bound to the file, or None.
     """
     return next(
         (item.binding.rule for item in command.bound if item.binding.rule.id == PARTIAL_SCAN and path in item.files),
@@ -102,8 +98,7 @@ def refuse_non_utf8(tool: str, files: list) -> None:
         files: Paths the tool would receive.
 
     Raises:
-        QualityError: A name is not UTF-8. Semgrep then reports nothing for the
-            file and jscpd aborts, so the check fails closed with the reason.
+        QualityError: A name is not UTF-8.
     """
     if not all(map(utf8_name, files)):
         raise QualityError(f"{tool} cannot read a file whose name is not UTF-8")
@@ -122,7 +117,7 @@ class Skipped:
     """
     Args:
         path: File a tool was given but did not check, or checked only in part.
-        reason: Why, without file content; the report names it as unchecked.
+        reason: Why, without file content.
     """
 
     path: str

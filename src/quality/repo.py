@@ -263,8 +263,8 @@ class Repo:
             commit: One commit.
 
         Returns:
-            Every entry the commit holds in a version none of its parents has,
-            so a merge yields only what it resolved itself, never what it took
+            Every entry the commit holds in a version none of its parents has;
+            for a merge only what it resolved itself, never what it took
             over unchanged from the merged side.
         """
         raw = self._output(
@@ -353,7 +353,7 @@ class Repo:
         """
         Args:
             targets: Map of object ID to the destination paths of that blob,
-                streamed so that no blob is held in memory.
+                streamed.
             request_file: Scratch file carrying the object IDs to git's stdin.
 
         Raises:

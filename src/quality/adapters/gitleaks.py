@@ -45,7 +45,7 @@ def commands(bound: list, _settings: dict, config_file) -> list:
 
     Returns:
         One command in redact mode that ignores `gitleaks:allow`. Leaks exit 0,
-        because gitleaks exits 1 on a fatal error, so that exit fails closed.
+        a fatal error exits 1.
         The trace log names every file gitleaks read or skipped.
     """
     prefix = [
@@ -81,8 +81,7 @@ def bounds(data: bytes, limit: int) -> list:
         line only when that line began at or before the current window's start.
 
     Raises:
-        QualityError: The limit leaves no room past two overlaps, so the next
-            window could start at or before the current one.
+        QualityError: The limit leaves no room past two overlaps.
     """
     if limit <= 2 * PEEK:
         raise QualityError(f"gitleaks window of {limit} bytes must exceed twice the overlap")
@@ -180,8 +179,7 @@ def named_copy(path: str) -> str:
 
     Returns:
         A name the default allowlist can only match by its suffix. A name
-        ending in a WHOLE_NAMES entry keeps that entry, because gitleaks'
-        nuget-config-password rule matches the whole name.
+        ending in a WHOLE_NAMES entry keeps that entry.
     """
     name = PurePosixPath(path).name
     whole = [kept for kept in WHOLE_NAMES if name.lower().endswith(kept)]
@@ -229,7 +227,7 @@ def rescan(command: Command, snapshot) -> list:
         snapshot: Snapshot holding its files.
 
     Returns:
-        The files whose own path gitleaks skipped, for the padded second run.
+        The files whose own path gitleaks skipped.
     """
     return [command.files[index] for index in sorted(skipped_own_paths(command, snapshot))]
 
@@ -269,7 +267,7 @@ def diverts(skip: str | None, binary: bool) -> bool:
 
     Returns:
         True when another copy must read the file: always, except for a blob
-        gitleaks skipped as binary, which no copy would read.
+        gitleaks skipped as binary.
     """
     return skip is not None and not (binary and skip.startswith(BINARY_SKIP))
 
@@ -300,7 +298,7 @@ def tolerated(kind: str, skip: str, sniffed: bool) -> bool:
         kind: The copy gitleaks skipped.
         skip: Its reason.
         sniffed: A binary skip is expected: the blob is binary, or the run
-            is the first, whose skipped text the second run pads.
+            is the first.
 
     Returns:
         True for a skip the runner covers.
@@ -341,7 +339,7 @@ def unread(command: Command, snapshot) -> dict:
         snapshot: Snapshot holding its files.
 
     Returns:
-        Path to reason for every binary blob, since no text rule reads it.
+        Path to reason for every binary blob.
     """
     return {path: BINARY for path in command.files if snapshot.text(path) is None}
 

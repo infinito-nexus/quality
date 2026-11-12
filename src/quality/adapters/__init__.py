@@ -140,8 +140,7 @@ def selector(binding):
 
     Returns:
         A test of path and kinds: the enforcer's `files` patterns when it names
-        them, as for lockfiles that have no kind, else the binding's kinds,
-        `any` included.
+        them, else the binding's kinds, `any` included.
     """
     patterns = binding.settings.get("files")
     if patterns is None:
@@ -157,8 +156,7 @@ def reads_by_name(binding, path: str) -> bool:
         path: Path relative to the repository root.
 
     Returns:
-        True only when the enforcer's `files` patterns match the path, since a
-        binding to `any` kind reads every file without naming it.
+        True only when the enforcer's `files` patterns match the path.
     """
     return "files" in binding.settings and selector(binding)(path, frozenset())
 
@@ -173,8 +171,7 @@ def bind_files(data: RuleData, bindings: list, kinds: dict, predicate) -> list:
 
     Returns:
         One Bound per binding with files: those its `files` patterns name, or
-        those it binds by a kind the tool may see, so a parsing tool never
-        gets an unrendered template by its inner type.
+        those it binds by a kind the tool may see.
     """
     bound = []
     for binding in bindings:
@@ -200,10 +197,9 @@ class Collector:
         Args:
             snapshot: Snapshot holding the files.
             paths: Files to check; a tool marked whole_snapshot in tools.yml gets
-                every file of the snapshot, as a clone of an untouched file spans both.
+                every file of the snapshot.
             predicate: Selects the rules of this run.
-            tolerant: True records a failing tool instead of aborting, for the
-                base side, whose missing findings only make head findings new.
+            tolerant: True records a failing tool instead of aborting.
 
         Returns:
             All findings unfiltered, the files tools skipped, and the failures.
@@ -307,10 +303,9 @@ class Collector:
         Returns:
             The findings. An adapter with `unparsed` names files the tool could
             not parse, which get a finding each while the rest run once more.
-            An adapter with `unread` also names the files the tool skipped,
-            which the snapshot then reports as unchecked. An adapter with
-            `rescan` names files its first run could not read, which run once
-            more with `rescan` set.
+            An adapter with `unread` also names the files the tool skipped. An
+            adapter with `rescan` names files its first run could not read,
+            which run once more with `rescan` set.
         """
         settings = self.data.tool(tool)
         result = run(
@@ -348,13 +343,11 @@ class Collector:
             snapshot: Snapshot holding the files.
 
         Returns:
-            One file-level security.partial-scan finding per gap, so only a
-            path entry in .qualityignore.yml waives it, plus the findings of a
-            run over the remaining files.
+            One file-level security.partial-scan finding per gap, plus the
+            findings of a run over the remaining files.
 
         Raises:
-            QualityError: No security.partial-scan binding covers a gap, so the
-                file would pass unchecked.
+            QualityError: No security.partial-scan binding covers a gap.
         """
         hits = []
         for path in gaps:
@@ -393,8 +386,7 @@ def one_per_line(hits: list) -> list:
         hits: Findings of a tool that reports matching lines, not matches.
 
     Returns:
-        The findings with one per rule, path and line, because a template
-        line can match the patterns of both its own kinds and its inner type.
+        The findings with one per rule, path and line.
     """
     seen = set()
     kept = []

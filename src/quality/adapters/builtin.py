@@ -58,8 +58,7 @@ def workflow_scripts(data: bytes) -> list:
         data: Workflow file content.
 
     Returns:
-        (entity, line, script) per `run:` step. Each node is visited once, so
-        aliases cannot multiply the work.
+        (entity, line, script) per `run:` step. Each node is visited once.
     """
     try:
         root = yaml.compose(data, Loader=yaml.SafeLoader)
@@ -237,7 +236,7 @@ def yaml_error(data: bytes) -> tuple:
 
     Returns:
         (broken, line) from composing every document, which covers syntax and
-        aliases but constructs nothing, so custom tags such as `!vault` pass.
+        aliases but constructs nothing.
     """
     try:
         for _ in yaml.compose_all(data, Loader=YAML_LOADER):
@@ -255,8 +254,7 @@ def utf8_error(data: bytes) -> tuple:
         data: File content.
 
     Returns:
-        (broken, None) where the bytes are no UTF-8, which ast-grep skips
-        without a word, so no structural rule would see the file.
+        (broken, None) where the bytes are no UTF-8.
     """
     try:
         data.decode("utf-8")
@@ -275,9 +273,7 @@ def uncounted_line_breaks(item, snapshot) -> list:
 
     Returns:
         One finding per file whose text holds such a break, on the
-        LF-counted line of the first one: ast-grep, ripgrep and the nocheck
-        lookup count no line there, so code after it shares the line of a
-        comment.
+        LF-counted line of the first one.
     """
     breaks = require(item.binding.settings, "breaks", f"enforcer of {item.binding.rule.id}")
     hits = []

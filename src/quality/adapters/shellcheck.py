@@ -9,7 +9,7 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
     Args:
         bound: The rule with its files.
         _settings: Unused tool entry.
-        _empty_file: Unused; --norc replaces a configuration file.
+        _empty_file: Unused.
 
     Returns:
         One command. Without --external-sources shellcheck follows no `source`.

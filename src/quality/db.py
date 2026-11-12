@@ -45,9 +45,8 @@ class Bundle:
         root: Bundle directory.
         date: Fetch time from the manifest.
         digest: Content digest from the manifest, verified when opened.
-        handle: The manifest, open and shared-locked while the check runs, so
-            `quality db update` cannot swap the content between head and base
-            side; None for a bundle update() returns.
+        handle: The manifest, open and shared-locked while the check runs;
+            None for a bundle update() returns.
     """
 
     root: Path
@@ -171,10 +170,9 @@ def open_bundle(root: Path, max_age_days: int, now: datetime) -> Bundle:
         now: Current UTC time.
 
     Returns:
-        The bundle, its content verified against the manifest digest (about
-        2.3 s for 1.9 GiB from the page cache) and locked until the process ends.
-        Its root is resolved once, before the digest, and every tool gets that
-        path, so retargeting a link above it later changes nothing.
+        The bundle, its content verified against the manifest digest and
+        locked until the process ends. Its root is resolved once, before the
+        digest.
 
     Raises:
         QualityError: The bundle is missing, a link, unreadable, dated in the
@@ -212,8 +210,7 @@ def content_files(root: Path) -> list:
 
     Raises:
         QualityError: An entry anywhere in the bundle is a symbolic link or
-            neither a directory nor a regular file, since a link can be
-            retargeted after the digest and a FIFO would block reading it.
+            neither a directory nor a regular file.
     """
     files = []
     for directory, folders, names in os.walk(root):
@@ -237,7 +234,7 @@ def tree_digest(root: Path) -> str:
 
     Returns:
         One sha256 over the path and content digest of every file below the
-        content directories, so the manifest itself does not change it.
+        content directories.
 
     Raises:
         QualityError: The bundle holds a link or a special file.

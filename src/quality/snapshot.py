@@ -38,8 +38,8 @@ def textual(data: bytes) -> bytes | None:
 
     Returns:
         The bytes a text rule reads: UTF-16 or UTF-32 behind a byte order mark
-        as UTF-8, anything else unchanged, so Latin-1 stays text. None when
-        those bytes hold a NUL, which marks the blob as binary.
+        as UTF-8, anything else, Latin-1 included, unchanged. None when
+        those bytes hold a NUL.
     """
     encoding = next((name for bom, name in WIDE_ENCODINGS if data.startswith(bom)), None)
     if encoding is not None:
@@ -105,8 +105,8 @@ class Snapshot:
             path: The file.
 
         Returns:
-            Its lines as ast-grep, ripgrep and the tokenizer count them: split
-            at LF, a CR before it dropped, any other CR kept inside its line.
+            Its lines: split at LF, a CR before it dropped, any other CR kept
+            inside its line.
         """
         if path not in self.line_cache:
             pieces = LINE_BREAK.split(self.data(path))
@@ -188,9 +188,9 @@ def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: Kind
 
     Returns:
         The snapshot. Symlinks and gitlinks are recorded as irregular and never
-        followed. A symlink's target text is written as a kindless file, so
-        only rules binding every file read it; a gitlink is named unread, and
-        so is a name holding a control character, which no tool is given.
+        followed. A symlink's target text is written as a kindless file; a
+        gitlink is named unread, and so is a name holding a control character,
+        which no tool is given.
     """
     root.mkdir(mode=0o700)
     readable = [entry for entry in entries if entry.mode in READABLE_MODES and not CONTROL.search(entry.path)]
@@ -234,9 +234,7 @@ def refuse_control_names(paths) -> None:
         paths: Paths this run must judge.
 
     Raises:
-        QualityError: One holds a control character, which the `files`
-            patterns of the lockfile scanners never match, so the file would
-            pass unchecked.
+        QualityError: One holds a control character.
     """
     named = sorted(path for path in paths if CONTROL.search(path))
     if named:

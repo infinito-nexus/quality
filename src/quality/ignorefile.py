@@ -63,8 +63,7 @@ def narrow_enough(pattern: str) -> bool:
         pattern: One gitignore pattern of a hard rule entry.
 
     Returns:
-        True when its first segment is a literal name and it holds no `**`,
-        so that `*.py` or `[a-z]*` cannot switch a hard rule off repo-wide.
+        True when its first segment is a literal name and it holds no `**`.
     """
     first = pattern.removeprefix("/").split("/", 1)[0]
     if "**" in pattern or pattern.startswith("!") or first in ("", ".", ".."):
@@ -121,7 +120,7 @@ def parse(content: bytes | None, data: RuleData) -> list:
 
     Raises:
         QualityError: The file breaks the schema. The message never quotes
-            the file, because YAML errors carry a source snippet.
+            the file.
     """
     if content is None:
         return []
@@ -142,8 +141,7 @@ def split_ignored(hits: list, soft_entries: list, hard_entries: list) -> tuple:
         hits: Findings on the head side.
         soft_entries: Entries consulted for the other rules.
         hard_entries: Entries consulted for hard and changed_only rules,
-            which `--base` reads from the base side, so a pull request
-            cannot waive its own finding or parse gap.
+            which `--base` reads from the base side.
 
     Returns:
         The remaining findings and the entries that applied.
@@ -175,7 +173,7 @@ def stale_names(entries: list, hits: list, checked: set, rule_ids: set) -> list:
 
     Returns:
         The entries naming one of those rules and a checked file that rule
-        did not flag, so they outlived their gap.
+        did not flag.
     """
     flagged = {(hit.rule.id, hit.path) for hit in hits}
     return [

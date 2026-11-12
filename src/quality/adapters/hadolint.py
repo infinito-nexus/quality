@@ -21,8 +21,8 @@ def commands(bound: list, settings: dict, config_file) -> list:
 
     Returns:
         One command that ignores `# hadolint ignore=` pragmas. --no-fail
-        leaves exit 1 to errors, so it fails closed. The run's --threads
-        value goes to hadolint's own runtime as +RTS -N.
+        leaves exit 1 to errors. The run's --threads value goes to
+        hadolint's own runtime as +RTS -N.
     """
     threads = require(settings, "threads", "runtime")
     runtime = [] if threads is None else ["+RTS", f"-N{threads}", "-RTS"]
@@ -48,7 +48,7 @@ def operands(command: Command, snapshot, work) -> list:
 
     Returns:
         The copies hadolint lints, as <index>/<name>. A binary blob is staged
-        empty, since the security.binary-code rule judges it instead.
+        empty.
     """
     staged = []
     for index, path in enumerate(command.files):

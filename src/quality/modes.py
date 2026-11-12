@@ -122,8 +122,7 @@ class Session:
 
         Returns:
             One finding per path named like code or like a lockfile a rule of the
-            running tiers reads, since a padded file would otherwise pass every
-            rule unread.
+            running tiers reads.
         """
         return self.unread_code(SIZE_GUARD, snapshot, paths)
 
@@ -134,8 +133,7 @@ class Session:
 
         Returns:
             One finding per path named like code whose content the secret
-            scanner skipped as binary, since a magic prefix would otherwise
-            let a file pass it unread.
+            scanner skipped as binary.
         """
         paths = sorted(path for path, reason in snapshot.unread.items() if reason == BINARY)
         return self.unread_code(BINARY_GUARD, snapshot, paths)
@@ -253,7 +251,7 @@ def update_database(option: str | None, rules: str | None) -> db.Bundle:
         rules: The --rules value, or None for the packaged rule data.
 
     Returns:
-        The fetched bundle; the only network access quality makes.
+        The fetched bundle.
     """
     data = load(locate(rules))
     return db.update(db.location(option, os.environ), data, validated_path(os.environ), os.environ)
@@ -286,8 +284,7 @@ def baseline_hits(session: Session, snapshot: Snapshot, paths: list, plan: Plan)
     Returns:
         The parent's soft findings without changed_only ones, plus its unused
         nochecks judged under the same ignore entries as the head side's.
-        Every rule runs, hard ones included, so a nocheck naming one is
-        judged as on the head side.
+        Every rule runs, hard ones included.
     """
     hits = session.collect(snapshot, paths, every_rule, True)
     unused = suppressed(session.data, snapshot, paths, hits, (plan.soft_entries, plan.hard_entries))[1]
@@ -300,10 +297,7 @@ def without_changed_only(hits: list) -> list:
         hits: Findings of one side.
 
     Returns:
-        The findings without those of rules marked changed_only. Such a rule
-        judges only changed files, absolutely, so it has no baseline, and
-        `--all` names the files elsewhere in the report instead: ast-grep's
-        under parse_incomplete, a file-level gap's in the notes.
+        The findings without those of rules marked changed_only.
     """
     return [hit for hit in hits if not hit.rule.changed_only]
 

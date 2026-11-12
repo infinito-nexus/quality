@@ -14,13 +14,12 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     Args:
         bound: Rules with their files.
         settings: The tool's entry in tools.yml with the values of this run.
-        _empty_file: Unused; ripgrep needs no empty configuration.
+        _empty_file: Unused.
 
     Returns:
         One command per rule. A rule setting `multiline` lets its pattern span
-        lines, such as a pipe continued after a backslash; a rule setting
-        `pcre2` gets look-around, which its pattern needs to skip permitted
-        values and comments. --threads carries the run's thread cap.
+        lines; a rule setting `pcre2` gets look-around. --threads carries the
+        run's thread cap.
     """
     return [
         Command(
@@ -53,8 +52,7 @@ def operands(command: Command, snapshot, work) -> list:
     Returns:
         The files under their own paths in the working directory: the
         code_view() copy when the rule sets `code_view` with its `levels` and
-        `window`, else a hard link, so line numbers and reported paths stay
-        those of the snapshot.
+        `window`, else a hard link.
     """
     binding = command.bound[0].binding
     view = binding.settings.get("code_view")
@@ -84,8 +82,7 @@ def match_rows(data: dict) -> list:
         data: One match event of ripgrep's JSON output.
 
     Returns:
-        The line each match starts on, since a multiline event can join
-        matches on adjacent lines.
+        The line each match starts on.
     """
     text = reported_bytes(data["lines"])
     first = data["line_number"]

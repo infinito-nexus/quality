@@ -18,7 +18,7 @@ def commands(bound: list, _settings: dict, empty_file) -> list:
     Args:
         bound: Metric rules with their files.
         _settings: Unused tool entry.
-        empty_file: Replaces the ./whitelizard.txt lizard would read.
+        empty_file: Replaces the ./whitelizard.txt.
 
     Returns:
         One command, with no .gitignore lookup.

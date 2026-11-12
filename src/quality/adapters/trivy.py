@@ -11,13 +11,11 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     Args:
         bound: The rule with its lockfiles.
         settings: The tool's entry in tools.yml with the paths of this run.
-        _empty_file: Unused; empty --config and --ignorefile values disable loading.
+        _empty_file: Unused.
 
     Returns:
-        One command per lockfile, because trivy takes one target. It reads the
-        bundle's database in place, keeps its cache in memory and never fetches.
-        --debug, because trivy logs a lockfile it cannot parse only at debug
-        level and exits 0 as if it held no package.
+        One command per lockfile, with --debug. It reads the bundle's
+        database in place, keeps its cache in memory and never fetches.
     """
     bundle = require(settings, "database", "runtime")
     if bundle is None:
@@ -66,13 +64,13 @@ def parse(stdout: bytes, command: Command, _snapshot) -> list:
     Args:
         stdout: trivy's JSON report on one lockfile.
         command: The command naming that lockfile.
-        _snapshot: Unused; the gate compares packages, not source lines.
+        _snapshot: Unused.
 
     Returns:
         One finding per vulnerable package, on the line declaring it when trivy
         knows it, carrying its name as its registry resolves it, named by the
         package's purl type, and its vulnerability ids. None when only
-        security.partial-scan is bound, which judges parsing, not packages.
+        security.partial-scan is bound.
     """
     document = json.loads(stdout)
     rules = checked_rules(command)
@@ -103,11 +101,10 @@ def unparsed(result, command: Command, settings: dict, _snapshot) -> list:
         command: The command naming one lockfile.
         settings: The tool's entry in tools.yml, whose `parse_errors` are the
             log lines of a lockfile trivy could not parse.
-        _snapshot: Unused; trivy reads one lockfile per command.
+        _snapshot: Unused.
 
     Returns:
-        The lockfile when the log holds such a line, since trivy then exits 0
-        as if it held no package.
+        The lockfile when the log holds such a line.
     """
     markers = settings.get("parse_errors", [])
     return list(command.files) if any(marker.encode() in result.stderr for marker in markers) else []
