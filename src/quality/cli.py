@@ -45,6 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     coverage = commands.add_parser("coverage", allow_abbrev=False)
     coverage.add_argument("--json", action="store_true", dest="as_json")
     coverage.add_argument("--rules", metavar="DIR")
+    doctor = commands.add_parser("doctor", allow_abbrev=False)
+    doctor.add_argument("--db", metavar="DIR")
+    doctor.add_argument("--rules", metavar="DIR")
     return parser
 
 
@@ -57,6 +60,10 @@ def selected_mode(args: argparse.Namespace) -> str:
 def execute(args: argparse.Namespace) -> int:
     if args.command == "coverage":
         return execute_coverage(args)
+    if args.command == "doctor":
+        from quality.doctor import doctor
+
+        return doctor(args.rules, args.db)
     from quality.modes import Options, check, update_database
     from quality.report import exit_code, render_json, render_text
 

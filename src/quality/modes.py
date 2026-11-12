@@ -15,7 +15,12 @@ from quality.adapters.builtin import (
     prefix_groups,
     tree_children,
 )
-from quality.environment import enclosing_roots, tool_environment, validated_path
+from quality.environment import (
+    enclosing_roots,
+    tool_environment,
+    trusted_worktree,
+    validated_path,
+)
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.history import finding_key, history_hits
 from quality.ignorefile import audit_lines, refuse_stale, stale_names
@@ -215,7 +220,7 @@ def open_session(options: Options, scratch: Path) -> Session:
     if git is None:
         raise QualityError("missing tool: git")
     refuse_inside(git, "git", enclosing_roots(options.cwd))
-    env = hardened_env(path_value, os.environ)
+    env = hardened_env(path_value, os.environ, trusted_worktree(options.cwd))
     repo = Repo.open(options.cwd, env, data.limit("git_timeout"), git)
     refuse_inside(git, "git", [Path(repo.root).resolve()])
     tiers = MODE_TIERS[options.mode]

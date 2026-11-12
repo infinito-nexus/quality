@@ -62,3 +62,18 @@ def enclosing_roots(cwd: str) -> list:
     start = Path(cwd).resolve()
     marked = [path for path in (start, *start.parents) if (path / ".git").exists()]
     return [start, *marked[:1]]
+
+
+def trusted_worktree(cwd: str) -> Path | None:
+    """
+    Args:
+        cwd: Directory the check runs in.
+
+    Returns:
+        That directory when it holds `.git` itself, as git's one
+        `safe.directory`; None otherwise and for a directory named `*`.
+    """
+    start = Path(cwd).resolve()
+    if start.name == "*" or not (start / ".git").exists():
+        return None
+    return start

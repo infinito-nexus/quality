@@ -13,6 +13,7 @@ import pytest
 import yaml
 
 from quality.db import OSV_DIR, TRIVY_DIR, open_bundle, tree_digest, write_manifest
+from tests.distribution.support import SYSTEM, copy_of, needs_nix, nix_eval
 from tests.integration.support import (
     DEEP_TOOLS,
     LAUNCHER,
@@ -114,8 +115,20 @@ def test_package_excludes_service(wheel):
     assert leaked == []
 
 
-def test_package_excludes_service_from_image():
-    pytest.skip("needs nix: the image is built by phase D, this criterion holds for the wheel only")
+@needs_nix
+def test_package_excludes_service_from_image(tmp_path):
+    attribute = f"packages.{SYSTEM}.image.drvPath"
+    image = nix_eval(ROOT, attribute)
+    planted = copy_of(ROOT, tmp_path / "planted")
+    for path in SERVICE_PATHS:
+        (planted / path / "planted.py").write_text("x = 1\n", encoding="utf-8")
+    assert nix_eval(planted, attribute) == image
+    control = copy_of(ROOT, tmp_path / "control")
+    (control / "src" / "quality" / "planted.py").write_text("x = 1\n", encoding="utf-8")
+    assert nix_eval(control, attribute) != image
+    source = Path(nix_eval(ROOT, f"packages.{SYSTEM}.default.src"))
+    assert sorted(path.name for path in source.iterdir()) == ["LICENSE", "README.md", "pyproject.toml", "rules", "src"]
+    assert [path for path in source.rglob("*") if "service" in path.name or "ansible" in path.name] == []
 
 
 @pytest.mark.deep

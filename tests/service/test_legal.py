@@ -174,7 +174,8 @@ def flake_packages():
         nixpkgs attribute of every package the scan and proxy images of flake.nix bundle.
     """
     flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
-    tools = re.search(r"tools = with pkgs; \[([^\]]*)\]", flake).group(1).split()
+    block = re.search(r"toolPackages = \{([^}]*)\}", flake).group(1)
+    tools = re.findall(r"=\s*(?:pkgs\.)?([\w.-]+);", block)
     scan = re.search(r"paths = tools \+\+ \(with pkgs; \[([^\]]*)\]\)", flake).group(1).split()
     proxy = re.search(r'"quality-proxy"; paths = \[([^\]]*)\]', flake).group(1).split()
     runner = re.search(r"runner = pkgs\.python3\.withPackages \(ps: \[([^\]]*)\]\)", flake).group(1).split()
@@ -326,7 +327,11 @@ def test_notices_list_every_flake_package_at_its_locked_revision(tmp_path):
     assert all(licence.strip() for _attribute, licence, _link in rows)
     lock = json.loads((ROOT / "flake.lock").read_text(encoding="utf-8"))
     for name in lock["nodes"]["root"]["inputs"].values():
-        assert lock["nodes"][name]["locked"]["rev"] in page, name
+        locked = lock["nodes"][name]["locked"]
+        if locked["type"] == "tarball":
+            assert f"<code>{name}</code>" in page, name
+        else:
+            assert locked["rev"] in page, name
 
 
 def test_notices_list_every_web_image_package(tmp_path):

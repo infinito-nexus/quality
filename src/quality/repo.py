@@ -53,16 +53,21 @@ class Change:
     oid: str
 
 
-def hardened_env(path_value: str, inherited: dict) -> dict:
+def hardened_env(path_value: str, inherited: dict, trusted: Path | None) -> dict:
     """
     Args:
         path_value: Validated PATH.
         inherited: The caller's environment; only PASSED_VARIABLES survive it.
+        trusted: The one work tree git may open although another user owns
+            it, or None for none.
 
     Returns:
         The only environment git ever sees. It overrides repository config
         able to run commands.
     """
+    overrides = list(CONFIG_OVERRIDES)
+    if trusted is not None:
+        overrides.append(("safe.directory", str(trusted)))
     env = {
         "PATH": path_value,
         "HOME": os.devnull,
@@ -75,9 +80,9 @@ def hardened_env(path_value: str, inherited: dict) -> dict:
         "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_ALLOW_PROTOCOL": "none",
         "GIT_PAGER": "cat",
-        "GIT_CONFIG_COUNT": str(len(CONFIG_OVERRIDES)),
+        "GIT_CONFIG_COUNT": str(len(overrides)),
     }
-    for index, (key, value) in enumerate(CONFIG_OVERRIDES):
+    for index, (key, value) in enumerate(overrides):
         env[f"GIT_CONFIG_KEY_{index}"] = key
         env[f"GIT_CONFIG_VALUE_{index}"] = value
     for name in PASSED_VARIABLES:
