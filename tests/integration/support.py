@@ -24,13 +24,10 @@ DEEP_TOOLS = ("jscpd", "osv-scanner", "semgrep", "trivy")
 VULNERABLE_PIN = "requests==2.19.0\n"
 AUTHOR_NAME = "QualityAuthorCanary"
 AUTHOR_EMAIL = "quality-author-canary@example.invalid"
-# Exception: the token is split, so this repository's own secret scan passes.
 SECRET = "ghp_" + "8fK2mQ7xL4pN9sV1" + "tB6yR3wZ0cH5jD2gA7eU"
 SECRET_ENV_LINE = f"GITHUB_TOKEN={SECRET}\n"
 UNTAGGED_DOCKERFILE = "FROM debian\n"
 RAW_GITLEAKS = ("--no-banner", "--report-format", "json", "--report-path", "-")
-# Exception: -I keeps the target's directory off sys.path. `python -m quality`
-# from the target would import a planted yaml.py before any check runs.
 LAUNCHER = (
     "import sys\n"
     f"sys.path.insert(0, {str(SRC)!r})\n"
@@ -82,8 +79,6 @@ def raw_tool(cwd: Path, *argv: str) -> subprocess.CompletedProcess:
 
 
 def launcher_argv(*args: str) -> list:
-    # Exception: -I also ignores PYTHONDONTWRITEBYTECODE, so -B keeps the
-    # source tree free of bytecode.
     return [sys.executable, "-I", "-B", "-c", LAUNCHER, *args]
 
 

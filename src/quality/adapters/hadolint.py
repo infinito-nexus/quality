@@ -50,11 +50,6 @@ def operands(command: Command, snapshot, work) -> list:
         The copies hadolint lints, as <index>/<name>. A binary blob is staged
         empty, since the security.binary-code rule judges it instead.
     """
-    # Exception: no flag refuses a `hadolint shell=powershell` pragma, which
-    # switches every ShellCheck check off, so each copy turns its pragma lines
-    # into bare comments and keeps its line numbers. hadolint also honours one
-    # after any byte order mark or a lone carriage return at the start of a
-    # file, so UTF-16 and UTF-32 reach it as UTF-8 first.
     staged = []
     for index, path in enumerate(command.files):
         copy = f"{index}/{PurePosixPath(path).name}"

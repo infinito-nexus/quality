@@ -38,8 +38,6 @@ make -C "${core}" roles-pull inventory="${declaration}/inventory.yml"
 if [ "${action}" = test ]; then
   make -C "${core}" compose-up
   cores="$(lscpu --parse=Core | grep -v '^#' | sort -u | wc -l)"
-  # Exception: core's `make test` runs four suites at once, each with pytest -n auto sized by the container's CPUs (4 x 20 workers on this host);
-  # pinning the container to one CPU per physical core and running the suites one after another keeps threads at the core count (operator 2026-11-07)
   docker update --cpuset-cpus "0-$((cores - 1))" "$(cd "${core}" && docker compose ps -q infinito)"
   make -k -C "${core}" test-external test-integration test-lint test-unit
   exit

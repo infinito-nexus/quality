@@ -89,8 +89,6 @@ def test_repo_config_ignored(target):
 
 
 def findings_without_folder_size(result) -> list:
-    # Exception: the planted files alone push the root over the folder item
-    # limit, so that finding says nothing about configuration.
     return [item for item in findings_of(result) if item[0] != "clean.folder-items"]
 
 

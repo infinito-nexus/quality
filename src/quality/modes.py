@@ -397,8 +397,6 @@ def check_staged(session: Session, _options: Options) -> Outcome:
 
 
 def base_side_entries(session: Session, base: str) -> list:
-    # Exception: a broken file on the base side must not block the pull request
-    # fixing it, and an empty list keeps every hard rule enforced.
     try:
         blob = session.repo.ignore_blob(base, session.data.limit("blob_max_bytes"))
         return parse_ignore(blob, session.data)

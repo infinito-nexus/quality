@@ -116,7 +116,6 @@
   vars:
     system_service_id: "{{ application_id }}"
     system_service_on_calendar: "*:*:0/30"
-    # Exception: the 30-second cadence is how long a submitter waits; the global 5-minute jitter would stretch it to minutes
     RANDOMIZED_DELAY_SEC: "0"
     system_service_timer_enabled: true
     system_service_tpl_on_failure: "{{ SYS_SERVICE_ON_FAILURE_COMPOSE }}"

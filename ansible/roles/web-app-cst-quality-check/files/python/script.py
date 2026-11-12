@@ -94,7 +94,6 @@ def valid_host(host):
 
 def safe_name(name):
     base = re.split(r"[/\\]", str(name))[-1]
-    # Exception: a name of only dots and dashes strips to nothing, yet the scan still needs a file to write the upload to
     return UNSAFE_NAME.sub("_", base).lstrip(".-")[:100] or "upload"  # nocheck: clean.default-value -- the specified name of an upload whose name strips to nothing
 
 
@@ -254,7 +253,6 @@ class Launcher:
                 discard(spool, entry.name)
         names = [name for _tier, _modified, name in sorted(candidates)[: self.limits["jobs_per_run"]]]
         for name in names:
-            # Exception: the marker comes first, so the web app's report link always finds the job in one place
             marker = self.path("reports", f"{name[2:34]}.running")
             with open(marker, "w", encoding="utf-8"):
                 os.chmod(marker, 0o644)
@@ -282,7 +280,6 @@ class Launcher:
         try:
             if not os.path.lexists(self.path("reports", f"{job_id}.json")):
                 self.write_report(job_id, self.outcome(name, tier, job_id))
-        # Exception: deliberately blind, a hostile or broken job must end as "not checked", never stop the launcher serving every other job
         except Exception:
             self.write_report(job_id, failed("not checked"))
         finally:

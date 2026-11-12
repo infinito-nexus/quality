@@ -283,8 +283,6 @@ def demo_check(service_provider, environment, domain):
         (fields the role reports as demo data, whether its assert runs, whether the assert passes).
     """
     jinja = jinja2.Environment(undefined=jinja2.StrictUndefined)
-    # Exception: stand-ins for Ansible's dict2items, intersect and difference; they skip Ansible's de-duplication,
-    # which unique field names never need
     jinja.filters.update(
         dict2items=lambda mapping: [{"key": key, "value": value} for key, value in mapping.items()],
         intersect=lambda left, right: [item for item in left if item in right],

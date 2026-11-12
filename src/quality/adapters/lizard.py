@@ -29,8 +29,6 @@ def commands(bound: list, _settings: dict, empty_file) -> list:
         if field not in CSV_COLUMNS:
             raise QualityError(f"rule {rule.id}: lizard has no field {field!r}")
     files = all_files(bound)
-    # Exception: lizard's CSV leaves quotes in file names unescaped, so a crafted
-    # name could move columns and report its functions under another file.
     if any('"' in path for path in files):
         raise QualityError("lizard cannot report a file name holding a double quote")
     prefix = ["--csv", "-i", "-1", "--no-gitignore", "-W", str(empty_file), "--"]

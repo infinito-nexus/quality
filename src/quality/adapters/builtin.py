@@ -61,8 +61,6 @@ def workflow_scripts(data: bytes) -> list:
         (entity, line, script) per `run:` step. Each node is visited once, so
         aliases cannot multiply the work.
     """
-    # Exception: a workflow that is no valid YAML yields nothing here, because
-    # actionlint already reports it as a finding of its own.
     try:
         root = yaml.compose(data, Loader=yaml.SafeLoader)
     except yaml.YAMLError:

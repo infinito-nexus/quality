@@ -55,18 +55,13 @@ QUALITY_CHECK_CONTROLLER_DEFAULTS:
   city: "{{ defaults_service_provider.company.address.city }}"
   country: "{{ defaults_service_provider.company.address.country }}"
   email: "{{ defaults_service_provider.contact.email }}"
-# Exception: core's default contact address on DOMAIN_PRIMARY is the operator's own mailbox; only the project fallback address is demo data
 QUALITY_CHECK_CONTROLLER_DEMO_FIELDS: >-
   {{ (QUALITY_CHECK_CONTROLLER | dict2items)
      | intersect(QUALITY_CHECK_CONTROLLER_DEFAULTS | dict2items)
      | map(attribute='key')
      | difference(['email'] if QUALITY_CHECK_CONTROLLER.email.endswith('@' ~ DOMAIN_PRIMARY) else [])
      | sort }}
-# Exception: journald vacuums only archived files, and core leaves MaxFileSec at systemd's 1month of 30.44 days
-# (sys-svc-journalctl/templates/journald.conf.j2), so a line can outlive MaxRetentionSec by one file period
 QUALITY_CHECK_JOURNAL_HOURS: "{{ ((lookup('config', 'sys-svc-journalctl', 'services.svc-journalctl.max_retention_sec') | int) + 2630016) / 3600 }}"
-# Exception: Loki's compactor deletes in 24h index periods after a 2h retention_delete_delay (web-svc-loki), so a line
-# can outlive its class retention by 26 hours; sys-svc-log-collector ships the journal only while a web-svc-loki host exists
 QUALITY_CHECK_LOKI_HOURS: >-
   {%- set loki = namespace(hours=0) -%}
   {%- if 'web-svc-loki' in groups and groups['web-svc-loki'] | length > 0 -%}
