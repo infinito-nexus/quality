@@ -1,5 +1,31 @@
 {
   "nodes": {
+    "jscpd-aarch64-linux": {
+      "flake": false,
+      "locked": {
+        "lastModified": 499162500,
+        "narHash": "sha256-ueoxeTlHnNISQWy7ysF7Y8jNaz4/6zCD4nWRxcs3ez8=",
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/jscpd-linux-arm64-gnu/-/jscpd-linux-arm64-gnu-5.4.2.tgz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/jscpd-linux-arm64-gnu/-/jscpd-linux-arm64-gnu-5.4.2.tgz"
+      }
+    },
+    "jscpd-x86_64-linux": {
+      "flake": false,
+      "locked": {
+        "lastModified": 499162500,
+        "narHash": "sha256-S/oIG6zoWwikSifwgNqQAmVuHuhOZ5otfYcrWZM+8Qs=",
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/jscpd-linux-x64-gnu/-/jscpd-linux-x64-gnu-5.4.2.tgz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/jscpd-linux-x64-gnu/-/jscpd-linux-x64-gnu-5.4.2.tgz"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793726008,
@@ -34,6 +60,8 @@
     },
     "root": {
       "inputs": {
+        "jscpd-aarch64-linux": "jscpd-aarch64-linux",
+        "jscpd-x86_64-linux": "jscpd-x86_64-linux",
         "nixpkgs": "nixpkgs",
         "nixpkgs-stable": "nixpkgs-stable"
       }

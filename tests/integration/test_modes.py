@@ -76,7 +76,7 @@ def test_staged_name_status(target):
     target.stage()
     repo = Repo.open(
         str(target.path),
-        hardened_env(os.environ["PATH"], os.environ),
+        hardened_env(os.environ["PATH"], os.environ, None),
         60,
         shutil.which("git"),
     )
