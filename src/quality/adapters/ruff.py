@@ -17,8 +17,6 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         One command.
     """
     codes = sorted({code for item in bound for code in item.binding.settings.get("codes", ())})
-    # Exception: E902 must stay selected through coding.syntax-error, because
-    # without it ruff skips an undecodable file with only a warning and exit 0.
     prefix = [
         "check",
         "--isolated",

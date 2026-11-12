@@ -132,21 +132,6 @@ def pieces(path: str, snapshot, padded: bool) -> list:
         One piece per window, with the offset that turns a piece's line into
         the file's line. For a binary blob one piece without data.
     """
-    # Exception: the runner, not gitleaks, decides text versus binary, since
-    # gitleaks skips a file whose first bytes match a magic number of
-    # h2non/filetype v1.1.3, which reads as deep as byte 32,773 (the ISO 9660
-    # `CD001` at 32,769), so text holding `%PDF` at 0, `DICM` at 128 or `ustar`
-    # at 257 passed unread. Each window fits one gitleaks read of 100,000
-    # bytes and starts and ends at a line boundary, so a line allowlist sees
-    # its whole line. Accepted limits: a line longer than the 25,000-byte
-    # overlap, or from 17,226 bytes up in the padded second run, can be cut,
-    # which can give a false positive or a miss; a secret over 25,000 bytes,
-    # on one line or several, can be missed. Only a file gitleaks skipped is
-    # staged again behind newlines, which leave the sniffer nothing to match,
-    # since padding every file made the scan ten times slower than gitleaks
-    # alone on a 10 MB repository. Raw bytes are always read, as gitleaks
-    # reads them, because a byte order mark before plain ASCII decodes to
-    # unrelated text.
     found = spans(path, snapshot, padded)
     if found is None:
         return [Piece(0, None)]
@@ -167,15 +152,6 @@ def operands(command: Command, snapshot, work) -> list:
     Returns:
         The ignore file location and the one directory gitleaks scans.
     """
-    # Exception: `gitleaks dir` scans the working directory when given more
-    # than one path and always loads .gitleaksignore from the scanned root.
-    # Each piece is <index>/<piece>/path/<own path>, where every allowlist
-    # of gitleaks applies as when it scans the file itself. Its global
-    # allowlist skips names such as *.pdf, go.sum or node_modules/, so the
-    # second run also links each piece as `content`, a name no allowlist
-    # matches, and under named/ with a neutral stem and its suffix, for the
-    # rules that match the suffix; those two count only when gitleaks skipped
-    # the own path.
     for index, path in enumerate(command.files):
         for number, piece in enumerate(pieces(path, snapshot, command.rescan)):
             folder = work / str(index) / str(number)

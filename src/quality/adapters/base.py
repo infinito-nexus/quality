@@ -147,7 +147,5 @@ def known_path(reported: str, snapshot) -> str:
     """
     if reported in snapshot.files:
         return reported
-    # Exception: ruff prints a non-UTF-8 file name with U+FFFD, so the lossy
-    # spelling is mapped back instead of treating the file as unknown.
     lossy = {os.fsencode(path).decode("utf-8", "replace"): path for path in snapshot.files}
     return lossy[reported]

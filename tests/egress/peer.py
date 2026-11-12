@@ -85,7 +85,6 @@ def direct(target):
     except TimeoutError:
         return "timeout"
     except OSError as error:
-        # Exception: socket.gaierror carries negative EAI_* codes that errno.errorcode does not name
         return errno.errorcode.get(error.errno, str(error))  # nocheck: clean.default-value -- errno.errorcode has no name for a negative EAI code, so the error text reports it
     return "connected"
 

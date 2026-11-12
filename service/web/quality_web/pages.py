@@ -81,8 +81,6 @@ def require_origin():
     origin = request.headers.get("Origin", "").rstrip("/")
     if origin == expected:
         return
-    # Exception: Referrer-Policy no-referrer makes browsers send Origin: null on this site's own form posts;
-    # Sec-Fetch-Site comes from the browser alone, so it still tells those apart from a sandboxed or foreign page
     if origin == "null" and request.headers.get("Sec-Fetch-Site") == "same-origin":
         return
     abort(403)
@@ -173,7 +171,6 @@ def report(job_id):
 
 @pages.get("/<any(privacy, terms):page>")
 def legal(page):
-    # Exception: the footer links carry no ?lang= and sit on pages written in English, so they open the English text
     language = request.args.get("lang", "en")  # nocheck: clean.default-value -- a footer link carries no ?lang= and opens the English text
     if language not in LEGAL_LANGUAGES:
         abort(404)

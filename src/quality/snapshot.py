@@ -70,8 +70,6 @@ def labelled(kinds: frozenset, path: str) -> frozenset:
 def safe_path(path: str) -> str:
     parts = path.split("/")
     unsafe = {"", ".", ".."}
-    # Exception: a top-level file named `-` reaches tools after `--`, and ruff,
-    # rg and shellcheck then read an empty stdin instead, so it would pass unread.
     hostile = path == "-" or path.startswith("/")
     if hostile or any(p in unsafe or p.lower() == ".git" for p in parts):
         raise QualityError(f"unsafe path in the git tree: {path!r}")

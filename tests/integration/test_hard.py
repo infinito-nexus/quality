@@ -38,7 +38,6 @@ BINARY_RULE = "security.binary-code"
 DOCKERFILE_RULE = "coding.dockerfile"
 BINARY_PDF = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n\x00"
 BINARY_ELF = b"\x7fELF\x02\x01\x01\x00\x00\x00\n"
-# Exception: the value is split, so this repository's own secret scan passes.
 BITBAKE_RECIPE = b'SUMMARY = "x"\nSRCREV_tokenizer = "' + b'9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"\n'
 K8S_SECRET = (
     b"apiVersion: v1\nkind: Secret\nmetadata:\n  name: db\ndata:\n"

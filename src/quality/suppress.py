@@ -180,8 +180,6 @@ def line_comment(text: str, marker: str) -> str | None:
 def starts_comment(text: str, index: int, marker: str) -> bool:
     if not text.startswith(marker, index):
         return False
-    # Exception: `$#` and `${#x}` are shell syntax, so `#` needs leading blank.
-    # A byte order mark is no blank to isspace(), yet a comment may follow it.
     return marker != "#" or text[:index] in ("", BOM) or text[index - 1].isspace()
 
 

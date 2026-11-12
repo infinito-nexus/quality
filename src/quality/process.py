@@ -22,8 +22,6 @@ def kill_group(proc: subprocess.Popen) -> None:
 
 def abandon(proc: subprocess.Popen) -> None:
     kill_group(proc)
-    # Exception: an escaped grandchild may hold the pipes open, so closing them
-    # replaces a second communicate() that could block past the timeout.
     for stream in (proc.stdin, proc.stdout, proc.stderr):
         if stream is not None:
             stream.close()
