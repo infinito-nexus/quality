@@ -27,7 +27,7 @@ include-package-data = false
 "quality.rules" = "rules"
 
 [tool.setuptools.package-data]
-"quality.rules" = ["*.yml"]
+"quality.rules" = ["*.yml", "semgrep/*.yml"]
 
 [tool.setuptools.dynamic]
 version = { attr = "quality.__version__" }
@@ -36,3 +36,4 @@ version = { attr = "quality.__version__" }
 addopts = "-p no:cacheprovider -rs"
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["deep: runs the deep tier on the shared test bundle, which `quality db update` fetches"]

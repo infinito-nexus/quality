@@ -1,4 +1,9 @@
+import json
+import os
 import re
+import subprocess
+
+import pytest
 
 from quality.ruledata import load
 from tests.integration.support import (
@@ -13,6 +18,7 @@ from tests.integration.support import (
     rules_copy,
 )
 
+CLONES = "clean.clones"
 PREFIXES = ("security.", "coding.", "clean.")
 DOCKERFILE_RULE = "coding.dockerfile"
 DOCKERFILE_KIND = "dockerfile"
@@ -159,12 +165,11 @@ def test_hadolint_never_reads_a_template(target, tmp_path):
 def test_size_limits(target, mode):
     target.write("seed.py", "x = 1\n")
     target.start_feature(mode)
-    shell = "#!/bin/bash\n" + lines_of("echo ", 500)
-    target.write("run.sh", shell)
-    target.write("tests/long.sh", shell)
+    target.write("run.sh", "#!/bin/bash\n" + lines_of("echo ", 500))
+    target.write("tests/long.sh", "#!/bin/bash\n" + lines_of("printf ", 500))
     target.write("data.json", lines_of('"x', 501))
     target.write("yarn.lock", lines_of("x", 501))
-    target.write("package-lock.json", lines_of("x", 501))
+    target.write("package-lock.json", "{\n" + lines_of('  "x', 501).replace("\n", '": 0,\n') + '  "y": 0\n}\n')
     target.write("locales/de.js", lines_of("export const a", 501))
     target.write("generated/api.ts", lines_of("export const a", 501))
     target.advance(mode)
@@ -328,8 +333,53 @@ def test_function_limits(target, mode):
     target.advance(mode)
     result = target.judge(mode, "--json")
     assert result.returncode == 1, result.stderr
-    assert sorted((item["rule"], item["value"]) for item in report(result)["findings"]) == [
+    metric = [item for item in report(result)["findings"] if item["rule"] != CLONES]
+    assert sorted((item["rule"], item["value"]) for item in metric) == [
         ("clean.complexity", 11),
         ("clean.function-length", 51),
         ("clean.parameters", 6),
     ]
+
+
+def sum_function(name: str, parameters: str, terms: int) -> str:
+    """
+    Args:
+        name: Function name.
+        parameters: Parameter list text.
+        terms: Number of added literals.
+
+    Returns:
+        A function of 8 + 2 * terms jscpd tokens with one parameter, one fewer without.
+    """
+    total = " + ".join(str(term) for term in range(1, terms + 1))
+    return f"def {name}({parameters}):\n    return a + {total}\n"
+
+
+@pytest.mark.deep
+def test_clone_limit(target, tmp_path):
+    fifty = sum_function("first", "a", 21)
+    forty_nine = sum_function("second", "", 21)
+    target.write("seed.py", "x = 0\n")
+    target.start_feature("base")
+    target.write("one.py", f"{fifty}\n\nx = 0\n\n\n{forty_nine}")
+    target.write("two.py", f"y = 1\n\n\n{fifty}\n\nz = 2\n\n\n{forty_nine}")
+    target.write(".jscpd.json", '{"ignore": ["**/*.py"]}\n')
+    target.write("package.json", '{"jscpd": {"ignore": ["**/*.py"]}}\n')
+    target.advance("base")
+    expected = [("one.py", 1), ("two.py", 4)]
+    for flags in (("--base", "main"), ("--all",)):
+        found = report(target.check(*flags, "--json"))["findings"]
+        assert sorted((i["path"], i["line"]) for i in found if i["rule"] == CLONES) == expected
+    output = tmp_path / "raw"
+    home = tmp_path / "home"
+    home.mkdir()
+    control = subprocess.run(
+        ["jscpd", "--reporters", "json", "--output", str(output), "one.py", "two.py"],
+        cwd=target.path,
+        env={"PATH": os.environ["PATH"], "HOME": str(home)},
+        capture_output=True,
+        check=False,
+    )
+    assert control.returncode == 0
+    raw = json.loads((output / "jscpd-report.json").read_text(encoding="utf-8"))
+    assert raw["duplicates"] == []

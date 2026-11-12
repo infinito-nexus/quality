@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.integration.support import (
+    DEEP_TOOLS,
     Target,
     branchy,
     edit_yaml,
@@ -25,9 +26,13 @@ from tests.integration.support import (
 )
 
 F401 = rule_for("F401")
+CLONES = "clean.clones"
 SYNTAX = "coding.syntax-error"
 OVERSIZED = "security.oversized-code"
-TOOL_NAMES = sorted(tools())
+TOOL_NAMES = [
+    pytest.param(tool, marks=pytest.mark.deep) if tool in DEEP_TOOLS else tool
+    for tool in sorted(tools())
+]
 CANARY = "QUALITYSHIMCANARY"
 
 
@@ -89,11 +94,22 @@ def test_undecodable_python_is_a_finding(target):
     assert rule_ids(result) == [SYNTAX]
 
 
+def drop_clones(entries: list) -> None:
+    entries.remove(next(entry for entry in entries if entry["id"] == CLONES))
+
+
+@pytest.mark.deep
 def test_argv_limit_splits_commands(target, tmp_path):
     every_kind_target(target)
-    whole = sorted(rule_ids(target.check("--all", "--json")))
-    rules = rules_copy(tmp_path / "rules")
+    rules = rules_copy(tmp_path / "rules", True)
     edit_yaml(rules / "limits.yml", lambda document: document.update(argv_max_bytes=1))
+    refused = target.check("--all", "--json", "--rules", str(rules))
+    assert refused.returncode == 2
+    assert "jscpd must see its files in one command" in refused.stderr
+    whole = sorted(
+        rule_id for rule_id in rule_ids(target.check("--all", "--json")) if rule_id != CLONES
+    )
+    edit_yaml(rules / "clean.yml", drop_clones)
     result = target.check("--all", "--json", "--verbose", "--rules", str(rules))
     assert sorted(rule_ids(result)) == whole
     lines = [line for line in result.stderr.splitlines() if "tool rg:" in line]
@@ -112,7 +128,7 @@ def test_tool_stderr_on_clean_exit_fails_closed_for_lizard(target, tmp_path):
 @pytest.mark.parametrize("tool", TOOL_NAMES)
 def test_tool_timeout_exits_2(target, tmp_path, tool):
     every_kind_target(target)
-    rules = rules_copy(tmp_path / "rules")
+    rules = rules_copy(tmp_path / "rules", target.deep)
     edit_yaml(rules / "tools.yml", lambda document: document[tool].update(timeout=1))
     pid_file = tmp_path / "child.pid"
     shims = tmp_path / "shims"

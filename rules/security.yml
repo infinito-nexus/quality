@@ -33,7 +33,7 @@
       unless_message: seems safe
 - id: security.oversized-code
   severity: high
-  summary: Changed code file over the size limit, so no rule could read it
+  summary: Changed code file or lockfile over the size limit, so no rule could read it
   hard: true
   file_level: true
   enforcer: size-guard
@@ -50,21 +50,143 @@
     python:
       tool: ruff
       codes: [S108]
+- id: security.unverified-download
+  severity: high
+  summary: Downloaded script runs without a digest check; write it to a file and check its digest first
+  enforcer:
+    shell:
+      tool: rg
+      multiline: true
+      code_view:
+        levels: 8
+        window: 256
+      pattern: >-
+        (?mx)
+        ^(?:(?:(?:[^\x23\n\s\\]\x23+|\\[^\n]|\$\{[^}\n]*\}|[^\x23\n\\])*?
+        (?:[;&|(){`!]|\b(?:(?:ba|da|z|k|a|mk)?sh|su|runuser)(?:[\t\x20]+[^\s;&|]+)*?[\t\x20]+-[A-Za-z]*c[A-Za-z]*(?:[\t\x20]+(?:[-+][A-Za-z]+|--))*[\t\x20]+))?
+        [\t\x20]*(?:(?:if|elif|while|until|then|do|else|time|eval|trap|command|builtin|!)[\t\x20]+)*
+        (?:(?:/[\w./-]*/)?(?:sudo|doas|env|command|exec|nohup|nice|stdbuf|setsid|run0)
+        (?:(?:[\t\x20]|\\\n)+(?:-{1,2}[\w-]+(?:=[^\s;&|]*)?(?:(?:[\t\x20]|\\\n)+[^\s;&|<>-][^\s;&|<>]*)?|[A-Za-z_]\w*=[^\s;&|]*))*(?:[\t\x20]|\\\n)+
+        |(?:/[\w./-]*/)?timeout(?:(?:[\t\x20]|\\\n)+-{1,2}[\w-]+(?:=[^\s;&|]*)?)*(?:[\t\x20]|\\\n)+[0-9.]+[smhd]?(?:[\t\x20]|\\\n)+
+        |[A-Za-z_]\w*=[^\s;&|]*(?:[\t\x20]|\\\n)+
+        |\$\{?[A-Za-z_]\w*\}?(?:[\t\x20]|\\\n)+)*
+        (?:
+        \\?(?:/[\w./-]*/)?(?:busybox(?:[\t\x20]|\\\n)+)?(?:curl|wget|fetch|https?|aria2c)(?:[\t\x20]|\\\n)
+        (?:\\\n|[0-9]*>&[0-9-]*|&>|&[^\s;&|<>]|[^\n;&|])*
+        (?:;[\t\x20]*\}[\t\x20]*)?
+        (?:\|&?(?:\s|\\\n)*(?:\\\n|[0-9]*>&[0-9-]*|&>|&[^\s;&|<>]|[^\n;&|])+)*
+        \|&?(?:\s|\\\n)*
+        (?:(?:/[\w./-]*/)?(?:sudo|doas|env|command|exec|nohup|nice|stdbuf|setsid|run0)
+        (?:(?:[\t\x20]|\\\n)+(?:-{1,2}[\w-]+(?:=[^\s;&|]*)?(?:(?:[\t\x20]|\\\n)+[^\s;&|<>-][^\s;&|<>]*)?|[A-Za-z_]\w*=[^\s;&|]*))*(?:[\t\x20]|\\\n)+
+        |(?:/[\w./-]*/)?timeout(?:(?:[\t\x20]|\\\n)+-{1,2}[\w-]+(?:=[^\s;&|]*)?)*(?:[\t\x20]|\\\n)+[0-9.]+[smhd]?(?:[\t\x20]|\\\n)+
+        |[A-Za-z_]\w*=[^\s;&|]*(?:[\t\x20]|\\\n)+
+        |\$\{?[A-Za-z_]\w*\}?(?:[\t\x20]|\\\n)+)*
+        (?:
+        (?:/[\w./-]*/)?(?:(?:ba|da|z|k|a|mk|ya|tc|c|fi)?sh|busybox(?:[\t\x20]|\\\n)+(?:ba|a)?sh|\$\{?(?:SHELL|BASH)\}?)
+        (?:(?:[\t\x20]|\\\n)+(?:[-+][abd-zA-Z]*o(?:[\t\x20]|\\\n)+[A-Za-z]+|[-+][abd-zA-Z]+|--[\w-]*))*
+        (?:(?:[\t\x20]|\\\n)+(?:-|-[abd-zA-Z]*s[abd-zA-Z]*|/dev/stdin|/dev/fd/0)(?:[\t\x20]+[^\n;&|)\x1f]*)?)?
+        |
+        (?:/[\w./-]*/)?(?:python[0-9.]*|pypy[0-9.]*)
+        (?:(?:[\t\x20]|\\\n)+(?:-[abd-ln-zA-Z0-9]+|--[\w-]+))*
+        (?:(?:[\t\x20]|\\\n)+-(?:[\t\x20]+[^\n;&|)\x1f]*)?)?
+        |
+        (?:/[\w./-]*/)?(?:perl[0-9.]*|ruby[0-9.]*|node(?:js)?|deno|bun)
+        (?:(?:[\t\x20]|\\\n)+-[a-df-moqs-zA-DF-Z0-9]+)*
+        (?:(?:[\t\x20]|\\\n)+-(?:[\t\x20]+[^\n;&|)\x1f]*)?)?
+        |
+        (?:/[\w./-]*/)?php[0-9.]*
+        (?:(?:[\t\x20]|\\\n)+(?:-d(?:[\t\x20]|\\\n)*[\w.]+(?:=[^\s;&|]*)?|-[a-qs-zACDG-QS-Z0-9]+))*
+        (?:(?:[\t\x20]|\\\n)+--?(?:[\t\x20]+[^\n;&|)\x1f]*)?)?
+        )
+        (?:[\t\x20]+(?:EXIT|ERR|RETURN|DEBUG|HUP|INT|QUIT|TERM|USR[12]|SIG[A-Z0-9]+))*
+        (?:[\t\x20]*(?:[0-9]*>>?|&>>?|<)(?:&[0-9-]+|[\t\x20]*[^\s;&|<>()`\x1f]+))*
+        [\t\x20]*(?:[;&|)`\x23\x1f]|$)
+        |
+        (?:(?:/[\w./-]*/)?(?:(?:ba|da|z|k|a|mk|ya|tc|c|fi)?sh|busybox(?:[\t\x20]|\\\n)+(?:ba|a)?sh
+        |python[0-9.]*|pypy[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node(?:js)?|php[0-9.]*|deno|bun|\$\{?(?:SHELL|BASH)\}?)
+        |source|\.)
+        (?:(?:[\t\x20]|\\\n)+-[\w-]*)*(?:[\t\x20]|\\\n)+(?:<[\t\x20]*)?<\(
+        (?:\s|\\\n)*(?:(?:/[\w./-]*/)?(?:sudo|doas|env)(?:[\t\x20]|\\\n)+)*
+        \\?(?:/[\w./-]*/)?(?:busybox(?:[\t\x20]|\\\n)+)?(?:curl|wget|fetch|https?|aria2c)(?:[\t\x20]|\\\n)
+        )
+        |
+        (?:(?:[^\x23\n\s\\]\x23+|\\[^\n]|\$\{[^}\n]*\}|[^\x23\n\\])*?[\t\x20;&|(){`!])?
+        (?:(?:(?:/[\w./-]*/)?(?:(?:ba|da|z|k|a|mk|ya|tc|c|fi)?sh|busybox(?:[\t\x20]|\\\n)+(?:ba|a)?sh
+        |python[0-9.]*|pypy[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node(?:js)?|php[0-9.]*|deno|bun)|\$\{?(?:SHELL|BASH)\}?)
+        (?:(?:(?:[\t\x20]|\\\n)+-[\w-]*)*(?:[\t\x20]|\\\n)+-[A-Za-z]*[ce][A-Za-z]*(?:(?:[\t\x20]|\\\n)+(?:[-+][A-Za-z]+|--))*(?:[\t\x20]|\\\n)+|(?:[\t\x20]|\\\n)*<<<(?:[\t\x20]|\\\n)*)
+        |(?:su|runuser)(?:[\t\x20]+[^\s;&|]+)*?[\t\x20]+-[A-Za-z]*c[A-Za-z]*(?:[\t\x20]|\\\n)+
+        |(?:eval|trap)(?:[\t\x20]|\\\n)+)
+        (?:\$\(|`)(?:\s|\\\n)*(?:(?:/[\w./-]*/)?(?:sudo|doas|env)(?:[\t\x20]|\\\n)+)*
+        \\?(?:/[\w./-]*/)?(?:busybox(?:[\t\x20]|\\\n)+)?(?:curl|wget|fetch|https?|aria2c)(?:[\t\x20]|\\\n)
+        )
 - id: security.static-analysis
   severity: high
   summary: Semgrep rule set matched
-  pending: true
   tier: deep
   enforcer:
-    code:
+    javascript:
+      tool: semgrep
+    typescript:
+      tool: semgrep
+    tsx:
       tool: semgrep
 - id: security.vulnerable-dependency
   severity: high
   summary: Dependency with a known vulnerability
-  pending: true
   tier: deep
   enforcer:
-    code:
+    manifest: &trivy_manifest
       tool: trivy
-    lockfile:
+      files:
+        - requirements.txt
+        - Pipfile.lock
+        - poetry.lock
+        - uv.lock
+        - pylock.toml
+        - "pylock.*.toml"
+        - package-lock.json
+        - yarn.lock
+        - pnpm-lock.yaml
+        - bun.lock
+        - go.mod
+        - Cargo.lock
+        - Gemfile.lock
+        - composer.lock
+    lockfile: &osv_lockfile
       tool: osv-scanner
+      files:
+        - "*requirements*.txt"
+        - "**/requirements/*.txt"
+        - Pipfile.lock
+        - poetry.lock
+        - uv.lock
+        - pdm.lock
+        - pylock.toml
+        - "pylock.*.toml"
+        - package-lock.json
+        - npm-shrinkwrap.json
+        - yarn.lock
+        - pnpm-lock.yaml
+        - bun.lock
+        - go.mod
+        - Cargo.lock
+        - Gemfile.lock
+        - gems.locked
+        - composer.lock
+      parse_as:
+        "**/requirements/*.txt": requirements.txt
+- id: security.partial-scan
+  severity: high
+  summary: Changed file Semgrep read only in part or not at all, or lockfile trivy or osv-scanner could not parse, so a rule may miss code or packages anywhere in it; waive it per path
+  tier: deep
+  changed_only: true
+  file_level: true
+  enforcer:
+    javascript:
+      tool: semgrep
+    typescript:
+      tool: semgrep
+    tsx:
+      tool: semgrep
+    manifest: *trivy_manifest
+    lockfile: *osv_lockfile

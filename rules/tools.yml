@@ -52,3 +52,46 @@ hadolint:
   loads:
     - .hadolint.yaml
     - .hadolint.yml
+semgrep:
+  timeout: 600
+  exit_codes: [0]
+  configs:
+    javascript: semgrep/javascript.yml
+    typescript: semgrep/javascript.yml
+    tsx: semgrep/javascript.yml
+  loads:
+    - .semgrepignore
+    - .semgrep.yml
+    - .semgrep.yaml
+    - .semgrep/settings.yml
+jscpd:
+  timeout: 600
+  exit_codes: [0]
+  single_command: true
+  whole_snapshot: true
+  max_size: 1gb
+  loads:
+    - .jscpd.json
+    - package.json
+trivy:
+  timeout: 300
+  exit_codes: [0]
+  parse_errors: [Walk error, Analysis error, Failed to parse]
+  database: true
+  db_repository: ghcr.io/aquasecurity/trivy-db:2
+  update_timeout: 1800
+  loads:
+    - trivy.yaml
+    - .trivyignore
+    - .trivyignore.yaml
+    - trivy-secret.yaml
+osv-scanner:
+  timeout: 300
+  exit_codes: [0, 1]
+  database: true
+  ecosystems: [PyPI, npm, Go, crates.io, RubyGems, Packagist]
+  offline_url: https://osv-vulnerabilities.storage.googleapis.com/{ecosystem}/all.zip
+  offline_path: osv-scalibr/{ecosystem}/all.zip
+  update_timeout: 1800
+  loads:
+    - osv-scanner.toml

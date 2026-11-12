@@ -6,6 +6,7 @@ import pytest
 
 from quality.repo import Repo, hardened_env
 from tests.integration.support import (
+    DEEP_TOOLS,
     SECRET_ENV_LINE,
     UNTAGGED_DOCKERFILE,
     path_without,
@@ -15,6 +16,7 @@ from tests.integration.support import (
     rule_for,
     rule_ids,
     rules_without_pending,
+    write_every_kind,
 )
 
 F401 = rule_for("F401")
@@ -245,6 +247,33 @@ def test_staged_feeds_touched_files_only_to_gitleaks_and_hadolint(target):
     every_file = "new.yml new/Dockerfile old.env old/Dockerfile"
     whole = target.check("--all", "--verbose")
     assert f"quality: tool gitleaks: exit 0, files: {every_file}" in whole.stderr
+
+
+def tool_lines(result, tool: str) -> list:
+    return [line for line in result.stderr.splitlines() if f"tool {tool}:" in line]
+
+
+@pytest.mark.deep
+def test_staged_runs_the_fast_tier_on_touched_files_only(target):
+    target.write("untouched.py", "x = 1\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    write_every_kind(target)
+    target.stage()
+    staged = target.check("--staged", "--verbose")
+    assert staged.returncode == 1, staged.stderr
+    for tool in DEEP_TOOLS:
+        assert tool_lines(staged, tool) == []
+    lizard = tool_lines(staged, "lizard")
+    assert lizard
+    assert all("untouched.py" not in line for line in lizard)
+    assert all("pkg/code.py" in line for line in lizard)
+    target.commit()
+    for flags in (("--base", "main"), ("--all",)):
+        deep = target.check(*flags, "--verbose")
+        assert deep.returncode == 1, deep.stderr
+        for tool in DEEP_TOOLS:
+            assert tool_lines(deep, tool), tool
 
 
 def test_staged_on_unborn_head(target):

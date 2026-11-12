@@ -9,3 +9,12 @@
     - ansible/roles/web-app-cst-quality-check/files/python/script.py
     - service/verify/extra_vars.py
   reason: standalone scripts run by path; sys-service copies script.py alone, so a package file next to it would never ship
+- rule: clean.folder-items
+  paths: ["src/quality"]
+  reason: requirement 001 decision 24 adds db.py as the thirteenth item of the runner package; moving modules into subpackages would change every import and is a refactor of its own
+- rule: clean.clones
+  paths: ["tests/integration/test_hard.py", "tests/integration/test_modes.py"]
+  reason: the secret-scanner tests spell out each staged, base and history scenario in full, as main wrote them before the deep tier ran jscpd; folding them is a refactor of its own
+- rule: clean.clones
+  paths: ["tests/service/test_web.py"]
+  reason: each rate-limit test spells out its own request sequence, so the repeated client setup and first two submissions keep every test readable on its own

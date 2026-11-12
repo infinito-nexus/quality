@@ -4,7 +4,7 @@ import pytest
 
 from quality import QualityError
 from quality.gate import Hit
-from quality.ignorefile import audit_lines, parse, split_ignored
+from quality.ignorefile import audit_lines, parse, split_ignored, stale_names
 from quality.ruledata import load, locate
 
 DATA = load(locate(str(Path(__file__).resolve().parents[2] / "rules")))
@@ -17,7 +17,7 @@ def rule_named(rule_id: str):
 
 
 def hit(rule_id: str, path: str) -> Hit:
-    return Hit(rule_named(rule_id), path, 1, "", "", None, "", None)
+    return Hit(rule_named(rule_id), path, 1, "", "", None, "", None, False, frozenset())
 
 
 def test_parse_absent_and_empty_files():
@@ -116,6 +116,42 @@ def test_split_ignored_consults_the_side_of_each_rule():
     kept, applied = split_ignored(hits, [], soft_only + hard_only)
     assert [item.rule.id for item in kept] == [SOFT]
     assert applied == hard_only
+
+
+GAP = "security.partial-scan"
+STATIC = "security.static-analysis"
+
+
+@pytest.mark.parametrize(
+    "paths",
+    ["", "\n  paths: ['**/*.js']", "\n  paths: ['web/*.js']", "\n  paths: [web/]", "\n  paths: ['!a.js']",
+     "\n  paths: [a.js, '*.js']"],
+)
+def test_parse_rejects_a_partial_scan_entry_without_literal_files(paths: str):
+    with pytest.raises(QualityError, match="literal file paths"):
+        parse(f"- rule: {GAP}\n  reason: why{paths}\n".encode(), DATA)
+
+
+def test_only_an_entry_naming_the_very_file_waives_a_partial_scan():
+    entries = parse(
+        f"- rule: {GAP}\n  reason: why\n  paths: [app.js, /web/run.js]\n"
+        "- rule: security\n  reason: why\n  paths: ['web/*']\n".encode(),
+        DATA,
+    )
+    hits = [hit(GAP, "web/app.js"), hit(GAP, "web/run.js"), hit(STATIC, "web/app.js")]
+    kept, applied = split_ignored(hits, entries, entries)
+    assert [(item.rule.id, item.path) for item in kept] == [(GAP, "web/app.js")]
+    assert applied == entries
+    kept, applied = split_ignored(hits, entries, [])
+    assert [(item.rule.id, item.path) for item in kept] == [(GAP, "web/app.js"), (GAP, "web/run.js")]
+
+
+def test_a_partial_scan_entry_for_a_checked_file_without_its_finding_is_stale():
+    entries = parse(f"- rule: {GAP}\n  reason: why\n  paths: [web/app.js]\n".encode(), DATA)
+    assert stale_names(entries, [hit(GAP, "web/app.js")], {"web/app.js"}, {GAP}) == []
+    assert stale_names(entries, [], {"web/other.js"}, {GAP}) == []
+    assert stale_names(entries, [], {"web/app.js"}, set()) == []
+    assert stale_names(entries, [hit(STATIC, "web/app.js")], {"web/app.js"}, {GAP}) == entries
 
 
 def test_audit_lines_one_per_change():

@@ -72,8 +72,9 @@
 - id: clean.clones
   severity: medium
   summary: Duplicated code block
-  pending: true
   tier: deep
   enforcer:
     code:
       tool: jscpd
+      min_tokens: 50
+      min_lines: 1

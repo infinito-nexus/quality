@@ -12,6 +12,11 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 RULES = ROOT / "rules"
 RESERVED = ("tools.yml", "limits.yml", "kinds.yml")
+TEST_CACHE = Path(tempfile.gettempdir()) / "quality-test-cache"
+TEST_DB = TEST_CACHE / "quality" / "db"
+NO_BUNDLE_CACHE = Path(tempfile.gettempdir()) / "quality-test-no-bundle"
+DEEP_TOOLS = ("jscpd", "osv-scanner", "semgrep", "trivy")
+VULNERABLE_PIN = "requests==2.19.0\n"
 AUTHOR_NAME = "QualityAuthorCanary"
 AUTHOR_EMAIL = "quality-author-canary@example.invalid"
 # Exception: the token is split, so this repository's own secret scan passes.
@@ -72,10 +77,26 @@ def launcher_argv(*args: str) -> list:
     return [sys.executable, "-I", "-B", "-c", LAUNCHER, *args]
 
 
-def quality(cwd: Path, *args: str, path_value: str | None = None) -> subprocess.CompletedProcess:
+def quality(
+    cwd: Path, *args: str, path_value: str | None = None, extra_env: dict | None = None
+) -> subprocess.CompletedProcess:
+    """
+    Args:
+        cwd: Directory quality runs in.
+        args: Command line after the program name.
+        path_value: PATH, or None for the caller's.
+        extra_env: Variables added to or replacing PATH, TMPDIR and XDG_CACHE_HOME,
+            or None. XDG_CACHE_HOME names a directory without a bundle, so the
+            deep tier exits 2 unless a test brings the shared test bundle.
+
+    Returns:
+        The finished process.
+    """
     env = {
         "PATH": path_value if path_value is not None else os.environ["PATH"],
         "TMPDIR": tempfile.gettempdir(),
+        "XDG_CACHE_HOME": str(NO_BUNDLE_CACHE),
+        **(extra_env or {}),
     }
     return subprocess.run(
         launcher_argv(*args),
@@ -89,14 +110,30 @@ def quality(cwd: Path, *args: str, path_value: str | None = None) -> subprocess.
 
 
 class Target:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, deep: bool = False):
+        """
+        Args:
+            path: Work tree of the repository.
+            deep: True checks with the packaged rule data and the shared test
+                bundle; False with the fast tier only and no bundle, unless a
+                check passes its own --rules.
+        """
         self.path = path
+        self.deep = deep
 
     @classmethod
-    def create(cls, path: Path) -> "Target":
+    def create(cls, path: Path, deep: bool = False) -> "Target":
         path.mkdir(parents=True)
         git(path, "init", "-q", "-b", "main")
-        return cls(path)
+        return cls(path, deep)
+
+    def rule_args(self, args: tuple) -> tuple:
+        if self.deep or "--rules" in args:
+            return ()
+        fast = self.path.with_name(f"{self.path.name}-fast-rules")
+        if not fast.exists():
+            rules_copy(fast)
+        return ("--rules", str(fast))
 
     def write(self, relative: str, text: str) -> None:
         destination = self.path / relative
@@ -114,8 +151,13 @@ class Target:
         self.git("commit", "-q", "--allow-empty", "--allow-empty-message", "-m", message)
         return self.git("rev-parse", "HEAD").stdout.strip()
 
-    def check(self, *args: str, path_value: str | None = None) -> subprocess.CompletedProcess:
-        return quality(self.path, "check", *args, path_value=path_value)
+    def check(
+        self, *args: str, path_value: str | None = None, extra_env: dict | None = None
+    ) -> subprocess.CompletedProcess:
+        cache = TEST_CACHE if self.deep else NO_BUNDLE_CACHE
+        env = {"XDG_CACHE_HOME": str(cache), **(extra_env or {})}
+        argv = ("check", *args, *self.rule_args(args))
+        return quality(self.path, *argv, path_value=path_value, extra_env=env)
 
     def judge(self, mode: str, *args: str) -> subprocess.CompletedProcess:
         flags = ("--staged",) if mode == "staged" else ("--base", "main")
@@ -173,17 +215,31 @@ def pending_tools() -> list:
     )
 
 
-def rules_copy(destination: Path) -> Path:
+def keep_rules(destination: Path, keep) -> None:
+    for path in sorted(destination.glob("*.yml")):
+        if path.name not in RESERVED:
+            kept = [rule for rule in yaml.safe_load(path.read_text()) or [] if keep(rule)]
+            path.write_text(yaml.safe_dump(kept), encoding="utf-8")
+
+
+def rules_copy(destination: Path, deep: bool = False) -> Path:
+    """
+    Args:
+        destination: Directory for the copy of the rule data.
+        deep: True keeps the deep tier, which needs the shared test bundle.
+
+    Returns:
+        The copy.
+    """
     shutil.copytree(RULES, destination)
+    if not deep:
+        keep_rules(destination, lambda rule: rule.get("tier") != "deep")
     return destination
 
 
-def rules_without_pending(destination: Path) -> Path:
-    rules_copy(destination)
-    for path in sorted(destination.glob("*.yml")):
-        if path.name not in RESERVED:
-            kept = [rule for rule in yaml.safe_load(path.read_text()) if not rule.get("pending")]
-            path.write_text(yaml.safe_dump(kept), encoding="utf-8")
+def rules_without_pending(destination: Path, deep: bool = False) -> Path:
+    rules_copy(destination, deep)
+    keep_rules(destination, lambda rule: not rule.get("pending"))
     return destination
 
 
@@ -216,6 +272,44 @@ def path_without(directory: Path, missing: str) -> str:
     return str(directory)
 
 
+def rules_with_enforcers(destination: Path, rule_id: str, keep: set) -> Path:
+    """
+    Args:
+        destination: Directory for the copy of the rule data.
+        rule_id: Rule whose enforcers are reduced.
+        keep: Enforcer keys that stay.
+
+    Returns:
+        The copy, so one tool's findings can be told from another's. An
+        enforcer another rule shares through a YAML alias goes there too.
+    """
+    rules_copy(destination, True)
+    for path in sorted(destination.glob("*.yml")):
+        if path.name not in RESERVED:
+            rules = yaml.safe_load(path.read_text(encoding="utf-8")) or []
+            dropped = {
+                id(settings)
+                for rule in rules
+                if rule["id"] == rule_id
+                for key, settings in rule["enforcer"].items()
+                if key not in keep
+            }
+            drop_enforcers(rules, dropped)
+            path.write_text(yaml.safe_dump(rules), encoding="utf-8")
+    return destination
+
+
+def drop_enforcers(rules: list, dropped: set) -> None:
+    """
+    Args:
+        rules: Rules of one file, changed in place.
+        dropped: Identities of the enforcer settings to remove from every rule.
+    """
+    for rule in rules:
+        if isinstance(rule["enforcer"], dict):
+            rule["enforcer"] = {key: value for key, value in rule["enforcer"].items() if id(value) not in dropped}
+
+
 def branchy(name: str, count: int) -> str:
     body = "".join(f"    if a == {index}:\n        return {index}\n" for index in range(count))
     return f"def {name}(a):\n{body}    return -1\n"
@@ -224,7 +318,10 @@ def branchy(name: str, count: int) -> str:
 def write_every_kind(target: Target) -> None:
     target.write("pkg/__init__.py", "")
     target.write("pkg/code.py", "import os  # noqa\n\n\n" + branchy("branchy", 12))
+    target.write("pkg/copy.py", branchy("copied", 12))
     target.write("run.sh", "#!/bin/bash\necho $1\n")
+    target.write("web/app.js", "new Function(location.hash)();\n")
+    target.write("requirements.txt", VULNERABLE_PIN)
     target.write(
         ".github/workflows/w.yml",
         "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
@@ -242,4 +339,9 @@ EVERY_KIND_RULES = {
     "clean.complexity",
     "clean.tool-pragma",
     "security.secret",
+}
+DEEP_KIND_RULES = {
+    "clean.clones",
+    "security.static-analysis",
+    "security.vulnerable-dependency",
 }

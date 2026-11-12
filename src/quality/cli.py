@@ -17,6 +17,12 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--json", action="store_true", dest="as_json")
     check.add_argument("--verbose", action="store_true")
     check.add_argument("--rules", metavar="DIR")
+    check.add_argument("--db", metavar="DIR")
+    database = commands.add_parser("db", allow_abbrev=False)
+    actions = database.add_subparsers(dest="action", required=True)
+    update = actions.add_parser("update", allow_abbrev=False)
+    update.add_argument("--db", metavar="DIR")
+    update.add_argument("--rules", metavar="DIR")
     return parser
 
 
@@ -29,10 +35,14 @@ def selected_mode(args: argparse.Namespace) -> str:
 def execute(args: argparse.Namespace) -> int:
     # Exception: these imports stay inside main's try block, because a broken
     # PyYAML raising at import time would exit 1, which reads as findings.
-    from quality.modes import Options, check
+    from quality.modes import Options, check, update_database
     from quality.report import exit_code, render_json, render_text
 
-    options = Options(selected_mode(args), args.base, args.rules, args.verbose, os.getcwd())
+    if args.command == "db":
+        print(printable(update_database(args.db, args.rules).note()))
+        return 0
+    mode = selected_mode(args)
+    options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd())
     outcome = check(options)
     print(render_json(outcome) if args.as_json else render_text(outcome))
     return exit_code(outcome)

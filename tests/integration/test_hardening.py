@@ -4,7 +4,10 @@ import subprocess
 import tarfile
 import tempfile
 
+import pytest
+
 from tests.integration.support import (
+    DEEP_KIND_RULES,
     EVERY_KIND_RULES,
     RAW_GITLEAKS,
     RULES,
@@ -111,7 +114,7 @@ def test_tool_environment_ignored(target, tmp_path):
     assert raw_tool(target.path, *hadolint).stdout.strip() != "[]"
     assert raw_tool_with(target.path, hostile, *hadolint).stdout.strip() == "[]"
     result = subprocess.run(
-        launcher_argv("check", "--all", "--json"),
+        launcher_argv("check", "--all", "--json", *target.rule_args(())),
         cwd=target.path,
         env={"PATH": os.environ["PATH"], "TMPDIR": tempfile.gettempdir(), **hostile},
         capture_output=True,
@@ -167,6 +170,46 @@ def assert_config_changes_the_raw_tools(target) -> None:
     assert "branchy" in plain_lizard.stdout
     assert raw_tool(target.path, "rg", "--no-config", "noqa").stdout == ""
     assert "noqa" in raw_tool(target.path, "rg", "--no-config", "--no-ignore", "noqa").stdout
+
+
+PLANTED_SEMGREP = (
+    "rules:\n  - id: planted\n    languages: [javascript]\n    severity: ERROR\n"
+    "    message: planted\n    pattern: const $X = $Y;\n"
+)
+
+
+@pytest.mark.deep
+def test_semgrep_reads_only_its_own_rules(target, tmp_path):
+    target.write("app.js", "const run = new Function(location.hash); // nosemgrep\nrun();\n")
+    target.write("ok.js", "const plain = 1;\n")
+    target.commit()
+    plain = findings_of(target.check("--all", "--json"))
+    assert ("security.static-analysis", "app.js", 1, None) in plain
+    target.write(".semgrep.yml", PLANTED_SEMGREP)
+    target.write(".semgrepignore", "*.js\n")
+    target.commit()
+    home = tmp_path / "home"
+    home.mkdir()
+    hostile = {
+        "HOME": str(home),
+        "SEMGREP_RULES": str(target.path / ".semgrep.yml"),
+        "SEMGREP_SEND_METRICS": "on",
+        "SEMGREP_ENABLE_VERSION_CHECK": "1",
+    }
+    assert findings_of(target.check("--all", "--json", extra_env=hostile)) == plain
+    assert list(home.iterdir()) == []
+    raw_home = tmp_path / "raw-home"
+    raw_home.mkdir()
+    control = subprocess.run(
+        ["semgrep", "scan", "--config", ".semgrep.yml", "--metrics=off", "--json", "ok.js"],
+        cwd=target.path,
+        env={"PATH": os.environ["PATH"], "HOME": str(raw_home), "SEMGREP_ENABLE_VERSION_CHECK": "0"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "planted" in control.stdout
+    assert (raw_home / ".semgrep").is_dir()
 
 
 def test_tracked_gitignored_file_checked(target):
@@ -389,6 +432,7 @@ def adapter_named_canaries(target, markers) -> None:
                 target.write(name, "[[[ not valid in any format\n")
 
 
+@pytest.mark.deep
 def test_no_target_code_per_tool(target, tmp_path):
     markers = tmp_path / "markers"
     markers.mkdir()
@@ -414,7 +458,8 @@ def test_no_target_code_per_tool(target, tmp_path):
     raw_tool(target.path, "python3", "setup.py")
     assert (markers / "setup").exists()
     if shutil.which("node"):
-        raw_tool(target.path, "node", "eslint.config.js")
+        shutil.copy2(target.path / "eslint.config.js", control / "eslint.config.js")
+        raw_tool(control, "node", "eslint.config.js")
         assert (markers / "eslint").exists()
     for marker in markers.iterdir():
         marker.unlink()
@@ -423,7 +468,7 @@ def test_no_target_code_per_tool(target, tmp_path):
     assert result.returncode == 1, result.stderr
     for tool in tools():
         assert f"tool {tool}:" in result.stderr
-    assert EVERY_KIND_RULES <= set(rule_ids(result))
+    assert EVERY_KIND_RULES | DEEP_KIND_RULES <= set(rule_ids(result))
     assert sorted(path.name for path in markers.iterdir()) == []
 
 
@@ -535,6 +580,60 @@ def test_non_utf8_path_never_passes_silently(target):
         "clean.complexity",
         "coding.shell-lint",
     } <= set(rule_ids(result))
+
+
+CONTROL_LOCK = "x\ny/package-lock.json"
+
+
+def test_a_changed_name_with_a_control_character_stops_the_check(target):
+    target.write("app.py", "y = 2\n")
+    target.write(CONTROL_LOCK, "{}\n")
+    target.stage()
+    staged = target.check("--staged")
+    target.commit()
+    for result in (staged, target.check("--all")):
+        assert result.returncode == 2
+        assert "control character: x\\ny/package-lock.json" in result.stderr
+
+
+@pytest.mark.parametrize("later", ["delete", "rename"])
+def test_a_control_character_name_any_commit_touched_stops_the_check(target, later):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    target.write("x\ny.env", SECRET_ENV_LINE)
+    target.commit()
+    if later == "delete":
+        (target.path / "x\ny.env").unlink()
+    else:
+        target.git("mv", "x\ny.env", "y.env")
+    target.write("app.py", "y = 2\n")
+    target.commit()
+    result = target.check("--base", "main")
+    assert result.returncode == 2
+    assert "control character: x\\ny.env" in result.stderr
+
+
+@pytest.mark.deep
+def test_an_untouched_name_with_a_control_character_is_named_unchecked(target):
+    target.write(CONTROL_LOCK, "{}\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    target.write("app.py", "y = 2\n")
+    target.commit()
+    result = target.check("--base", "main", "--json")
+    assert result.returncode == 0, result.stderr
+    reason = "has a control character in its name, which no file pattern of a rule matches"
+    assert f"unchecked: {CONTROL_LOCK}: {reason}" in report(result)["notes"]
+
+
+@pytest.mark.deep
+def test_non_utf8_script_name_stops_the_deep_tier(target):
+    (target.path / os.fsdecode(b"caf\xe9.js")).write_text("run();\n", encoding="utf-8")
+    target.commit()
+    result = target.check("--all")
+    assert result.returncode == 2
+    assert "cannot read a file whose name is not UTF-8" in result.stderr
 
 
 def test_quote_in_file_name_fails_closed_for_lizard(target):

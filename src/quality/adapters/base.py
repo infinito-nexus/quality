@@ -1,11 +1,23 @@
 import os
 from dataclasses import dataclass
 
+from quality import QualityError
+
+PARTIAL_SCAN = "security.partial-scan"
+
 
 @dataclass(frozen=True, eq=False)
 class Bound:
+    """
+    Args:
+        binding: A rule bound to one tool.
+        files: Paths the tool checks for that rule.
+        kinds: Kinds of each of those paths, from extension, glob or shebang.
+    """
+
     binding: object
     files: list
+    kinds: dict
 
 
 @dataclass(frozen=True, eq=False)
@@ -30,6 +42,60 @@ class Command:
 
 def all_files(bound: list) -> list:
     return sorted({path for item in bound for path in item.files})
+
+
+def checked_rules(command: Command) -> list:
+    return [item.binding.rule for item in command.bound if item.binding.rule.id != PARTIAL_SCAN]
+
+
+def gap_rule(command: Command, path: str):
+    """
+    Args:
+        command: The command that was to read the file.
+        path: File the tool read only in part or not at all.
+
+    Returns:
+        The security.partial-scan rule bound to the file, or None, when the gap
+        would pass unseen and the caller must fail closed.
+    """
+    return next(
+        (item.binding.rule for item in command.bound if item.binding.rule.id == PARTIAL_SCAN and path in item.files),
+        None,
+    )
+
+
+def refuse_non_utf8(tool: str, files: list) -> None:
+    """
+    Args:
+        tool: Name for the error.
+        files: Paths the tool would receive.
+
+    Raises:
+        QualityError: A name is not UTF-8. Semgrep then reports nothing for the
+            file and jscpd aborts, so the check fails closed with the reason.
+    """
+    if not all(map(utf8_name, files)):
+        raise QualityError(f"{tool} cannot read a file whose name is not UTF-8")
+
+
+def utf8_name(path: str) -> bool:
+    try:
+        os.fsencode(path).decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+@dataclass(frozen=True)
+class Skipped:
+    """
+    Args:
+        path: File a tool was given but did not check, or checked only in part.
+        reason: Why, without file content; the report names it as unchecked.
+    """
+
+    path: str
+    reason: str
 
 
 def relative(reported: str, root) -> str:
