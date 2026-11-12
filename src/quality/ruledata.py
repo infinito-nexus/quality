@@ -1,22 +1,29 @@
-import re
+import json
+from collections import Counter
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import pathspec
 import yaml
 
 from quality import QualityError
+from quality.kinds import CODE_KIND, KindMap
+from quality.suppress import COMMENTS_FILE, comment_patterns, nocheck_names
 
-RESERVED_FILES = ("tools.yml", "limits.yml", "kinds.yml")
-VERSION_SUFFIX = re.compile(r"[0-9.]+$")
-CODE_KIND = "code"
+RESERVED_FILES = ("tools.yml", "limits.yml", "kinds.yml", COMMENTS_FILE)
 ANY_KIND = "any"
 BUILTIN = "builtin"
 SIZE_GUARD = "size-guard"
 BINARY_GUARD = "binary-guard"
 FOLDER_ITEMS = "folder-items"
 PREFIX_GROUPS = "prefix-groups"
-RUNNER_CHECKS = (SIZE_GUARD, BINARY_GUARD, FOLDER_ITEMS, PREFIX_GROUPS)
+UNUSED_NOCHECK = "unused-nocheck"
+RUNNER_CHECKS = (SIZE_GUARD, BINARY_GUARD, FOLDER_ITEMS, PREFIX_GROUPS, UNUSED_NOCHECK)
+RULE_DIR = "rule_dir"
+PLACEHOLDERS = "placeholders"
+COMMENTS = "comments"
+NOCHECK_NAMES = "nocheck_names"
+PARSES = "parses"
 
 
 def require(mapping: dict, key: str, where: str):
@@ -27,10 +34,6 @@ def require(mapping: dict, key: str, where: str):
 
 def gitignore_spec(patterns: list):
     return pathspec.GitIgnoreSpec.from_lines(patterns)
-
-
-def interpreter_name(word: str) -> str:
-    return VERSION_SUFFIX.sub("", PurePosixPath(word.removeprefix("-S")).name)
 
 
 @dataclass(frozen=True, eq=False)
@@ -54,6 +57,25 @@ class Rule:
     def pending_tools(self) -> list:
         return sorted({settings["tool"] for settings in self.enforcer.values()})
 
+    def file_gap(self) -> bool:
+        """
+        Returns:
+            True for a file-level changed_only rule, such as a file a tool read
+            only in part: it names each file once, and only a .qualityignore.yml
+            entry naming that very file, read from the base side, waives it. A
+            changed_only rule with lines keeps per-line nochecks and entries.
+        """
+        return self.changed_only and self.file_level
+
+    def waived_from_base(self) -> bool:
+        """
+        Returns:
+            True for a hard rule and for a changed_only rule, a gap a tool
+            left: `--base` reads their .qualityignore.yml entries from the
+            base side, so a pull request cannot waive its own finding or gap.
+        """
+        return self.hard or self.changed_only
+
 
 @dataclass(frozen=True, eq=False)
 class Binding:
@@ -72,97 +94,6 @@ class Binding:
             names the `any` kind, which holds every file, kindless ones included.
         """
         return ANY_KIND in self.kinds or bool(path_kinds & self.kinds)
-
-
-@dataclass(frozen=True, eq=False)
-class KindMap:
-    extensions: dict
-    shebangs: dict
-    globs: dict
-    names: dict
-    known: dict
-    binary_names: list
-    code: tuple
-    markers: dict
-
-    def kinds_of(self, path: str, first_line: bytes) -> frozenset:
-        """
-        Args:
-            path: Path relative to the repository root.
-            first_line: Start of the file, read only without a known extension.
-
-        Returns:
-            Every kind the file belongs to. Extensions, globs and names match
-            case-insensitively. A name never claims a known extension, so
-            `Dockerfile.PY` is Python only, while globs always apply.
-        """
-        suffix = lower_suffix(path)
-        found = {kind for kind, spec in self.globs.items() if spec.match_file(path.lower())}
-        found |= {kind for kind, stems in self.names.items() if self.named(path, stems)}
-        kind = self.extensions.get(suffix) or self.shebang_kind(first_line)
-        if kind is not None:
-            found.add(kind)
-        return frozenset(found)
-
-    def named(self, path: str, stems: list) -> bool:
-        """
-        Args:
-            path: Path of a file; only its base name counts.
-            stems: Lowercase names of one kind, such as dockerfile.
-
-        Returns:
-            True for a stem itself, `<x>.<stem>`, or `<stem>.<variant>` whose
-            suffix names no kind and no known file type, so `Dockerfile.prod`
-            counts and `Dockerfile.png` or `Dockerfile.erb` does not.
-        """
-        name = PurePosixPath(path).name.lower()
-        suffix = PurePosixPath(name).suffix
-        known = suffix in self.extensions or any(suffix in listed for listed in self.known.values())
-        return any(
-            name == stem
-            or name.endswith(f".{stem}")
-            or (name.startswith(f"{stem}.") and not known)
-            for stem in stems
-        )
-
-    def shebang_kind(self, first_line: bytes) -> str | None:
-        """
-        Args:
-            first_line: Start of the file.
-
-        Returns:
-            The kind of its interpreter. Every word after `env` counts, because
-            `env -S python3 -u` and `env -u NAME python3` both run Python.
-        """
-        if not first_line.startswith(b"#!"):
-            return None
-        names = [interpreter_name(w) for w in first_line[2:].decode("utf-8", "replace").split()]
-        candidates = names[1:] if names[:1] == ["env"] else names[:1]
-        return next((self.shebangs[name] for name in candidates if name in self.shebangs), None)
-
-    def needs_first_line(self, path: str) -> bool:
-        return lower_suffix(path) not in self.extensions
-
-    def code_name(self, path: str) -> bool:
-        """
-        Args:
-            path: Path of a file.
-
-        Returns:
-            True for a name without extension, other than a known binary name
-            such as .DS_Store, for a code extension, and for a name of a kind
-            such as Dockerfile.prod.
-        """
-        suffix = lower_suffix(path)
-        if PurePosixPath(path).name.lower() in self.binary_names:
-            return False
-        code = not suffix or self.extensions.get(suffix) in self.code
-        named = any(self.named(path, stems) for stems in self.names.values())
-        return code or suffix in self.known[CODE_KIND] or named
-
-
-def lower_suffix(path: str) -> str:
-    return PurePosixPath(path).suffix.lower()
 
 
 @dataclass(frozen=True, eq=False)
@@ -211,20 +142,108 @@ class RuleData:
                     grouped.setdefault(binding.tool, []).append(binding)
         return grouped
 
+    def visible_kinds(self, binding: Binding, path: str, kinds: frozenset) -> frozenset:
+        """
+        Args:
+            binding: Rule binding to one tool.
+            path: Path relative to the repository root.
+            kinds: Every kind of the file.
+
+        Returns:
+            The kinds the binding binds the file by: all of them for a builtin
+            that does not set `parses` and for a tool whose tools.yml entry sets
+            `templates`, else its parsed kinds.
+        """
+        if binding.tool == BUILTIN and not binding.settings.get(PARSES):
+            return kinds
+        if self.tools.get(binding.tool, {}).get("templates"):
+            return kinds
+        return self.kinds.parsed_kinds(path, kinds)
+
+    def kind_rules(self, files: dict, tiers: tuple) -> tuple:
+        """
+        Args:
+            files: Path to every kind of the file.
+            tiers: Tiers whose pending rules count.
+
+        Returns:
+            Two maps of kind to sorted rule ids: the active rules that run on
+            a file by that kind, and the pending rules that would.
+        """
+        active = [binding for bindings in self.bindings().values() for binding in bindings]
+        pending = [
+            binding for rule in self.pending_rules(tiers) for binding in rule_bindings(rule, self.kinds)
+        ]
+        return self.ids_per_kind(active, files), self.ids_per_kind(pending, files)
+
+    def every_binding(self) -> list:
+        return [
+            binding
+            for rule in self.rules
+            if isinstance(rule.enforcer, dict)
+            for binding in rule_bindings(rule, self.kinds)
+        ]
+
+    def ids_per_path(self, bindings: list, files: dict) -> dict:
+        found = {}
+        for path, kinds in files.items():
+            for binding in bindings:
+                if not binding.rule.excludes(path) and binding.binds(self.visible_kinds(binding, path, kinds)):
+                    found.setdefault(path, set()).add(binding.rule.id)
+        return found
+
+    def ids_per_kind(self, bindings: list, files: dict) -> dict:
+        found = {}
+        for path, kinds in files.items():
+            for binding in bindings:
+                if not binding.rule.excludes(path):
+                    for kind in binding.kinds & self.visible_kinds(binding, path, kinds):
+                        found.setdefault(kind, set()).add(binding.rule.id)
+        return {kind: sorted(ids) for kind, ids in found.items()}
+
 
 def rule_bindings(rule: Rule, kind_map: KindMap) -> list:
-    per_tool = {}
+    """
+    Args:
+        rule: Catalogue rule whose enforcer maps kinds to settings.
+        kind_map: File kind classification.
+
+    Returns:
+        One binding per tool and distinct settings, so that kinds sharing
+        their settings share one tool run and kinds with their own pattern
+        or language keep it.
+    """
+    grouped = {}
     for kind, settings in rule.enforcer.items():
         kinds = kind_map.code if kind == CODE_KIND else (kind,)
         tool = settings["tool"] if "tool" in settings else BUILTIN
-        per_tool.setdefault(tool, (settings, set()))[1].update(kinds)
+        key = (tool, json.dumps(settings, sort_keys=True))
+        grouped.setdefault(key, (settings, set()))[1].update(kinds)
     return [
         Binding(rule, tool, settings, frozenset(kinds))
-        for tool, (settings, kinds) in per_tool.items()
+        for (tool, _), (settings, kinds) in grouped.items()
     ]
 
 
-def build_rule(raw: dict, where: str) -> Rule:
+def filled(value, placeholders: dict):
+    """
+    Args:
+        value: Loaded YAML.
+        placeholders: Strings to replace where a value equals one exactly.
+
+    Returns:
+        A copy of the value with each such string replaced.
+    """
+    if isinstance(value, dict):
+        return {key: filled(item, placeholders) for key, item in value.items()}
+    if isinstance(value, list):
+        return [filled(item, placeholders) for item in value]
+    if isinstance(value, str) and value in placeholders:
+        return placeholders[value]
+    return value
+
+
+def build_rule(raw: dict, where: str, placeholders: dict) -> Rule:
     rule_id = require(raw, "id", where)
     entry = f"{where} rule {rule_id}"
     metric = raw.get("metric")
@@ -235,7 +254,7 @@ def build_rule(raw: dict, where: str) -> Rule:
         id=rule_id,
         severity=require(raw, "severity", entry),
         summary=require(raw, "summary", entry),
-        enforcer=require(raw, "enforcer", entry),
+        enforcer=filled(require(raw, "enforcer", entry), placeholders),
         hard=bool(raw.get("hard")),
         metric=metric,
         file_level=bool(raw.get("file_level")),
@@ -254,6 +273,12 @@ def build_rule(raw: dict, where: str) -> Rule:
     if rule.pending:
         require(raw, "tier", entry)
     return rule
+
+
+def check_unique(rules: list) -> None:
+    repeated = sorted(rule_id for rule_id, count in Counter(rule.id for rule in rules).items() if count > 1)
+    if repeated:
+        raise QualityError(f"rule data: duplicate rule id {repeated[0]}")
 
 
 def check_allow_list(rules: list, tools: dict) -> None:
@@ -300,7 +325,33 @@ def load_kinds(raw: dict) -> KindMap:
         binary_names=[name.lower() for name in require(raw, "binary_names", "kinds.yml")],
         code=tuple(require(raw, "code", "kinds.yml")),
         markers=require(raw, "comment_markers", "kinds.yml"),
+        templates=tuple(require(raw, "templates", "kinds.yml")),
     )
+
+
+def anchor_rule_dirs(tools: dict, directory: Path, comments: dict) -> dict:
+    """
+    Args:
+        tools: Content of tools.yml.
+        directory: Directory the rule data was loaded from.
+        comments: Comment patterns, comments.yml and the nocheck names, under
+            the keys `placeholders`, `comments` and `nocheck_names`.
+
+    Returns:
+        tools.yml with every `rule_dir` resolved against that directory, so a
+        tool reads this repository's rule files and never the target's, and
+        given what its rule files compose their comment patterns from.
+    """
+    if not isinstance(tools, dict):
+        return tools
+    return {
+        name: (
+            {**settings, RULE_DIR: str(directory.resolve() / settings[RULE_DIR]), **comments}
+            if isinstance(settings, dict) and RULE_DIR in settings
+            else settings
+        )
+        for name, settings in tools.items()
+    }
 
 
 def locate(option: str | None) -> Path:
@@ -325,20 +376,29 @@ def locate(option: str | None) -> Path:
 def load(directory: Path) -> RuleData:
     """
     Args:
-        directory: Directory holding tools.yml, limits.yml, kinds.yml and the catalogue.
+        directory: Directory holding tools.yml, limits.yml, kinds.yml,
+            comments.yml and the catalogue.
 
     Returns:
         The validated rule data.
 
     Raises:
-        QualityError: A key is missing or an enforcer names a tool outside the allow-list.
+        QualityError: A key is missing, a rule id repeats, or an enforcer
+            names a tool outside the allow-list.
     """
-    tools = read_yaml(directory / "tools.yml")
-    rules = []
-    for path in sorted(directory.glob("*.yml")):
-        if path.name not in RESERVED_FILES:
-            for raw in read_yaml(path) or []:
-                rules.append(build_rule(raw, path.name))
+    entries = [
+        (path.name, raw)
+        for path in sorted(directory.glob("*.yml"))
+        if path.name not in RESERVED_FILES
+        for raw in read_yaml(path) or []
+    ]
+    comments = read_yaml(directory / COMMENTS_FILE)
+    placeholders = comment_patterns(comments)
+    names = nocheck_names([require(raw, "id", where) for where, raw in entries])
+    shared = {PLACEHOLDERS: placeholders, COMMENTS: comments, NOCHECK_NAMES: names}
+    tools = anchor_rule_dirs(read_yaml(directory / "tools.yml"), directory, shared)
+    rules = [build_rule(raw, where, placeholders) for where, raw in entries]
+    check_unique(rules)
     check_allow_list(rules, tools)
     return RuleData(
         rules=tuple(rules),

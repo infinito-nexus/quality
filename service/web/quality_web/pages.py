@@ -65,7 +65,7 @@ def health():
 @pages.get("/")
 def index():
     anonymous = quality()["settings"]["access"]["anonymous"]
-    return render_template("index.html", form=form_context("anonymous") if anonymous else None)
+    return render_template("index.html.j2", form=form_context("anonymous") if anonymous else None)
 
 
 @pages.get("/account/")
@@ -73,7 +73,7 @@ def account():
     user = current_user()
     if user is None:
         return redirect(url_for("pages.login"))
-    return render_template("index.html", form=form_context("member" if user["member"] else "registered"))
+    return render_template("index.html.j2", form=form_context("member" if user["member"] else "registered"))
 
 
 def require_origin():
@@ -167,26 +167,26 @@ def report(job_id):
     if state is None:
         abort(404)
     if state == "report":
-        return render_template("report.html", report=document)
-    return render_template("pending.html", state=state)
+        return render_template("report.html.j2", report=document)
+    return render_template("pending.html.j2", state=state)
 
 
 @pages.get("/<any(privacy, terms):page>")
 def legal(page):
     # Exception: the footer links carry no ?lang= and sit on pages written in English, so they open the English text
-    language = request.args.get("lang", "en")
+    language = request.args.get("lang", "en")  # nocheck: clean.default-value -- a footer link carries no ?lang= and opens the English text
     if language not in LEGAL_LANGUAGES:
         abort(404)
     settings = quality()["settings"]
     path = os.path.join(settings["legal_dir"], language, f"{page}.html")
     with open(path, encoding="utf-8") as handle:
         body = render_template_string(handle.read(), **{key: settings[key] for key in LEGAL_CONTEXT})
-    return render_template("legal.html", body=Markup(body))
+    return render_template("legal.html.j2", body=Markup(body))
 
 
 @pages.get("/notices")
 def notices():
-    return render_template("notices.html")
+    return render_template("notices.html.j2")
 
 
 @pages.get("/account/login")

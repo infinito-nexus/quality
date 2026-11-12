@@ -47,13 +47,13 @@ def project() -> dict:
     return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
-def tracked_or_new_files() -> list:
-    listing = git(ROOT, "ls-files", "-co", "--exclude-standard", "-z").stdout
+def tracked_files() -> list:
+    listing = git(ROOT, "ls-files", "-c", "-z").stdout
     return [name for name in listing.split("\0") if name]
 
 
 def copy_of_this_repository(destination: Path) -> None:
-    for name in tracked_or_new_files():
+    for name in tracked_files():
         source = ROOT / name
         if source.is_file():
             target_file = destination / name
@@ -161,14 +161,14 @@ def test_all_on_this_repository_reports_what_it_cannot_claim(target, tmp_path):
     target.commit()
     result = target.check("--all", "--json")
     document = report(result)
+    pending = sorted(rule["id"] for rule in catalogue() if rule.get("pending"))
     assert document["findings"] == []
     assert [note for note in document["notes"] if note.startswith("parse incomplete:")] == []
-    assert result.returncode == 2
+    assert result.returncode == (2 if pending else 0)
     assert [entry for entry in document["ignored"] if entry["rule"] == "coding.dockerfile"] == []
     assert {"path": "service/dev/Dockerfile", "line": 2, "rule": "coding.dockerfile"} in (
         document["nocheck"]
     )
-    pending = sorted(rule["id"] for rule in catalogue() if rule.get("pending"))
     assert sorted(document["incomplete"]) == pending
     assert "security.secret" not in pending
     assert "coding.dockerfile" not in pending
@@ -184,7 +184,7 @@ def test_all_on_this_repository_reports_what_it_cannot_claim(target, tmp_path):
 def findings_of(result, rule: str) -> list:
     return sorted(
         ((item["path"], item["line"]) for item in report(result)["findings"] if item["rule"] == rule),
-        key=lambda found: (found[0], found[1] or 0),
+        key=lambda found: (found[0], found[1] or 0),  # nocheck: clean.default-value -- a finding without a line sorts as line 0
     )
 
 
@@ -1387,3 +1387,15 @@ def test_report_names_db(target, tmp_path):
     target.write("c.py", "y = 1\n")
     target.stage()
     assert "vulnerability database" not in target.check("--staged").stdout
+
+
+def test_hosted_launcher_accepts_the_real_report(target):
+    target.write(".qualityignore.yml", "- rule: clean.file-lines\n  paths: [big.py]\n  reason: fixture\n")
+    target.write("big.py", "x = 1\n" * 501)
+    target.write("a.py", "import os\nimport sys  # nocheck: coding.unused-import -- fixture\n")
+    target.write("gap.ts", "interface I<in out T> {\n  f(x: T): T;\n}\n")
+    target.commit()
+    document = report(target.check("--all", "--json"))
+    assert document["findings"] and document["ignored"] and document["nocheck"]
+    assert document["parse_incomplete"] == ["gap.ts"]
+    assert load_launcher().fits(document, load_launcher().REPORT)

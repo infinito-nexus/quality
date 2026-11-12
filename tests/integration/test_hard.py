@@ -9,7 +9,7 @@ import pytest
 
 from quality.adapters import Collector, Runtime
 from quality.adapters.base import Bound
-from quality.modes import tool_environment
+from quality.environment import tool_environment
 from quality.ruledata import load
 from quality.snapshot import Snapshot
 from tests.integration.support import (
@@ -113,7 +113,10 @@ def test_hard_secret_in_range(target):
         ("deploy/values.yml", f"github:\n  token: {SECRET}\n"),
         ("node_modules/pkg/index.js", SECRET_LINE),
         ("venv/lib/settings.txt", SECRET_ENV_LINE),
-        *[(name, SECRET_ENV_LINE) for name in ALLOWLISTED_NAMES],
+        *[
+            (name, f'{{"env": "{SECRET_ENV_LINE.strip()}"}}\n' if name.endswith(".json") else SECRET_ENV_LINE)
+            for name in ALLOWLISTED_NAMES
+        ],
     ],
     ids=["env", "yml", "node-modules", "venv", *ALLOWLISTED_NAMES],
 )

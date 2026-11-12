@@ -4,6 +4,52 @@ F401 = rule_for("F401")
 EVAL = "security.eval-exec"
 DOCKERFILE = "coding.dockerfile"
 IGNORE = ".qualityignore.yml"
+PARSE_GAP = "coding.parse-incomplete"
+GAP_SOURCE = "export function run( {\n  go();\n}\n"
+LINE_BREAK = "security.uncounted-line-break"
+STRUCTURAL = "coding.structural"
+LS = "\N{LINE SEPARATOR}"
+PS = "\N{PARAGRAPH SEPARATOR}"
+NEL = "\x85"
+HIDDEN_JS = "// nocheck: coding.structural -- r{0}function f() {{{0}  debugger;{0}  try {{ x(); }} catch (e) {{}}{0}}}{0}\n"
+HIDDEN_YAML = 'a: 1 # c{0}b: "{{{{ x | default(1) }}}}"\n'
+HIDDEN_CS = '// c{0}class A {{ static void Main() {{ string x = null; System.Console.WriteLine(x ?? "hidden"); }} }}\n'
+JAVA_ESCAPE = "\\u000a"
+SEPARATED = {
+    "ls.cs": HIDDEN_CS.format(LS),
+    "ps.cs": HIDDEN_CS.format(PS),
+    "nel.cs": HIDDEN_CS.format(NEL),
+    "Escape.java": f"// c {JAVA_ESCAPE} class Escape {{ void m() {{ try {{ x(); }} catch (Exception e) {{}} }} }}\n",
+    "ls.js": HIDDEN_JS.format(LS),
+    "ps.js": HIDDEN_JS.format(PS),
+    "ls.ts": HIDDEN_JS.format(LS),
+    "ps.tsx": HIDDEN_JS.format(PS),
+    "ls.yml": HIDDEN_YAML.format(LS),
+    "nel.yml": HIDDEN_YAML.format(NEL),
+    "ff.css": "/* nocheck: coding.structural -- r */\fa { }\n",
+}
+LEGAL = {
+    "escaped.js": 'export const s = "a\\u2028b";\n',
+    "nel.js": f'export const s = "a{NEL}b";\n',
+    "ls.py": f's = "a{LS}b"\n',
+    "nel.css": f'a::before {{ content: "{NEL}"; }}\n',
+    "Even.java": f'class Even {{ String s = "\\{JAVA_ESCAPE}"; }}\n',
+    "ls.rs": f"// c{LS}fn main() {{}}\n",
+}
+CR_ONLY = {
+    "nocheck.js": "// nocheck: coding.structural -- r\rfunction f() {\r  debugger;\r  try { x(); } catch (e) {}\r}\r",
+    "group.js": "// nocheck: clean -- r\r// narration\rconst p = process.env.PORT || 8080;\rfunction g(a = 5) { return a; }\r",
+    "heredoc.php": "<?php // nocheck: coding -- r\r$x = <<<EOT\r?>\rEOT;\rvar_dump($x);\r",
+}
+REGION = [
+    "// nocheck: coding.parse-incomplete -- grammar gap",
+    "function run( {",
+    "  debugger;",
+    "  try { go(); } catch (e) {}",
+    "  eval(input);",
+    "}",
+    "",
+]
 
 
 def staged_finding(target, ignore_text: str | None):
@@ -77,6 +123,26 @@ def test_ignore_hard_read_from_base(target):
     target.commit()
     target.git("checkout", "-q", "-b", "second")
     target.write("a.py", "X = eval(input())\n")
+    target.commit()
+    assert target.check("--base", "main").returncode == 0
+
+
+def test_ignore_parse_gap_read_from_base(target):
+    target.write("a.py", "x = 1\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    target.write("src/gap.js", GAP_SOURCE)
+    target.write(IGNORE, f'- rule: {PARSE_GAP}\n  paths: ["src/"]\n  reason: self exempted\n')
+    target.commit()
+    result = target.check("--base", "main", "--json")
+    assert result.returncode == 1
+    assert PARSE_GAP in rule_ids(result)
+    assert report(result)["ignored"] == []
+    target.git("checkout", "-q", "main")
+    target.write(IGNORE, f'- rule: {PARSE_GAP}\n  paths: ["src/"]\n  reason: reviewed on main\n')
+    target.commit()
+    target.git("checkout", "-q", "-b", "second")
+    target.write("src/gap.js", GAP_SOURCE)
     target.commit()
     assert target.check("--base", "main").returncode == 0
 
@@ -191,7 +257,7 @@ def test_nocheck_does_not_suppress_a_hard_rule(target):
     target.stage()
     result = target.check("--staged", "--json")
     assert result.returncode == 1
-    assert rule_ids(result) == [EVAL]
+    assert rule_ids(result) == ["clean.unused-nocheck", EVAL]
 
 
 def test_nocheck_in_a_shell_comment(target):
@@ -224,3 +290,67 @@ def test_nocheck_applies_to_every_tool_line(target):
     target.write("a.py", "import os  # nocheck: coding -- group\n")
     target.stage()
     assert target.check("--staged").returncode == 0
+
+
+def found_by_path(result) -> dict:
+    found = {}
+    for item in report(result)["findings"]:
+        found.setdefault(item["path"], []).append((item["rule"], item["line"]))
+    return {path: sorted(items) for path, items in found.items()}
+
+
+def test_a_lone_carriage_return_fails_closed_under_any_nocheck(target, mode):
+    target.write("seed.py", "x = 1\n")
+    target.start_feature(mode)
+    for name, text in CR_ONLY.items():
+        target.write(name, text)
+    target.advance(mode)
+    result = target.judge(mode, "--json")
+    assert result.returncode == 1
+    assert {path: (LINE_BREAK, 1) in items for path, items in found_by_path(result).items()} == dict.fromkeys(
+        CR_ONLY, True
+    )
+
+
+def test_a_separator_line_break_fails_closed_under_any_nocheck(target, mode):
+    target.write("seed.py", "x = 1\n")
+    target.start_feature(mode)
+    for name, text in {**SEPARATED, **LEGAL}.items():
+        target.write(name, text)
+    target.advance(mode)
+    result = target.judge(mode, "--json")
+    assert result.returncode == 1
+    found = found_by_path(result)
+    assert {path: line for path, items in found.items() for rule, line in items if rule == LINE_BREAK} == dict.fromkeys(
+        SEPARATED, 1
+    )
+
+
+def test_crlf_lines_count_as_lf_lines_and_a_lone_cr_is_a_finding(target):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    target.write("lf.js", "\n".join(REGION))
+    target.write("crlf.js", "\r\n".join(REGION))
+    target.write("cr.js", "\r".join(REGION))
+    target.stage()
+    found = found_by_path(target.check("--staged", "--json"))
+    assert found["crlf.js"] == found["lf.js"]
+    assert LINE_BREAK not in [rule for rule, _ in found["lf.js"]]
+    assert (LINE_BREAK, 1) in found["cr.js"]
+
+
+def test_a_stray_carriage_return_moves_no_nocheck_onto_the_next_line(target):
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    target.write(
+        "shift.js",
+        "const a = 1; // x\ry\nfunction f() {\n  // nocheck: coding.structural -- r\n  debugger;\n}\n",
+    )
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1
+    found = found_by_path(result)["shift.js"]
+    assert (STRUCTURAL, 4) in found
+    assert ("clean.unused-nocheck", 3) in found
+    assert (LINE_BREAK, 1) in found
+    assert report(result)["nocheck"] == []

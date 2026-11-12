@@ -1,0 +1,20 @@
+id: clean.default-value/variable
+language: hcl
+severity: warning
+message: variable default; fail early on the missing input and name where to set it
+rule:
+  kind: attribute
+  has:
+    kind: identifier
+    regex: '^default$'
+  not:
+    has:
+      kind: expression
+      regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+  inside:
+    kind: body
+    inside:
+      kind: block
+      has:
+        kind: identifier
+        regex: '^variable$'

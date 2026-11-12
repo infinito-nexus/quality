@@ -137,7 +137,7 @@ def baseline_of(hits: list, renames: dict) -> Baseline:
     metrics = {}
     packages = {}
     for hit in hits:
-        path = renames.get(hit.path, hit.path)
+        path = renames.get(hit.path, hit.path)  # nocheck: clean.default-value -- a path that was not renamed keeps its name
         if hit.ids:
             packages.setdefault(package_key(hit, path), set()).update(hit.ids)
         elif hit.rule.metric is not None:
@@ -185,7 +185,7 @@ def new_fingerprint_hits(hits: list, baseline: Baseline) -> list:
     fingerprint_rise.subtract(baseline.fingerprints)
     file_rise = Counter(per_file_key(hit, hit.path) for hit in hits)
     file_rise.subtract(baseline.per_file)
-    ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)
+    ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)  # nocheck: clean.default-value -- a finding without a line sorts as line 0
     new = []
     for hit in ordered:
         print_key = fingerprint(hit)

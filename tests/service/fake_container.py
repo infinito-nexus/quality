@@ -1,7 +1,8 @@
 """
 Args:
-    argv[1]: JSON file holding {"runtimes": {...}, "containers": [ids], "steps": {step: {"exit": n, "stdout": text}}},
-        step being the last part of the container name (fetch, prepare, scan, database).
+    argv[1]: JSON file holding {"info": text, "containers": [ids], "steps": {step: {"exit": n, "stdout": text}}},
+        info being what `info` prints and step the last part of the container name (fetch, prepare, scan,
+        database).
     argv[2]: JSON-lines file each call appends {"argv": [...], "stdin": text or null} to.
     argv[3:]: The container CLI arguments the launcher passes.
 
@@ -20,7 +21,7 @@ def main(behaviour_file, calls_file, *args):
     with open(calls_file, "a", encoding="utf-8") as handle:
         handle.write(json.dumps({"argv": list(args), "stdin": stdin}) + "\n")
     if args[0] == "info":
-        print(json.dumps(behaviour["runtimes"]))
+        sys.stdout.write(behaviour["info"])
     elif args[:2] == ("ps", "-aq"):
         print("\n".join(behaviour["containers"]))
     elif args[0] == "run":

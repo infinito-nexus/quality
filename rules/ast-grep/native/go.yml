@@ -1,0 +1,13 @@
+id: coding.structural/defer-in-loop
+language: go
+severity: warning
+message: defer inside a loop runs only when the function returns
+rule:
+  kind: defer_statement
+  inside:
+    kind: for_statement
+    stopBy:
+      any:
+        - kind: function_declaration
+        - kind: method_declaration
+        - kind: func_literal

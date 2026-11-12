@@ -27,7 +27,7 @@ include-package-data = false
 "quality.rules" = "rules"
 
 [tool.setuptools.package-data]
-"quality.rules" = ["*.yml", "semgrep/*.yml"]
+"quality.rules" = ["*.yml", "semgrep/*.yml", "ast-grep/*.yml", "ast-grep/*/*.yml"]
 
 [tool.setuptools.dynamic]
 version = { attr = "quality.__version__" }

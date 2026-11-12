@@ -1,0 +1,9 @@
+id: coding.structural/gets
+language: cpp
+severity: warning
+message: gets cannot bound its input and was removed in C++14
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: '^(?:std::)?gets$'

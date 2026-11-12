@@ -276,6 +276,35 @@ def test_staged_runs_the_fast_tier_on_touched_files_only(target):
             assert tool_lines(deep, tool), tool
 
 
+@pytest.mark.parametrize("name", ["a.py", "deploy", "compose.yml", "a.json"])
+def test_missing_tool_fails_closed(target, tmp_path, name):
+    target.write("notes.md", "# Notes\n")
+    target.write("compose.yml.j2", "a: {{ a }}\n")
+    target.stage()
+    no_ast_grep = path_without(tmp_path / "bin", "ast-grep")
+    assert target.check("--staged", path_value=no_ast_grep).returncode == 0
+    target.write(name, "#!/bin/bash\ntrue\n" if name == "deploy" else "{}\n")
+    target.stage()
+    for flags in (("--staged",), ("--all",)):
+        result = target.check(*flags, path_value=no_ast_grep)
+        assert result.returncode == 2
+        assert "missing tool: ast-grep" in result.stderr
+
+
+def test_staged_ast_grep_receives_touched_files_only(target):
+    target.write("a.py", "x = 1\n")
+    target.write("b.py", "y = 1\n")
+    target.write("c.sh", "#!/bin/bash\ntrue\n")
+    target.commit()
+    target.write("b.py", "y = 2\n")
+    target.stage()
+    result = target.check("--staged", "--verbose")
+    assert result.returncode == 0, result.stderr
+    lines = [line for line in result.stderr.splitlines() if "tool ast-grep:" in line]
+    assert lines
+    assert all(line.endswith("files: b.py") for line in lines), lines
+
+
 def test_staged_on_unborn_head(target):
     target.write("a.py", "import os\n")
     target.stage()

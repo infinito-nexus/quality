@@ -1,0 +1,37 @@
+id: coding.structural/empty-catch
+language: java
+severity: warning
+message: an empty catch block swallows the exception
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    regex: '^\{\s*\}$'
+---
+id: coding.structural/print-stack-trace
+language: java
+severity: warning
+message: printStackTrace bypasses the logger
+rule:
+  pattern: $ERROR.printStackTrace()
+---
+id: clean.default-value/get-or-default
+language: java
+severity: warning
+message: lookup with a fallback; fail early, check for the missing key and throw an error that names the missing key and where to set it
+rule:
+  kind: identifier
+  regex: '^(?:getOrDefault|GetValueOrDefault)$'
+  inside:
+    kind: method_invocation
+    field: name
+    not:
+      has:
+        field: arguments
+        has:
+          regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+          all:
+            - nthChild: 2
+            - nthChild:
+                position: 1
+                reverse: true

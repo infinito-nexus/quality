@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from quality import QualityError, db
-from quality.modes import tool_environment
+from quality.environment import tool_environment
 from quality.ruledata import load
 
 RULES = Path(__file__).resolve().parents[2] / "rules"

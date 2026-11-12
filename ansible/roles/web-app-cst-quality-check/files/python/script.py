@@ -1,4 +1,4 @@
-# nocheck: mirrored-unit-test - its tests live in this role's own repository under tests/service, which core cannot mirror
+# nocheck: mirrored-unit-test (its tests live in this role's own repository under tests/service, which core cannot mirror); nocheck: clean.comment -- the marker before this one is core's lint directive
 """
 Args:
     argv[1]: path of the launcher configuration (JSON) the role renders.
@@ -41,7 +41,7 @@ FINDING.update({"severity": {"critical", "high", "medium", "low"}, "value": (int
 IGNORED = {"rule": TEXT, "paths": "strings", "reason": TEXT}
 NOCHECK = {"path": TEXT, "line": LINE, "rule": TEXT}
 REPORT = {"findings": [FINDING], "ignored": [IGNORED], "nocheck": [NOCHECK]}
-REPORT.update({"unchecked": "strings", "notes": "strings", "incomplete": "strings"})
+REPORT.update({"unchecked": "strings", "notes": "strings", "incomplete": "strings", "parse_incomplete": "strings"})
 LABEL = "quality-check.job"
 STEP_USER = "65534:65534"
 TIMEOUT_EXIT = 124
@@ -95,7 +95,7 @@ def valid_host(host):
 def safe_name(name):
     base = re.split(r"[/\\]", str(name))[-1]
     # Exception: a name of only dots and dashes strips to nothing, yet the scan still needs a file to write the upload to
-    return UNSAFE_NAME.sub("_", base).lstrip(".-")[:100] or "upload"
+    return UNSAFE_NAME.sub("_", base).lstrip(".-")[:100] or "upload"  # nocheck: clean.default-value -- the specified name of an upload whose name strips to nothing
 
 
 def job_file_name(tier, job_id):
@@ -193,8 +193,11 @@ class Launcher:
 
     def require_runtime(self):
         result = self.cli("info", "--format", "{{json .Runtimes}}", timeout=60)
-        runtimes = json.loads(result.stdout or "{}") if result.returncode == 0 else {}
-        if self.config["runtime"] not in runtimes:
+        try:
+            runtimes = json.loads(result.stdout) if result.returncode == 0 else {}
+        except ValueError:
+            runtimes = {}
+        if not isinstance(runtimes, dict) or self.config["runtime"] not in runtimes:
             print(f"launcher: runtime {self.config['runtime']} is not installed", file=sys.stderr)
             raise SystemExit(2)
 
@@ -462,10 +465,8 @@ class JobStorage:
         self.launcher.unmount(self.mountpoint)
 
     def mount_flag(self, readonly):
-        suffix = ",readonly" if readonly else ""
-        if self.mode == "volume":
-            return f"--mount=type=volume,source={self.volume},target=/src{suffix}"
-        return f"--mount=type=bind,source={self.mountpoint},target=/src{suffix}"
+        source = f"volume,source={self.volume}" if self.mode == "volume" else f"bind,source={self.mountpoint}"
+        return f"--mount=type={source},target=/src{',readonly' if readonly else ''}"
 
     def full(self):
         if self.mode == "volume":

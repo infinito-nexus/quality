@@ -1,0 +1,9 @@
+id: coding.structural/empty-rule
+language: css
+severity: warning
+message: empty rule set
+rule:
+  kind: block
+  regex: '^\{\s*\}$'
+  inside:
+    kind: rule_set

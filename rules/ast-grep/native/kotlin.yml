@@ -1,0 +1,7 @@
+id: coding.structural/empty-catch
+language: kotlin
+severity: warning
+message: an empty catch block swallows the exception
+rule:
+  kind: catch_block
+  regex: '\{\s*\}$'

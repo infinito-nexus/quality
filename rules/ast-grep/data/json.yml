@@ -1,0 +1,15 @@
+id: coding.structural/duplicate-key
+language: json
+severity: warning
+message: duplicate object key; the later value silently wins
+rule:
+  kind: pair
+  has:
+    field: key
+    pattern: $KEY
+  follows:
+    kind: pair
+    has:
+      field: key
+      pattern: $KEY
+    stopBy: end

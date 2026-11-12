@@ -53,7 +53,7 @@ def solve(challenge_json: str) -> str:
     return Payload(challenge, solution).to_base64()
 
 
-def headers(address="203.0.113.7", **extra):
+def headers(address="203.0.113.7", **extra):  # nocheck: clean.default-value -- the documentation address a request comes from unless a test varies it
     """
     Args:
         address: X-Real-IP of the client; by default a TEST-NET-3 address (RFC 5737) that no real client has.
@@ -70,7 +70,7 @@ def queued(state: Path) -> list:
     return sorted(path.name for path in (state / "spool").iterdir() if not path.name.startswith("."))
 
 
-def login(app, name="alice", member=False, created=None) -> str:
+def login(app, name="alice", member=False, created=None) -> str:  # nocheck: clean.default-value -- the account a web test logs in as unless it varies the name
     """
     Args:
         app: Flask app whose login service holds the session.

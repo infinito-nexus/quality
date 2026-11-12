@@ -25,6 +25,10 @@
     limit: 1
     exempt: [test]
   enforcer: prefix-groups
+- id: clean.unused-nocheck
+  severity: medium
+  summary: A nocheck comment suppresses no finding on its line
+  enforcer: unused-nocheck
 - id: clean.inline-script
   severity: medium
   summary: Inline script exceeds the logical line limit
@@ -64,11 +68,78 @@
   severity: medium
   summary: Tool pragma added; use a nocheck comment with a reason
   enforcer:
-    code: &tool-pragma
+    jinja: &pragma-text
       tool: rg
       comment_only: true
-      pattern: '(?i)(#|//)\s*((ruff:\s*|flake8:\s*)?noqa\b|ruff:\s*disable\b|shellcheck\s+disable|ast-grep-ignore|hadolint\s+(global\s+)?(ignore|shell)\s*=)|#\s*lizard\s+forgive|gitleaks:allow'
-    dockerfile: *tool-pragma
+      pattern: '@pragma'
+    dockerfile: *pragma-text
+    python: {tool: ast-grep, language: python}
+    shell: {tool: ast-grep, language: bash}
+    javascript: {tool: ast-grep, language: javascript}
+    typescript: {tool: ast-grep, language: typescript}
+    tsx: {tool: ast-grep, language: tsx}
+    java: {tool: ast-grep, language: java}
+    kotlin: {tool: ast-grep, language: kotlin}
+    csharp: {tool: ast-grep, language: csharp}
+    rust: {tool: ast-grep, language: rust}
+    go: {tool: ast-grep, language: go}
+    ruby: {tool: ast-grep, language: ruby}
+    php: {tool: ast-grep, language: php}
+    lua: {tool: ast-grep, language: lua}
+    c: {tool: ast-grep, language: c}
+    cpp: {tool: ast-grep, language: cpp}
+    yaml: {tool: ast-grep, language: yaml}
+    json: {tool: ast-grep, language: json}
+    html: {tool: ast-grep, language: html}
+    css: {tool: ast-grep, language: css}
+    nix: {tool: ast-grep, language: nix}
+    hcl: {tool: ast-grep, language: hcl}
+- id: clean.comment
+  severity: low
+  summary: Comment is neither a tool directive, a parameter doc nor an Exception
+  enforcer:
+    python: {tool: ast-grep, language: python}
+    shell: {tool: ast-grep, language: bash}
+    javascript: {tool: ast-grep, language: javascript}
+    typescript: {tool: ast-grep, language: typescript}
+    tsx: {tool: ast-grep, language: tsx}
+    java: {tool: ast-grep, language: java}
+    kotlin: {tool: ast-grep, language: kotlin}
+    rust: {tool: ast-grep, language: rust}
+- id: clean.default-value
+  severity: medium
+  summary: Default value added; fail early instead, with an error that names the missing key and where to set it
+  enforcer:
+    python: {tool: ast-grep, language: python}
+    shell: {tool: ast-grep, language: bash}
+    javascript: {tool: ast-grep, language: javascript}
+    typescript: {tool: ast-grep, language: typescript}
+    tsx: {tool: ast-grep, language: tsx}
+    java: {tool: ast-grep, language: java}
+    rust: {tool: ast-grep, language: rust}
+    csharp: {tool: ast-grep, language: csharp}
+    hcl: {tool: ast-grep, language: hcl}
+    make:
+      tool: rg
+      pcre2: true
+      pattern: '^(?:[ \t]*(?:override[ \t]+|export[ \t]+)?[A-Za-z_][\w.-]*[ \t]*\?=[ \t]*(?!(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?[ \t]*(?:#|$))|(?:[^#\n]|(?<=[^ \t])#)*?\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\})'
+    dockerfile: &line-comment-expansion
+      tool: rg
+      pcre2: true
+      pattern: '^(?![ \t]*#).*?\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\}'
+    env: *line-comment-expansion
+    yaml:
+      tool: rg
+      pcre2: true
+      pattern: '^(?:---[ \t]++)?+[ \t]*+(?:[-?][ \t]++)*+(?:(?:[!&]\S*+[ \t]++)*+(?:(?:"(?:[^"\\\n]|\\.)*"|''(?:[^''\n]|'''')*'')[ \t]*+:(?:[ \t]++|(?=["'']))|(?![\s"''\[{!&#])(?:[^#\n:]|(?<=[^ \t])#|:(?![ \t]))*+:[ \t]++))*(?:[!&]\S*+[ \t]++)*+(?:[\[{][ \t]*+(?:[!&]\S*+[ \t]++)*+(?:[\[\]{},:?][ \t]*+(?:[!&]\S*+[ \t]++)*+|(?:"(?:[^"\\\n]|\\.)*"|''(?:[^''\n]|'''')*'')[ \t]*+|(?![\s"''\[\]{},:?#!&])(?:[^,\[\]{}#:\n]|(?<=[^ \t])#|:(?![ \t,\[\]{}]|$))++)*(?:(?:"(?:[^"\\\n]|\\.)*?|''(?:[^''\n]|'''')*?)|(?![\s"''\[\]{},:?#!&])(?:[^,\[\]{}#:\n]|(?<=[^ \t])#|:(?![ \t,\[\]{}]|$))*?)|(?:"(?:[^"\\\n]|\\.)*?|''(?:[^''\n]|'''')*?)|(?:[^#\n]|(?<=[^ \t])#)*?)(?:\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|''''''''|\\"\\"|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})(?:[^}\n#]|(?<=[^ \t])#)*\}|\|\s*(?:default|d)\s*\((?!\s*(?:""|''''|''''''''|\\"\\"|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))\s*[,)])|lookup\(\s*[''"]env[''"](?:(?!\}\}|%\}|[ \t]#).)*?\|\s*(?:default|d)\s*\()'
+    jinja:
+      tool: rg
+      pcre2: true
+      pattern: '^(?:(?!\{#).)*?(?:\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\}|\|\s*(?:default|d)\s*\((?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))\s*[,)])|lookup\(\s*[''"]env[''"](?:(?!\}\}|%\}).)*?\|\s*(?:default|d)\s*\()'
+    sql:
+      tool: rg
+      pcre2: true
+      pattern: '(?i)^(?:[^\-''\n]|-(?!-)|''(?:''''|[^''\n])*'')*?(?<!drop\s)(?<!delete\sset\s)(?<!update\sset\s)\bdefault\s+(?!(?:values|charset|character|collate|privileges)\b)(?!(?:null|false|none|nil|undefined|''''|""|``|\[\]|\{\}|\(\))(?:[\s,;)]|$))'
 - id: clean.clones
   severity: medium
   summary: Duplicated code block

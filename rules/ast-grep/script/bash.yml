@@ -1,0 +1,27 @@
+id: coding.structural/pipe-to-shell
+language: bash
+severity: warning
+message: a downloaded script is piped straight into a shell
+rule:
+  kind: pipeline
+  all:
+    - has:
+        kind: command
+        has:
+          field: name
+          regex: '^(?:curl|wget)$'
+    - has:
+        kind: command
+        has:
+          field: name
+          regex: '^(?:ba|da|z|k)?sh$'
+---
+id: clean.default-value/expansion
+language: bash
+severity: warning
+message: parameter expansion with a default; fail early with ${NAME:?set NAME in <where it is configured>}
+rule:
+  kind: expansion
+  regex: '^\$\{(?:[A-Za-z_]\w*|\d+):?[-=]'
+  not:
+    regex: '^\$\{(?:[A-Za-z_]\w*|\d+):?[-=]\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\}$'

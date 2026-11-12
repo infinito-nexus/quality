@@ -9,6 +9,7 @@ from pathlib import Path
 from quality import QualityError, printable
 from quality.adapters import (
     actionlint,
+    astgrep,
     gitleaks,
     hadolint,
     jscpd,
@@ -28,6 +29,7 @@ from quality.ruledata import BUILTIN, RuleData, gitignore_spec, require
 
 REGISTRY = {
     "actionlint": actionlint,
+    "ast-grep": astgrep,
     "gitleaks": gitleaks,
     "hadolint": hadolint,
     "jscpd": jscpd,
@@ -160,7 +162,19 @@ def reads_by_name(binding, path: str) -> bool:
     return "files" in binding.settings and selector(binding)(path, frozenset())
 
 
-def bind_files(bindings: list, kinds: dict, predicate) -> list:
+def bind_files(data: RuleData, bindings: list, kinds: dict, predicate) -> list:
+    """
+    Args:
+        data: Rule data deciding which kinds of a file a binding sees.
+        bindings: Rules bound to one tool.
+        kinds: Path to every kind of the file.
+        predicate: Selects the rules of this run.
+
+    Returns:
+        One Bound per binding with files: those its `files` patterns name, or
+        those it binds by a kind the tool may see, so a parsing tool never
+        gets an unrendered template by its inner type.
+    """
     bound = []
     for binding in bindings:
         if predicate(binding.rule):
@@ -168,7 +182,7 @@ def bind_files(bindings: list, kinds: dict, predicate) -> list:
             files = [
                 path
                 for path, path_kinds in kinds.items()
-                if selects(path, path_kinds) and not binding.rule.excludes(path)
+                if selects(path, data.visible_kinds(binding, path, path_kinds)) and not binding.rule.excludes(path)
             ]
             if files:
                 bound.append(Bound(binding, files, {path: kinds[path] for path in files}))
@@ -192,16 +206,21 @@ class Collector:
 
         Returns:
             All findings unfiltered, the files tools skipped, and the failures.
+            The snapshot's `ran` records, per file, the ids of the rules whose
+            tool ran on it without failing or skipping it.
         """
         found = []
         failures = []
         for tool, bound in self.bound_tools(snapshot, paths, predicate):
             try:
-                found += self.run_tool(tool, bound, snapshot)
+                hits = self.run_tool(tool, bound, snapshot)
             except QualityError as error:
                 if not tolerant:
                     raise
                 failures.append(str(error))
+            else:
+                found += hits
+                record_ran(snapshot, bound, {item.path for item in hits if isinstance(item, Skipped)})
         hits = once_per_gap([item for item in found if not isinstance(item, Skipped)])
         return hits, [item for item in found if isinstance(item, Skipped)], failures
 
@@ -216,7 +235,7 @@ class Collector:
                     path: snapshot.kinds_of(path) for path in snapshot.paths()
                 }
                 scope = everything
-            bound = bind_files(bindings, scope, predicate)
+            bound = bind_files(self.data, bindings, scope, predicate)
             if bound:
                 result.append((tool, bound))
         return result
@@ -236,7 +255,7 @@ class Collector:
                 raise QualityError(f"{tool} must see its files in one command, over argv_max_bytes")
             for files in chunks:
                 hits += self.run_chunk(tool, binary, replace(command, files=files), snapshot)
-        return hits
+        return one_per_line(hits) if settings.get("reports_lines") else hits
 
     def config_file(self, tool: str, settings: dict) -> Path:
         """
@@ -264,7 +283,7 @@ class Collector:
             snapshot: Snapshot holding the files.
 
         Returns:
-            The chunk's findings. An adapter with `operands` stages the files
+            The chunk's findings. An adapter with `operands` stages its input
             in a work directory, removed afterwards, and the tool runs there.
         """
         adapter = REGISTRY[tool]
@@ -353,10 +372,36 @@ def once_per_gap(hits: list) -> list:
     kept = []
     for hit in hits:
         key = (hit.rule.id, hit.path)
-        if not hit.rule.changed_only or key not in seen:
+        if not hit.rule.file_gap() or key not in seen:
             kept.append(hit)
-        if hit.rule.changed_only:
+        if hit.rule.file_gap():
             seen.add(key)
+    return kept
+
+
+def record_ran(snapshot, bound: list, skipped: set) -> None:
+    for item in bound:
+        for path in item.files:
+            if path not in skipped:
+                snapshot.ran.setdefault(path, set()).add(item.binding.rule.id)
+
+
+def one_per_line(hits: list) -> list:
+    """
+    Args:
+        hits: Findings of a tool that reports matching lines, not matches.
+
+    Returns:
+        The findings with one per rule, path and line, because a template
+        line can match the patterns of both its own kinds and its inner type.
+    """
+    seen = set()
+    kept = []
+    for hit in hits:
+        key = (hit.rule.id, hit.path, hit.line)
+        if key not in seen:
+            seen.add(key)
+            kept.append(hit)
     return kept
 
 

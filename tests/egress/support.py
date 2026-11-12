@@ -15,7 +15,7 @@ LOW_PORTS = "--sysctl=net.ipv4.ip_unprivileged_port_start=0"
 SANDBOX = ["--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=64"]
 
 
-def docker(*args, timeout=180):
+def docker(*args, timeout=180):  # nocheck: clean.default-value -- the bound every docker call of the egress tests shares
     """
     Args:
         args: Arguments of the docker CLI.
@@ -27,7 +27,7 @@ def docker(*args, timeout=180):
     return result.stdout.strip()
 
 
-def peer(*args, network=FETCH_NETWORK, detach=False, extra=(), timeout=180):
+def peer(*args, network=FETCH_NETWORK, detach=False, extra=(), timeout=180):  # nocheck: clean.default-value -- a peer joins the fetch network within the shared bound unless a test names another
     """
     Args:
         args: Mode and arguments of tests/egress/peer.py.

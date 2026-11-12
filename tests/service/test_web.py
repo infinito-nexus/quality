@@ -233,6 +233,7 @@ def test_report_escaped(tmp_path):
         "commit": None,
     }
     result = {"findings": [finding], "ignored": [], "nocheck": [], "unchecked": [], "notes": [], "incomplete": []}
+    result["parse_incomplete"] = []
     document = {"status": "done", "reason": None, "kind": "file", "commit": None, "history": None}
     document.update(quality="local", database=None, result=result, finished=0)
     job_id = "a" * 32
@@ -241,6 +242,15 @@ def test_report_escaped(tmp_path):
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;" in page
     assert "<a href" not in page.split("<main>")[1].split("</main>")[0]
+
+
+def test_every_template_escapes(tmp_path):
+    app, _state = build(tmp_path)
+    environment = app.jinja_env
+    names = environment.list_templates()
+    assert names and all(name.endswith(".html.j2") for name in names)
+    chosen = environment.autoescape
+    assert all(chosen(name) if callable(chosen) else chosen for name in names)
 
 
 def test_failed_report_shows_not_checked(tmp_path):

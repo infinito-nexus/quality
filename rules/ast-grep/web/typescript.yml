@@ -1,0 +1,88 @@
+id: coding.structural/debugger
+language: typescript
+severity: warning
+message: debugger statement left in code
+rule:
+  kind: debugger_statement
+---
+id: coding.structural/focused-test
+language: typescript
+severity: warning
+message: a focused test skips every other test
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: '^(?:(?:describe|it|test|context|specify|suite|bench|QUnit)(?:\s*\.\s*\w+)*?\s*\.\s*only(?:\s*\.\s*\w+)*|module\s*\.\s*only)$'
+---
+id: coding.structural/empty-catch
+language: typescript
+severity: warning
+message: an empty catch block swallows the error
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    regex: '^\{\s*\}$'
+---
+id: clean.default-value/pattern
+language: typescript
+severity: warning
+message: default in a parameter or destructuring; fail early, make the value required, or throw an error that names the missing key and where to set it
+rule:
+  any:
+    - kind: assignment_pattern
+      has:
+        field: right
+        not:
+          regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+    - kind: object_assignment_pattern
+      has:
+        field: right
+        not:
+          regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+    - kind: required_parameter
+      has:
+        field: value
+        not:
+          regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+    - kind: optional_parameter
+      has:
+        field: value
+        not:
+          regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+---
+id: clean.default-value/nullish
+language: typescript
+severity: warning
+message: fallback after ??; fail early, check for undefined and throw an error that names the missing key and where to set it
+rule:
+  any:
+    - pattern: $LEFT ?? $RIGHT
+    - pattern: $LEFT ??= $RIGHT
+  all:
+    - has:
+        field: operator
+        pattern: $$AT
+  has:
+    field: right
+    not:
+      regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+---
+id: clean.default-value/or-literal
+language: typescript
+severity: warning
+message: literal after ||; fail early, check for undefined and throw an error that names the missing key and where to set it
+rule:
+  any:
+    - pattern: $LEFT || $RIGHT
+    - pattern: $LEFT ||= $RIGHT
+  all:
+    - has:
+        field: operator
+        pattern: $$AT
+  has:
+    field: right
+    regex: '^(?:[''"`\[{]|-?\.?\d|true\b)'
+    not:
+      regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'

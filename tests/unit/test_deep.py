@@ -73,7 +73,7 @@ def test_semgrep_reads_scripts_but_never_shell_without_metrics(tmp_path):
 
 def test_the_secret_scanner_binds_every_file_by_kind_alone():
     kinds = {"a.py": frozenset({"python"}), "notes.txt": frozenset()}
-    bound = bind_files(DATA.bindings()["gitleaks"], kinds, lambda _rule: True)
+    bound = bind_files(DATA, DATA.bindings()["gitleaks"], kinds, lambda _rule: True)
     assert [item.files for item in bound] == [["a.py", "notes.txt"]]
 
 

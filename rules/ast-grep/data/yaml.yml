@@ -1,0 +1,19 @@
+id: coding.structural/duplicate-key
+language: yaml
+severity: warning
+message: duplicate mapping key; the later value silently wins
+rule:
+  any:
+    - kind: block_mapping_pair
+    - kind: flow_pair
+  has:
+    field: key
+    pattern: $KEY
+  follows:
+    any:
+      - kind: block_mapping_pair
+      - kind: flow_pair
+    has:
+      field: key
+      pattern: $KEY
+    stopBy: end

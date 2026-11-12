@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html.j2" %}
 {% block head %}
 {% if form and form.challenge %}
 <link rel="stylesheet" href="{{ url_for('static', filename='altcha/altcha.css') }}">

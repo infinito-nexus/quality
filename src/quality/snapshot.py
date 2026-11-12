@@ -1,11 +1,12 @@
 import codecs
 import re
+from collections import Counter
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from quality import QualityError
+from quality.kinds import KindMap
 from quality.repo import IGNORE_FILE
-from quality.ruledata import KindMap
 from quality.suppress import marker_comments, python_comments
 
 REGULAR_MODES = ("100644", "100755", "100664")
@@ -17,10 +18,11 @@ SUBMODULE = "is a submodule, whose content no rule reads"
 BINARY = "holds binary content, which no text rule can vouch for"
 CONTROL_NAME = "has a control character in its name, which no file pattern of a rule matches"
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-LINE_BREAK = re.compile(rb"\r\n|\r|\n")
+LINE_BREAK = re.compile(rb"\r?\n")
 BLANKS = re.compile(r"\s+")
 FIRST_LINE_BYTES = 256
 PYTHON_KIND = "python"
+UNCLASSIFIED = "unclassified"
 WIDE_ENCODINGS = (
     (codecs.BOM_UTF32_LE, "utf-32"),
     (codecs.BOM_UTF32_BE, "utf-32"),
@@ -48,6 +50,23 @@ def textual(data: bytes) -> bytes | None:
     return None if b"\0" in data else data
 
 
+def labelled(kinds: frozenset, path: str) -> frozenset:
+    """
+    Args:
+        kinds: Kinds of the file.
+        path: Path of the file.
+
+    Returns:
+        The kinds, or for a file of no kind one label `unclassified` with its
+        extension, or with its name when it has none.
+    """
+    if kinds:
+        return kinds
+    pure = PurePosixPath(path)
+    name = f"*{pure.suffix}" if pure.suffix else pure.name
+    return frozenset({f"{UNCLASSIFIED} {name}"})
+
+
 def safe_path(path: str) -> str:
     parts = path.split("/")
     unsafe = {"", ".", ".."}
@@ -70,6 +89,8 @@ class Snapshot:
     unread: dict
     line_cache: dict = field(default_factory=dict)
     comment_cache: dict = field(default_factory=dict)
+    unparsed: set = field(default_factory=set)
+    ran: dict = field(default_factory=dict)
 
     def paths(self) -> list:
         return sorted(self.files)
@@ -81,6 +102,14 @@ class Snapshot:
         return textual(self.data(path))
 
     def lines(self, path: str) -> list:
+        """
+        Args:
+            path: The file.
+
+        Returns:
+            Its lines as ast-grep, ripgrep and the tokenizer count them: split
+            at LF, a CR before it dropped, any other CR kept inside its line.
+        """
         if path not in self.line_cache:
             pieces = LINE_BREAK.split(self.data(path))
             if pieces and not pieces[-1]:
@@ -90,8 +119,8 @@ class Snapshot:
 
     def line_count(self, path: str) -> int:
         data = self.data(path)
-        breaks = len(LINE_BREAK.findall(data))
-        return breaks if not data or data[-1:] in (b"\n", b"\r") else breaks + 1
+        breaks = data.count(b"\n")
+        return breaks if not data or data.endswith(b"\n") else breaks + 1
 
     def source_key(self, path: str, row: int) -> str:
         lines = self.lines(path)
@@ -106,10 +135,27 @@ class Snapshot:
                 first_line = stream.readline(FIRST_LINE_BYTES)
         return self.kind_map.kinds_of(path, first_line)
 
+    def census(self) -> Counter:
+        """
+        Returns:
+            File count per kind. A file of no kind counts as `unclassified`
+            with its extension, or with its name when it has none. An unread
+            file is classified by its name alone.
+        """
+        counted = Counter()
+        for path in self.paths():
+            counted.update(labelled(self.kinds_of(path), path))
+        for path in self.unchecked:
+            counted.update(labelled(self.kind_map.kinds_of(path, b""), path))
+        return counted
+
     def comment(self, path: str, row: int) -> str | None:
+        return self.comments(path).get(row)
+
+    def comments(self, path: str) -> dict:
         if path not in self.comment_cache:
             self.comment_cache[path] = self.comments_of(path)
-        return self.comment_cache[path].get(row)
+        return self.comment_cache[path]
 
     def comments_of(self, path: str) -> dict:
         kinds = self.kinds_of(path)
