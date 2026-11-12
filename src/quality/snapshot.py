@@ -15,6 +15,8 @@ READABLE_MODES = (*REGULAR_MODES, LINK_MODE)
 OVER_LIMIT = "is over the size limit"
 SUBMODULE = "is a submodule, whose content no rule reads"
 BINARY = "holds binary content, which no text rule can vouch for"
+CONTROL_NAME = "has a control character in its name, which no file pattern of a rule matches"
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 LINE_BREAK = re.compile(rb"\r\n|\r|\n")
 BLANKS = re.compile(r"\s+")
 FIRST_LINE_BYTES = 256
@@ -143,20 +145,58 @@ def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: Kind
     Returns:
         The snapshot. Symlinks and gitlinks are recorded as irregular and never
         followed. A symlink's target text is written as a kindless file, so
-        only rules binding every file read it; a gitlink is named unread.
+        only rules binding every file read it; a gitlink is named unread, and
+        so is a name holding a control character, which no tool is given.
     """
     root.mkdir(mode=0o700)
-    readable = [entry for entry in entries if entry.mode in READABLE_MODES]
+    readable = [entry for entry in entries if entry.mode in READABLE_MODES and not CONTROL.search(entry.path)]
     sizes = repo.sizes({entry.oid for entry in readable})
     kept, unchecked = split_by_size(readable, sizes, blob_limit)
     targets = blob_targets(kept, root)
     if targets:
         repo.export_blobs(targets, root.with_name(f"{root.name}.request"))
     links = {entry.path for entry in kept.values() if entry.mode == LINK_MODE}
+    irregular = irregular_paths(entries)
+    return Snapshot(root, kept, unchecked, irregular, kind_map, links, unread_reasons(entries, unchecked))
+
+
+def unread_reasons(entries: list, unchecked: list) -> dict:
     unread = {path: OVER_LIMIT for path in unchecked}
     unread |= {entry.path: SUBMODULE for entry in entries if entry.mode == GITLINK_MODE}
-    irregular = irregular_paths(entries)
-    return Snapshot(root, kept, unchecked, irregular, kind_map, links, unread)
+    return unread | {entry.path: CONTROL_NAME for entry in entries if CONTROL.search(entry.path)}
+
+
+def control_notes(head: Snapshot, changes: list) -> list:
+    """
+    Args:
+        head: Snapshot the run judges.
+        changes: Changes of the run, each with a path and a status.
+
+    Returns:
+        One unchecked note per untouched file whose name holds a control character.
+
+    Raises:
+        QualityError: A changed file's name holds one, see refuse_control_names.
+    """
+    refuse_control_names(change.path for change in changes if change.status != "deleted")
+    changed = {change.path for change in changes}
+    named = sorted(path for path, reason in head.unread.items() if reason == CONTROL_NAME)
+    return [f"unchecked: {path}: {CONTROL_NAME}" for path in named if path not in changed]
+
+
+def refuse_control_names(paths) -> None:
+    """
+    Args:
+        paths: Paths this run must judge.
+
+    Raises:
+        QualityError: One holds a control character, which the `files`
+            patterns of the lockfile scanners never match, so the file would
+            pass unchecked.
+    """
+    named = sorted(path for path in paths if CONTROL.search(path))
+    if named:
+        raise QualityError(f"cannot check a file whose name holds a control character: {named[0]}")
 
 
 def irregular_paths(entries: list) -> set:

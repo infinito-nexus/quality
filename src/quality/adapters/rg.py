@@ -6,6 +6,7 @@ import re
 from quality.adapters.base import Command, known_path
 from quality.gate import code_hit
 from quality.ruledata import require
+from quality.shellview import code_view
 
 
 def commands(bound: list, _settings: dict, _empty_file) -> list:
@@ -16,7 +17,8 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
         _empty_file: Unused; ripgrep needs no empty configuration.
 
     Returns:
-        One command per rule.
+        One command per rule; a rule setting `multiline` lets its pattern span
+        lines, such as a pipe continued after a backslash.
     """
     return [
         Command(
@@ -25,6 +27,7 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
                 "--no-ignore",
                 "--hidden",
                 "--json",
+                *(["--multiline"] if item.binding.settings.get("multiline") else []),
                 "--regexp",
                 require(item.binding.settings, "pattern", f"enforcer of {item.binding.rule.id}"),
                 "--",
@@ -36,9 +39,53 @@ def commands(bound: list, _settings: dict, _empty_file) -> list:
     ]
 
 
+def operands(command: Command, snapshot, work) -> list:
+    """
+    Args:
+        command: One chunk.
+        snapshot: Snapshot holding its files.
+        work: Empty working directory of the run, removed afterwards.
+
+    Returns:
+        The files under their own paths in the working directory: the
+        code_view() copy when the rule sets `code_view` with its `levels` and
+        `window`, else a hard link, so line numbers and reported paths stay
+        those of the snapshot.
+    """
+    binding = command.bound[0].binding
+    view = binding.settings.get("code_view")
+    for path in command.files:
+        staged = work / path
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        if view:
+            where = f"code_view of {binding.rule.id}"
+            levels, window = require(view, "levels", where), require(view, "window", where)
+            staged.write_bytes(code_view(snapshot.data(path), levels, window))
+        else:
+            os.link(snapshot.root / path, staged)
+    return list(command.files)
+
+
+def reported_bytes(field: dict) -> bytes:
+    return field["text"].encode() if "text" in field else base64.b64decode(field["bytes"])
+
+
 def reported_path(data: dict) -> str:
-    path = data["path"]
-    return path["text"] if "text" in path else os.fsdecode(base64.b64decode(path["bytes"]))
+    return os.fsdecode(reported_bytes(data["path"]))
+
+
+def match_rows(data: dict) -> list:
+    """
+    Args:
+        data: One match event of ripgrep's JSON output.
+
+    Returns:
+        The line each match starts on, since a multiline event can join
+        matches on adjacent lines.
+    """
+    text = reported_bytes(data["lines"])
+    first = data["line_number"]
+    return sorted({first + text[: item["start"]].count(b"\n") for item in data["submatches"]} or {first})
 
 
 def inside_comment(pattern: str, snapshot, path: str, row: int) -> bool:
@@ -55,8 +102,8 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
         if event["type"] != "match":
             continue
         path = known_path(reported_path(event["data"]), snapshot)
-        row = event["data"]["line_number"]
         comment_only = binding.settings.get("comment_only")
-        if not comment_only or inside_comment(pattern, snapshot, path, row):
-            hits.append(code_hit(binding.rule, path, row, "", snapshot))
+        for row in match_rows(event["data"]):
+            if not comment_only or inside_comment(pattern, snapshot, path, row):
+                hits.append(code_hit(binding.rule, path, row, "", snapshot))
     return hits

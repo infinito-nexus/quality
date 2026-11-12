@@ -78,9 +78,10 @@ def test_redaction_of_entity_and_metric_names(target):
 
 def test_text_output_escapes_control_characters(target):
     target.write("seed.py", "x = 1\n")
+    target.write("e\x1b[31m\n::error::forged.txt", "untouched\n")
     target.commit()
     target.git("checkout", "-q", "-b", "feature")
-    name = "x\n::error::forged\x1b[31m.py"
+    name = "x\x9b31m.py"
     target.write(name, "import os\n")
     target.write(
         ".qualityignore.yml",
@@ -90,12 +91,32 @@ def test_text_output_escapes_control_characters(target):
     target.commit()
     result = target.check("--base", "main", "--verbose")
     assert result.returncode == 1
+    assert "unchecked: e\\x1b[31m\\n::error::forged.txt: has a control character" in result.stdout
     for stream in (result.stdout, result.stderr):
-        assert "\x1b" not in stream
+        assert not {"\x1b", "\x9b"} & set(stream)
         assert not [line for line in stream.splitlines() if line.startswith("::")]
     assert "quality: 0 finding(s)" not in result.stdout.splitlines()
     assert result.stdout.splitlines()[-1] == "quality: 1 finding(s)"
     assert report(target.check("--base", "main", "--json"))["findings"][0]["path"] == name
+
+
+@pytest.mark.parametrize("kept", [True, False], ids=["in-the-head-tree", "added-and-deleted-in-the-range"])
+def test_a_refused_control_character_name_is_escaped(target, kept):
+    name = "x\n::error::forged\x1b[31m.py"
+    target.write("seed.py", "x = 1\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    target.write(name, "import os\n")
+    target.commit()
+    if not kept:
+        (target.path / name).unlink()
+        target.commit()
+    result = target.check("--base", "main", "--verbose")
+    assert result.returncode == 2
+    assert "control character: x\\n::error::forged\\x1b[31m.py" in result.stderr
+    for stream in (result.stdout, result.stderr):
+        assert not {"\x1b", "\x9b"} & set(stream)
+        assert not [line for line in stream.splitlines() if line.startswith("::")]
 
 
 def test_json_output_holds_only_ascii(target):

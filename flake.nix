@@ -8,11 +8,29 @@
     pkgs = import nixpkgs { inherit system; };
     # unstable cannot build semgrep (nixpkgs#579107 patchelf abort, and its CLI imports mcp.server.fastmcp, gone in mcp 2); release-26.05 builds it on Hydra
     semgrep = nixpkgs-stable.legacyPackages.${system}.semgrep;
+    jscpd = pkgs.stdenv.mkDerivation (finalAttrs: {
+      pname = "jscpd";
+      version = "5.4.2";
+      src = pkgs.fetchurl {
+        url = "https://registry.npmjs.org/jscpd-linux-x64-gnu/-/jscpd-linux-x64-gnu-${finalAttrs.version}.tgz";
+        hash = "sha512-eAmKLxx+pIOEX4lZ342CCCjL5bvf+a3gdmaaVHXiGIx2Zr3zKkF32YkfuN2sCvCui5I/wnely80XsRvVVFO47Q==";
+      };
+      nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+      buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+      installPhase = ''
+        runHook preInstall
+        install -Dm755 bin/jscpd $out/bin/jscpd
+        install -Dm644 LICENSE $out/share/licenses/jscpd/LICENSE
+        runHook postInstall
+      '';
+      meta.license = pkgs.lib.licenses.mit;
+    });
     tools = with pkgs; [
       actionlint
       ast-grep
       gitleaks
       hadolint
+      jscpd
       osv-scanner
       python3Packages.lizard
       ripgrep

@@ -1,3 +1,4 @@
 blob_max_bytes: 5242880
 git_timeout: 120
 argv_max_bytes: 1000000
+db_max_age_days: 7

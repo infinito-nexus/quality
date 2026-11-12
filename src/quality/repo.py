@@ -281,6 +281,30 @@ class Repo:
         )
         return parse_combined_diff(raw)
 
+    def touched_paths(self, commit: str) -> list:
+        """
+        Args:
+            commit: One commit.
+
+        Returns:
+            Every path the commit adds, deletes, modifies, or changes the type
+            or mode of, both sides of a rename included; for a merge only the
+            paths it resolved itself.
+        """
+        raw = self._output(
+            "diff-tree",
+            "--root",
+            "--no-commit-id",
+            "-r",
+            "-c",
+            "--no-renames",
+            "-z",
+            "--name-only",
+            commit,
+            "--",
+        )
+        return [os.fsdecode(path) for path in raw.split(b"\0") if path]
+
     def ignore_blob(self, rev: str, limit: int) -> bytes | None:
         entries = parse_tree_listing(self._output("ls-tree", "-z", rev, "--", IGNORE_FILE))
         regular = [entry for entry in entries if entry.mode.startswith("100")]

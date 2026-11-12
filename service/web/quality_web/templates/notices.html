@@ -4,7 +4,7 @@
 <h1>Notices</h1>
 <p>The code of this service and its scan rules are MIT licensed. Their source and the build files of every image are at <a href="https://github.com/infinito-nexus/quality">github.com/infinito-nexus/quality</a>, where <code>flake.nix</code> names the packages below and <code>flake.lock</code> pins their revisions.</p>
 <h2>Scan and proxy images</h2>
-<p>The scan image bundles every package below except squid, which the proxy image bundles, each with its runtime dependencies. All of them are built from nixpkgs revision <code>1d060086d60cb76a40cf37109f979d88a5bd6396</code> (nixos-unstable), except semgrep, which is built from nixpkgs revision <code>c56a87d8e41ce69bd2af57eb35dcc117a9dfca33</code> (nixos-26.05). Each licence is the one nixpkgs declares for the package at that revision.</p>
+<p>The scan image bundles every package below except squid, which the proxy image bundles, each with its runtime dependencies. All of them are built from nixpkgs revision <code>1d060086d60cb76a40cf37109f979d88a5bd6396</code> (nixos-unstable), except semgrep, which is built from nixpkgs revision <code>c56a87d8e41ce69bd2af57eb35dcc117a9dfca33</code> (nixos-26.05), and jscpd, which <code>flake.nix</code> builds from the jscpd-linux-x64-gnu 5.4.2 release on npm because nixpkgs has no jscpd. Each licence is the one nixpkgs declares for the package at that revision, and for jscpd the one <code>flake.nix</code> declares.</p>
 <table id="nix">
   <thead><tr><th>nixpkgs attribute</th><th>Licence</th><th>Project</th></tr></thead>
   <tbody>
@@ -12,6 +12,7 @@
     <tr><td><code>ast-grep</code></td><td>MIT</td><td><a href="https://ast-grep.github.io/">ast-grep.github.io</a></td></tr>
     <tr><td><code>gitleaks</code></td><td>MIT</td><td><a href="https://github.com/gitleaks/gitleaks">github.com/gitleaks/gitleaks</a></td></tr>
     <tr><td><code>hadolint</code></td><td>GPL-3.0-only</td><td><a href="https://hackage.haskell.org/package/hadolint">hackage.haskell.org/package/hadolint</a></td></tr>
+    <tr><td><code>jscpd</code></td><td>MIT</td><td><a href="https://github.com/kucherenko/jscpd">github.com/kucherenko/jscpd</a></td></tr>
     <tr><td><code>osv-scanner</code></td><td>Apache-2.0</td><td><a href="https://github.com/google/osv-scanner">github.com/google/osv-scanner</a></td></tr>
     <tr><td><code>python3Packages.lizard</code></td><td>MIT</td><td><a href="http://www.lizard.ws">www.lizard.ws</a></td></tr>
     <tr><td><code>ripgrep</code></td><td>Unlicense, MIT</td><td><a href="https://github.com/BurntSushi/ripgrep">github.com/BurntSushi/ripgrep</a></td></tr>

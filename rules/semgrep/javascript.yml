@@ -1,0 +1,18 @@
+rules:
+  - id: quality.javascript.function-constructor
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: The Function constructor compiles a string into code, as eval does
+    pattern-either:
+      - pattern: new Function(...)
+      - pattern: Function(...)
+  - id: quality.javascript.inner-html-from-variable
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Assigning markup built from a variable to innerHTML or outerHTML allows injection
+    patterns:
+      - pattern-either:
+          - pattern: $ELEMENT.innerHTML = $VALUE
+          - pattern: $ELEMENT.outerHTML = $VALUE
+      - pattern-not: $ELEMENT.$PROPERTY = "..."
+      - pattern-not: $ELEMENT.$PROPERTY = `...`

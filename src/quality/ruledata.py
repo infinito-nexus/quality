@@ -46,6 +46,7 @@ class Rule:
     pending: bool
     tier: str | None
     exclude: object
+    changed_only: bool
 
     def excludes(self, path: str) -> bool:
         return self.exclude is not None and self.exclude.match_file(path)
@@ -242,7 +243,10 @@ def build_rule(raw: dict, where: str) -> Rule:
         pending=bool(raw.get("pending")),
         tier=raw.get("tier"),
         exclude=gitignore_spec(exclude) if exclude else None,
+        changed_only=bool(raw.get("changed_only")),
     )
+    if rule.changed_only and rule.hard:
+        raise QualityError(f"rule data: {entry} sets changed_only with hard")
     if rule.history and not rule.hard:
         raise QualityError(f"rule data: {entry} sets history without hard")
     if not isinstance(rule.enforcer, dict) and rule.enforcer not in RUNNER_CHECKS:

@@ -328,9 +328,11 @@ def adapter_findings(target, tmp_path, names) -> list:
     empty = tmp_path / "empty.yaml"
     empty.touch()
     path_value = os.environ["PATH"]
-    runtime = Runtime(path_value, tool_environment(path_value, home), empty, target.path, False)
+    environment = tool_environment(path_value, home, None)
+    runtime = Runtime(path_value, environment, empty, target.path, False, {"work_dir": tmp_path})
     snapshot = Snapshot(target.path, dict.fromkeys(names), [], set(), data.kinds, set(), {})
-    bound = [Bound(binding, names) for binding in data.bindings()["gitleaks"]]
+    kinds = {name: snapshot.kinds_of(name) for name in names}
+    bound = [Bound(binding, names, kinds) for binding in data.bindings()["gitleaks"]]
     hits = Collector(data, runtime).run_tool("gitleaks", bound, snapshot)
     assert snapshot.unread == {}
     return sorted((hit.path, hit.line, hit.message) for hit in hits)

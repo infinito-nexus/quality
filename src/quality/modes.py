@@ -3,10 +3,11 @@ import shutil
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
-from quality import QualityError
-from quality.adapters import Collector, Runtime, refuse_inside
+from quality import QualityError, db
+from quality.adapters import Collector, Runtime, reads_by_name, refuse_inside
 from quality.adapters.builtin import (
     changed_folders,
     folder_items,
@@ -14,7 +15,8 @@ from quality.adapters.builtin import (
     tree_children,
 )
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
-from quality.ignorefile import audit_lines, describe, split_ignored
+from quality.history import finding_key, history_hits
+from quality.ignorefile import audit_lines, refuse_stale, split_ignored, stale_names
 from quality.ignorefile import parse as parse_ignore
 from quality.repo import Repo, hardened_env
 from quality.report import Outcome, unchecked_of
@@ -27,11 +29,19 @@ from quality.ruledata import (
     load,
     locate,
 )
-from quality.snapshot import BINARY, Snapshot, materialize
+from quality.snapshot import (
+    BINARY,
+    Snapshot,
+    control_notes,
+    materialize,
+    refuse_control_names,
+)
 from quality.suppress import split_nocheck
 
-FAST_TIER = ("fast",)
-ALL_TIERS = ("fast", "deep")
+FAST = "fast"
+FAST_TIER = (FAST,)
+ALL_TIERS = (FAST, "deep")
+MODE_TIERS = {"staged": FAST_TIER, "base": ALL_TIERS, "all": ALL_TIERS}
 HEAD_ONLY_NOTE = "HEAD only: history not scanned"
 
 
@@ -40,8 +50,13 @@ class Options:
     mode: str
     ref: str | None
     rules: str | None
+    db: str | None
     verbose: bool
     cwd: str
+
+
+def tier_of(rule) -> str:
+    return rule.tier or FAST
 
 
 @dataclass(frozen=True, eq=False)
@@ -50,6 +65,41 @@ class Session:
     repo: Repo
     collector: Collector
     scratch: Path
+    tiers: tuple
+    bundle: db.Bundle | None
+    notes: list
+
+    def collect(self, snapshot: Snapshot, paths: list, predicate, base_side: bool) -> list:
+        """
+        Args:
+            snapshot: Snapshot holding the files.
+            paths: Files to check.
+            predicate: Selects the rules of this run among those of the mode's tiers.
+            base_side: True for a parent of the differential gate: a failing tool
+                leaves that side without its findings, and skipped files are not named.
+
+        Returns:
+            All findings, unfiltered. Files a tool skipped on the checked side and
+            tools that failed on the base side are added to the notes.
+        """
+        hits, skipped, failures = self.collector.collect(
+            snapshot,
+            paths,
+            lambda rule: tier_of(rule) in self.tiers and predicate(rule),
+            base_side,
+        )
+        if base_side:
+            lines = [f"base side failed, so every finding of that tool counts as new: {failure}" for failure in failures]
+        else:
+            lines = [f"unchecked: {item.path}: {item.reason}" for item in skipped]
+        self.notes.extend(line for line in dict.fromkeys(lines) if line not in self.notes)
+        return hits
+
+    def database_notes(self) -> list:
+        return [] if self.bundle is None else [self.bundle.note()]
+
+    def changed_only_rules(self) -> set:
+        return {rule.id for rule in self.data.rules if rule.changed_only and tier_of(rule) in self.tiers}
 
     def snapshot(self, entries: list, label: str) -> Snapshot:
         return materialize(
@@ -67,8 +117,9 @@ class Session:
             paths: Unchecked paths of this run.
 
         Returns:
-            One finding per path named like code, since a padded file would
-            otherwise pass every rule unread.
+            One finding per path named like code or like a lockfile a rule of the
+            running tiers reads, since a padded file would otherwise pass every
+            rule unread.
         """
         return self.unread_code(SIZE_GUARD, snapshot, paths)
 
@@ -90,8 +141,15 @@ class Session:
         return [
             code_hit(rule, path, None, "", snapshot)
             for path in paths
-            if self.data.kinds.code_name(path)
+            if self.data.kinds.code_name(path) or self.read_by_name(path)
         ]
+
+    def read_by_name(self, path: str) -> bool:
+        return any(
+            tier_of(binding.rule) in self.tiers and reads_by_name(binding, path)
+            for bindings in self.data.bindings().values()
+            for binding in bindings
+        )
 
     def structure(self, snapshot: Snapshot, folders: list | None) -> list:
         """
@@ -133,10 +191,6 @@ def soft_rule(rule) -> bool:
     return not rule.hard
 
 
-def history_rule(rule) -> bool:
-    return rule.history
-
-
 def validated_path(environ: dict) -> str:
     """
     Args:
@@ -154,16 +208,51 @@ def validated_path(environ: dict) -> str:
     return os.pathsep.join(entry for entry in raw.split(os.pathsep) if os.path.isabs(entry))
 
 
-def tool_environment(path_value: str, home: Path) -> dict:
-    return {
+def tool_environment(path_value: str, home: Path, bundle: db.Bundle | None) -> dict:
+    """
+    Args:
+        path_value: Validated PATH.
+        home: Scratch directory every tool gets as HOME and cache.
+        bundle: Vulnerability database of the deep tier, or None.
+
+    Returns:
+        The only environment tools see: Semgrep without metrics and version
+        check, osv-scanner on the bundle, no proxy, so no tool reaches the network.
+    """
+    env = {
         "PATH": path_value,
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home),
+        "XDG_CACHE_HOME": str(home),
         "LC_ALL": "C.UTF-8",
         "PYTHONSAFEPATH": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
         "RUFF_NO_CACHE": "true",
+        "SEMGREP_ENABLE_VERSION_CHECK": "0",
+        "SEMGREP_SEND_METRICS": "off",
+        "EIO_BACKEND": "posix",
     }
+    if bundle is not None:
+        env["OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY"] = str(bundle.osv_cache())
+    return env
+
+
+def needs_database(data: RuleData, tiers: tuple) -> bool:
+    return any(
+        data.tools.get(tool, {}).get("database")
+        and any(tier_of(binding.rule) in tiers for binding in bindings)
+        for tool, bindings in data.bindings().items()
+    )
+
+
+def open_database(options: Options, data: RuleData, tiers: tuple) -> db.Bundle | None:
+    if not needs_database(data, tiers):
+        return None
+    return db.open_bundle(
+        db.location(options.db, os.environ),
+        data.limit("db_max_age_days"),
+        datetime.now(timezone.utc),
+    )
 
 
 def enclosing_roots(cwd: str) -> list:
@@ -181,7 +270,8 @@ def enclosing_roots(cwd: str) -> list:
 
 
 def open_session(options: Options, scratch: Path) -> Session:
-    data = load(locate(options.rules))
+    rules_dir = locate(options.rules)
+    data = load(rules_dir)
     path_value = validated_path(os.environ)
     git = shutil.which("git", path=path_value)
     if git is None:
@@ -190,18 +280,42 @@ def open_session(options: Options, scratch: Path) -> Session:
     env = hardened_env(path_value, os.environ)
     repo = Repo.open(options.cwd, env, data.limit("git_timeout"), git)
     refuse_inside(git, "git", [Path(repo.root).resolve()])
+    tiers = MODE_TIERS[options.mode]
+    bundle = open_database(options, data, tiers)
     home = scratch / "home"
     home.mkdir()
     empty_file = scratch / "empty.yaml"
     empty_file.touch()
+    empty_json = scratch / "empty.json"
+    empty_json.write_text("{}\n", encoding="utf-8")
+    resources = {
+        "rules_dir": rules_dir.resolve(),
+        "database": bundle,
+        "work_dir": scratch,
+        "empty_json": empty_json,
+    }
     runtime = Runtime(
         path_value,
-        tool_environment(path_value, home),
+        tool_environment(path_value, home, bundle),
         empty_file,
         Path(repo.root).resolve(),
         options.verbose,
+        resources,
     )
-    return Session(data, repo, Collector(data, runtime), scratch)
+    return Session(data, repo, Collector(data, runtime), scratch, tiers, bundle, [])
+
+
+def update_database(option: str | None, rules: str | None) -> db.Bundle:
+    """
+    Args:
+        option: The --db value, or None for the default location.
+        rules: The --rules value, or None for the packaged rule data.
+
+    Returns:
+        The fetched bundle; the only network access quality makes.
+    """
+    data = load(locate(rules))
+    return db.update(db.location(option, os.environ), data, validated_path(os.environ), os.environ)
 
 
 def parent_baseline(session: Session, plan: Plan, parent: str, index: int):
@@ -216,13 +330,21 @@ def parent_baseline(session: Session, plan: Plan, parent: str, index: int):
     }
     wanted |= {change.old_path for change in plan.changes if change.old_path}
     paths = sorted(path for path in wanted if path in snapshot.files)
-    hits = session.collector.collect(snapshot, paths, soft_rule)
+    hits = without_changed_only(session.collect(snapshot, paths, soft_rule, True))
     hits += session.structure(snapshot, plan_folders(plan))
     return baseline_of(hits, {old: new for new, old in renames_back.items()})
 
 
+def without_changed_only(hits: list) -> list:
+    return [hit for hit in hits if not hit.rule.changed_only]
+
+
 def plan_folders(plan: Plan) -> list:
     return changed_folders([path for change in plan.changes for path in (change.path, change.old_path) if path])
+
+
+def ungated(hit) -> bool:
+    return hit.rule.hard or hit.absolute
 
 
 def judged(session: Session, plan: Plan, notes: list) -> Outcome:
@@ -233,17 +355,20 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
         notes: Lines the report carries along.
 
     Returns:
-        Hard findings absolute, all other findings through the differential gate.
+        Hard and unread-file findings absolute, all other findings through the
+        differential gate.
     """
     changed = {change.path for change in plan.changes}
+    notes = notes + control_notes(plan.head, plan.changes)
     oversize = [path for path in plan.head.unchecked if path in changed]
-    hits = session.collector.collect(plan.head, touched_paths(plan), every_rule)
+    hits = session.collect(plan.head, touched_paths(plan), every_rule, False)
     hits += session.oversized(plan.head, oversize) + session.binary_code(plan.head)
     hits += session.structure(plan.head, plan_folders(plan))
+    refuse_stale(stale_names(plan.soft_entries, hits, set(touched_paths(plan)), session.changed_only_rules()))
     kept, ignored = split_ignored(hits, plan.soft_entries, plan.hard_entries)
     kept, nocheck = split_nocheck(kept, plan.head)
-    findings = [hit for hit in kept if hit.rule.hard]
-    soft = [hit for hit in kept if not hit.rule.hard]
+    findings = [hit for hit in kept if ungated(hit)]
+    soft = [hit for hit in kept if not ungated(hit)]
     if soft:
         findings += new_hits(soft, plan_baseline(session, plan))
     return Outcome(findings, ignored, nocheck, unchecked_of(plan.head, changed), notes, [])
@@ -267,20 +392,23 @@ def check_all(session: Session, _options: Options) -> Outcome:
     head = session.snapshot(session.repo.index_entries(), "head")
     if not head.files and not head.unchecked:
         raise QualityError("--all found zero files in the index")
-    hits = session.collector.collect(head, head.paths(), every_rule)
+    refuse_control_names(head.unread)
+    hits = session.collect(head, head.paths(), every_rule, False)
     hits += session.oversized(head, head.unchecked) + session.binary_code(head)
     hits += session.structure(head, None)
     entries = parse_ignore(head.ignore_data(), session.data)
     kept, ignored = split_ignored(hits, entries, entries)
-    stale = [entry for entry in entries if entry not in ignored]
-    if stale:
-        raise QualityError(f"stale .qualityignore.yml entry: {describe(stale[0])}")
-    findings, nocheck = split_nocheck(kept, head)
-    notes = session.pending_notes(ALL_TIERS)
+    refuse_stale([entry for entry in entries if entry not in ignored])
+    findings, nocheck = split_nocheck(without_changed_only(kept), head)
+    notes = session.database_notes() + session.pending_notes(ALL_TIERS) + unparsed_notes(kept)
     if session.repo.is_shallow():
         notes.append(HEAD_ONLY_NOTE)
     pending = [rule.id for rule in session.data.pending_rules(ALL_TIERS)]
     return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending)
+
+
+def unparsed_notes(kept: list) -> list:
+    return [f"parse incomplete: {path}" for path in sorted({hit.path for hit in kept if hit.rule.changed_only})]
 
 
 def check_staged(session: Session, _options: Options) -> Outcome:
@@ -308,70 +436,20 @@ def base_side_entries(session: Session, base: str) -> list:
         return []
 
 
-@dataclass(frozen=True, eq=False)
-class History:
-    found: list
-    ignored: list
-    unchecked: list
-    at_head: set
-
-
-def finding_key(hit) -> tuple:
-    return (hit.rule.id, hit.path, hit.line)
-
-
-def history_hits(session: Session, base: str, entries: list, head_blobs: set) -> History:
-    """
-    Args:
-        session: The running check.
-        base: Merge base.
-        entries: Base side ignore entries.
-        head_blobs: Path and object ID of every HEAD entry.
-
-    Returns:
-        Findings of the rules marked history over every blob the range adds,
-        each carrying its commit SHA. A blob the merge base already holds at
-        that path is legacy and skipped, and a merge adds only the blobs it
-        resolved itself, never one it took over from either side. The keys of
-        findings on blobs still at HEAD are kept to replace HEAD's copy.
-    """
-    if not session.data.has_history_rules():
-        return History([], [], [], set())
-    seen = {(entry.path, entry.oid) for entry in session.repo.tree_entries(base)}
-    found = []
-    unchecked = []
-    at_head = set()
-    for commit in session.repo.commits(base):
-        fresh = [e for e in session.repo.commit_entries(commit) if (e.path, e.oid) not in seen]
-        seen.update((entry.path, entry.oid) for entry in fresh)
-        scanned = scan_commit(session, commit, fresh, head_blobs)
-        found += scanned.found
-        unchecked += scanned.unchecked
-        at_head |= scanned.at_head
-    kept, ignored = split_ignored(found, [], entries)
-    return History(kept, ignored, unchecked, at_head)
-
-
-def scan_commit(session: Session, commit: str, fresh: list, head_blobs: set) -> History:
-    snapshot = session.snapshot(fresh, f"history-{commit}")
-    hits = session.collector.collect(snapshot, snapshot.paths(), history_rule)
-    hits += session.oversized(snapshot, snapshot.unchecked) + session.binary_code(snapshot)
-    blobs = {entry.path: entry.oid for entry in fresh}
-    at_head = {finding_key(hit) for hit in hits if (hit.path, blobs[hit.path]) in head_blobs}
-    unchecked = unchecked_of(snapshot, None)
-    shutil.rmtree(snapshot.root)
-    return History([replace(hit, commit=commit) for hit in hits], [], unchecked, at_head)
-
-
 def check_base(session: Session, options: Options) -> Outcome:
     repo = session.repo
     base = repo.merge_base(options.ref)
+    refuse_control_names(path for commit in repo.commits(base) for path in repo.touched_paths(commit))
     changes = repo.range_changes(base, "HEAD")
     head_tree = repo.tree_entries("HEAD")
     head = session.snapshot(head_tree, "head")
     head_entries = parse_ignore(head.ignore_data(), session.data)
     base_entries = base_side_entries(session, base)
-    notes = audit_lines(base_entries, head_entries) + session.pending_notes(ALL_TIERS)
+    notes = (
+        session.database_notes()
+        + audit_lines(base_entries, head_entries)
+        + session.pending_notes(ALL_TIERS)
+    )
 
     def diff(parent: str) -> list:
         return repo.range_changes(parent, "HEAD")
@@ -407,6 +485,7 @@ def check(options: Options) -> Outcome:
     try:
         session = open_session(options, scratch)
         session.repo.assert_no_conflict()
-        return HANDLERS[options.mode](session, options)
+        outcome = HANDLERS[options.mode](session, options)
+        return replace(outcome, notes=[*outcome.notes, *session.notes])
     finally:
         shutil.rmtree(scratch, ignore_errors=True)

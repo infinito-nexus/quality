@@ -306,6 +306,10 @@ def test_db_update_failure_alerts(harness):
     assert [step_of(call) for call in harness.runs()] == ["prepare", "scan", "database"]
     scan = harness.runs()[1]["argv"]
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db,readonly" in scan
+    assert scan[-6:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle"]
+    update = harness.runs()[2]["argv"]
+    assert f"--mount=type=bind,source={harness.root / 'db'},target=/db" in update
+    assert update[-4:] == ["db", "update", "--db", "/db/bundle"]
 
 
 def test_steps_keep_no_container_log(harness):

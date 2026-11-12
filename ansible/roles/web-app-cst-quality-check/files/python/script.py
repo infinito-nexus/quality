@@ -54,7 +54,8 @@ FETCH_SCRIPT = (
     "&& git -C /src/repo read-tree HEAD && git -C /src/repo rev-parse HEAD"
 )
 PREPARE_SCRIPT = 'git init -q /src/repo && cat > "/src/repo/$1" && git -C /src/repo add -- "$1"'
-SCAN_SCRIPT = "cd /src/repo && exec quality check --all --json"
+SCAN_COMMAND = ("sh", "-c", 'cd "$1" && exec quality check --all --json --db "$2"', "sh")
+BUNDLE_DIR = "/db/bundle"
 FETCH_ENVIRONMENT = ("--env=GIT_ALLOW_PROTOCOL=https", "--env=GIT_TERMINAL_PROMPT=0")
 FETCH_ENVIRONMENT += ("--env=GIT_CONFIG_NOSYSTEM=1", "--env=GIT_CONFIG_GLOBAL=/dev/null")
 
@@ -378,7 +379,7 @@ class Launcher:
             raise JobFailed("too large" if storage.full() else "not checked")
 
     def scan(self, storage, job, commit):
-        code, output = self.step(storage, "scan", ["sh", "-c", SCAN_SCRIPT])
+        code, output = self.step(storage, "scan", [*SCAN_COMMAND, "/src/repo", BUNDLE_DIR])
         if code == TIMEOUT_EXIT:
             raise JobFailed("timeout")
         if code not in (0, 1):
@@ -423,10 +424,8 @@ class Launcher:
         argv += [
             f"--env=https_proxy={self.config['fetch']['proxy']}",
             f"--mount=type=bind,source={self.database['dir']},target=/db",
-            self.config["images"]["scan"],
-            "timeout",
-            str(self.limits["timeouts"]["database"]),
-            *("quality", "db", "update", "--db", "/db"),
+            self.config["images"]["scan"], "timeout", str(self.limits["timeouts"]["database"]),
+            *("quality", "db", "update", "--db", BUNDLE_DIR),
         ]
         if subprocess.run(argv, env=CLEAN_ENV, capture_output=True, check=False).returncode != 0:
             return False

@@ -25,6 +25,7 @@ FILES = {
     "node_modules/pkg/a.js": b"content of a.js\nsecond line\n",
 }
 NAMES = list(FILES)
+BOUND = Bound(BINDING, NAMES, dict.fromkeys(NAMES, frozenset()))
 NAMED = ["file.toml", "file", "file.js"]
 FIRST = [f"scanning path path={index}/0/path/{name}" for index, name in enumerate(NAMES)]
 SECOND = [
@@ -48,7 +49,7 @@ def trace(*events: str) -> bytes:
 
 
 def command_with(*events: str, rescan: bool) -> Command:
-    return Command([], NAMES, [Bound(BINDING, NAMES)], trace(*events), rescan)
+    return Command([], NAMES, [BOUND], trace(*events), rescan)
 
 
 def test_any_kind_binds_kindless_files():
@@ -251,6 +252,6 @@ def test_parse_fails_closed(events, rescan, tmp_path):
     complete = FIRST if not rescan else SECOND
     assert gitleaks.parse(b"[]", command_with(*complete, rescan=rescan), snapshot) == []
     log = trace(*events).replace(b"TRC ERR failed", b"ERR failed")
-    command = Command([], NAMES, [Bound(BINDING, NAMES)], log, rescan)
+    command = Command([], NAMES, [BOUND], log, rescan)
     with pytest.raises(QualityError):
         gitleaks.parse(b"[]", command, snapshot)
