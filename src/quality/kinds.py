@@ -30,10 +30,10 @@ class KindMap:
 
         Returns:
             Every kind the file belongs to. Extensions, globs and names match
-            case-insensitively. A name never claims a known extension, so
+            case-insensitively. A name never claims a known extension:
             `Dockerfile.PY` is Python only, while globs always apply. A
             template suffix such as `.j2` adds its own kind and the kinds of
-            the name without it, so that `deploy.sh.j2` is Jinja and shell.
+            the name without it: `deploy.sh.j2` is Jinja and shell.
         """
         found = set()
         for layer in self.layers(path):
@@ -54,7 +54,7 @@ class KindMap:
 
         Returns:
             True for a stem itself, `<x>.<stem>`, or `<stem>.<variant>` whose
-            suffix names no kind and no known file type, so `Dockerfile.prod`
+            suffix names no kind and no known file type: `Dockerfile.prod`
             counts and `Dockerfile.png` or `Dockerfile.erb` does not.
         """
         name = PurePosixPath(path).name.lower()
@@ -73,8 +73,7 @@ class KindMap:
             suffix: File name suffix with its dot.
 
         Returns:
-            Its kind, in any case, because `.J2` would otherwise hand an
-            unrendered template to a parsing tool.
+            Its kind, matched case-insensitively, or None.
         """
         return self.extensions.get(suffix.lower())
 
@@ -89,8 +88,7 @@ class KindMap:
 
         Returns:
             The kinds a parsing tool may bind: a template keeps only its
-            template kinds, because its inner type does not parse before it
-            is rendered.
+            template kinds.
         """
         if self.is_template(PurePosixPath(path)):
             return kinds & frozenset(self.templates)
@@ -117,8 +115,7 @@ class KindMap:
             first_line: Start of the file.
 
         Returns:
-            The kind of its interpreter. Every word after `env` counts, because
-            `env -S python3 -u` and `env -u NAME python3` both run Python.
+            The kind of its interpreter. Every word after `env` counts.
         """
         if not first_line.startswith(b"#!"):
             return None
@@ -138,7 +135,7 @@ class KindMap:
             True for a name without extension, other than a known binary name
             such as .DS_Store, for a code extension, and for a name of a kind
             such as Dockerfile.prod; a template counts by its name without the
-            template suffix, so `run.sh.j2` and `Dockerfile.prod.j2` count.
+            template suffix: `run.sh.j2` and `Dockerfile.prod.j2` count.
         """
         if PurePosixPath(path).name.lower() in self.binary_names:
             return False

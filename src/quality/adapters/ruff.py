@@ -11,7 +11,7 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     Args:
         bound: Rules with their files.
         settings: The tool's entry in tools.yml.
-        _empty_file: Unused; ruff needs no empty configuration.
+        _empty_file: Unused.
 
     Returns:
         One command.

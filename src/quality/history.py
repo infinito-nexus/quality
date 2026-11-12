@@ -34,7 +34,7 @@ def history_hits(session, base: str, entries: list, head_blobs: set) -> History:
         each carrying its commit SHA. A blob the merge base already holds at
         that path is legacy and skipped, and a merge adds only the blobs it
         resolved itself, never one it took over from either side. The keys of
-        findings on blobs still at HEAD are kept to replace HEAD's copy.
+        findings on blobs still at HEAD are returned in at_head.
     """
     if not session.data.has_history_rules():
         return History([], [], [], set())

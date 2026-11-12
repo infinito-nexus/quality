@@ -10,7 +10,7 @@ def validated_path(environ: dict) -> str:
         environ: The caller's environment.
 
     Returns:
-        PATH with absolute entries only, so it never resolves a tool relative to the target.
+        PATH with absolute entries only.
 
     Raises:
         QualityError: PATH is not set.
@@ -30,7 +30,7 @@ def tool_environment(path_value: str, home: Path, bundle: db.Bundle | None) -> d
 
     Returns:
         The only environment tools see: Semgrep without metrics and version
-        check, osv-scanner on the bundle, no proxy, so no tool reaches the network.
+        check, osv-scanner on the bundle, no proxy.
     """
     env = {
         "PATH": path_value,
@@ -57,7 +57,7 @@ def enclosing_roots(cwd: str) -> list:
 
     Returns:
         That directory and the nearest ancestor holding `.git`, found without
-        git, because git itself must be vetted before it runs.
+        git.
     """
     start = Path(cwd).resolve()
     marked = [path for path in (start, *start.parents) if (path / ".git").exists()]

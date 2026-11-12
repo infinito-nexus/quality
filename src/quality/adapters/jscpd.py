@@ -23,13 +23,12 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     Args:
         bound: Rules with their files.
         settings: The tool's entry in tools.yml with the paths of this run.
-        _empty_file: Unused; jscpd needs a JSON document, so empty_json replaces
-            the .jscpd.json and package.json jscpd would read.
+        _empty_file: Unused.
 
     Returns:
         One command per rule, with the rule's token minimum, over the files whose
-        names are UTF-8, since jscpd aborts on any other; parse() names the rest.
-        The report lands in a fresh scratch directory outside the snapshot.
+        names are UTF-8. The report lands in a fresh scratch directory outside
+        the snapshot.
         --workers carries the run's thread cap.
     """
     found = []
@@ -74,7 +73,7 @@ def read_report(command: Command) -> dict:
 def parse(_stdout: bytes, command: Command, snapshot) -> list:
     """
     Args:
-        _stdout: Unused; the report is the JSON file jscpd wrote.
+        _stdout: Unused.
         command: The command naming the report directory.
         snapshot: Snapshot the files came from.
 

@@ -10,7 +10,7 @@ def commands(bound: list, _settings: dict, empty_file) -> list:
     Args:
         bound: The rule with its files.
         _settings: Unused tool entry.
-        empty_file: Replaces the .github/actionlint.yaml actionlint would discover.
+        empty_file: Replaces the .github/actionlint.yaml.
 
     Returns:
         One command, with the shellcheck and pyflakes helpers disabled.

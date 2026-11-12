@@ -29,9 +29,8 @@ def comment_patterns(raw: dict) -> dict:
 
     Returns:
         Placeholder to pattern for every language alike. Every pattern
-        compiles for Rust's regex crate, which ast-grep and ripgrep use, and
-        for Python; `@docstring` alone needs Python's lookahead and
-        backreferences and runs in the runner.
+        compiles for Rust's regex crate and for Python; `@docstring` alone
+        needs Python's lookahead and backreferences.
     """
     marker = spellings(raw, "marker")
     sections = "|".join(spellings(raw, "sections"))
@@ -88,10 +87,10 @@ def language_patterns(raw: dict, names: list, language: str) -> dict:
     Returns:
         `@directive`, the directives a tool of this language reads, a nocheck
         naming a catalogue rule among them; `@positional`, the directives a
-        tool reads only at a place in the file, as pattern and position for
-        the runner; `@starter`, the first line of an exception or parameter
-        doc; `@prose-starter`, the starters whose next lines may be prose;
-        and `@entry`, an indented line, the only kind a section line such as
+        tool reads only at a place in the file, as pattern and position;
+        `@starter`, the first line of an exception or parameter doc;
+        `@prose-starter`, the starters whose next lines may be prose; and
+        `@entry`, an indented line, the only kind a section line such as
         `Returns:` carries.
     """
     marker = spellings(raw, "marker")

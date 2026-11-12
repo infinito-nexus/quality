@@ -15,8 +15,7 @@ def thread_count(text: str) -> int:
 
     Raises:
         argparse.ArgumentTypeError: The value is not a whole number in that
-            range; a larger cap would cap nothing, and Go ignores a
-            GOMAXPROCS it cannot parse, so those tools would run uncapped.
+            range.
     """
     cores = os.cpu_count()
     if not (text.isascii() and text.isdigit()) or int(text) < 1 or (cores is not None and int(text) > cores):

@@ -84,8 +84,7 @@ def unread_hit(rule: Rule, path: str) -> Hit:
         path: Path relative to the snapshot root.
 
     Returns:
-        A finding the differential gate does not filter, since an old unreadable
-        file would otherwise hide whatever a change adds to it.
+        A finding the differential gate does not filter.
     """
     return Hit(rule, path, None, "", "", None, "", None, True, frozenset())
 
@@ -156,7 +155,7 @@ def merge_baselines(baselines: list) -> Baseline:
         baselines: One baseline per parent.
 
     Returns:
-        The per-key maximum, so that a finding in either parent counts as known.
+        The per-key maximum.
     """
     fingerprints = Counter()
     per_file = Counter()

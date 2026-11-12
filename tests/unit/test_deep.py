@@ -262,7 +262,7 @@ def linked_snapshot(root: Path, files: dict, links: dict) -> Snapshot:
     Args:
         root: Directory to write the snapshot into.
         files: Regular files and their text.
-        links: Symlinks and their target, written as the target text, as materialize() does.
+        links: Symlinks and their target, written as the target text.
 
     Returns:
         The snapshot holding both.

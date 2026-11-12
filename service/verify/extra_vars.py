@@ -5,8 +5,7 @@ Args:
 
 Output:
     One JSON object on stdout for INFINITO_INVENTORY_EXTRA_VARS: the role source, the local image tag for every
-    image, so the registry probe misses and the role builds from the checkout, and no vulnerability database,
-    because `quality db update` arrives with phase C of requirement 001.
+    image, and no vulnerability database.
 """
 
 import json

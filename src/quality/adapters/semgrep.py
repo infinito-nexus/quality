@@ -24,7 +24,7 @@ def files_per_config(bound: list, configs: dict) -> dict:
         configs: Rule file per kind from tools.yml.
 
     Returns:
-        The files of each rule file, so a script is parsed only in its own language.
+        The files of each rule file.
 
     Raises:
         QualityError: A kind of the binding has no rule file.
@@ -43,12 +43,11 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     Args:
         bound: The rule with its files.
         settings: The tool's entry in tools.yml with the paths of this run.
-        _empty_file: Unused; --config replaces every configuration Semgrep would discover.
+        _empty_file: Unused.
 
     Returns:
-        One command per rule file, reading only this repository's rules.
-        --scan-unknown-extensions, because Semgrep skips a script named on the
-        command line whose name has no known extension, such as bin/app. The
+        One command per rule file with --scan-unknown-extensions, reading only
+        this repository's rules. The
         environment turns metrics and the version check off, and HOME is a
         scratch directory. --jobs carries the run's thread cap.
     """
@@ -89,13 +88,10 @@ def gap_hit(command: Command, path: str, snapshot):
         snapshot: Snapshot the file came from.
 
     Returns:
-        One file-level security.partial-scan finding, because Semgrep names a
-        few error locations, not the lines it skipped, so no line can be waived
-        on its own; only a path entry in .qualityignore.yml waives it.
+        One file-level security.partial-scan finding.
 
     Raises:
-        QualityError: No security.partial-scan binding covers the file, so the
-            gap would pass unseen.
+        QualityError: No security.partial-scan binding covers the file.
     """
     rule = gap_rule(command, path)
     if rule is None:
@@ -136,14 +132,13 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
         snapshot: Snapshot the files came from.
 
     Returns:
-        One finding per match, plus one per file Semgrep could not parse at all,
-        since a syntax error would otherwise hide every match in it. A file it
-        read only in part, which valid code such as a class `static {` block
-        causes, or did not scan, gets one file-level security.partial-scan finding.
+        One finding per match, plus one per file Semgrep could not parse at all.
+        A file it read only in part, or did not scan, gets one file-level
+        security.partial-scan finding.
 
     Raises:
         QualityError: Semgrep reported an error other than a file it could not parse,
-            such as a rule timeout that would leave a file unchecked.
+            such as a rule timeout.
     """
     document = json.loads(stdout)
     rule = (checked_rules(command) or [command.bound[0].binding.rule])[0]  # nocheck: clean.default-value -- the bound rule when no checked rule ran

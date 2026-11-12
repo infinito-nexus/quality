@@ -55,7 +55,7 @@ def commands(bound: list, settings: dict, empty_file: Path) -> list:
 
     Returns:
         One command per language, run in a work directory that `operands`
-        fills, so ast-grep never searches the target for an sgconfig.yml.
+        fills.
     """
     rule_dir = Path(require(settings, RULE_DIR, "tools.yml ast-grep"))
     per_language = {}
@@ -133,10 +133,9 @@ def operands(command: Command, snapshot, work: Path) -> list:
 
     Returns:
         The copies ast-grep scans, named by their index in the chunk. The
-        configuration maps every name to the language, because kinds.yml
-        already chose it by extension, shebang or template suffix. A
-        language ast-grep parses without its host, PHP without its HTML,
-        gets its host blanked first.
+        configuration maps every name to the language. A language
+        ast-grep parses without its host, PHP without its HTML, gets its
+        host blanked first.
     """
     language = language_of(command.bound[0])
     (work / CONFIG_NAME).write_text(json.dumps({"languageGlobs": {language: ["*"]}}), encoding="utf-8")
@@ -176,11 +175,9 @@ def reported_rows(match: dict) -> list:
         match: One ast-grep match.
 
     Returns:
-        The line of a bound `$AT`, for a zero-width node inside the match,
-        else the match's first line. An unreadable region reports every line
-        from there to the end of the region, or for a missing node to the end
-        of the top-level item `$TOP` that holds it, so a nocheck waives one
-        line and never the code around it.
+        The line of a bound `$AT`, else the match's first line. An unreadable
+        region reports every line from there to the end of the region, or for
+        a missing node to the end of the top-level item `$TOP` that holds it.
     """
     at = bound_node(match, "AT")
     first = first_line(at if at is not None else match)
@@ -242,9 +239,8 @@ def stands(match: dict, snapshot, path: str, row: int) -> bool:
 
     Returns:
         False where the rule's `unless` pattern matches the whole matched
-        text, which needs Python's lookahead and backreferences, where the
-        comment is a directive at the only place its tool reads it, or where
-        a bound `$ABOVE` still carries the match; no ast-grep rule sees these.
+        text, where the comment is a directive at the only place its tool
+        reads it, or where a bound `$ABOVE` still carries the match.
     """
     metadata = match.get("metadata", {})
     if "unless" in metadata and re.fullmatch(metadata["unless"], match["text"]):
@@ -264,11 +260,9 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
 
     Returns:
         The findings, on the lines reported_rows names. A file the parser
-        could not read in full, or that is no UTF-8 and so skipped by ast-grep, is recorded in
-        the snapshot's `unparsed` for every language; it is a finding only
-        where coding.parse-incomplete binds the language, which leaves out
-        the languages a full parser reports, because tree-sitter grammars lag
-        their languages.
+        could not read in full, or that is no UTF-8, is recorded in the
+        snapshot's `unparsed` for every language; it is a finding only where
+        coding.parse-incomplete binds the language.
     """
     rules = owners(command.bound)
     hits = []

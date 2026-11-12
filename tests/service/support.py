@@ -10,7 +10,7 @@ SCRIPT = ROLE / "files" / "python" / "script.py"
 def load_launcher():
     """
     Returns:
-        The launcher script imported as the module `launcher`, as the web image ships it.
+        The launcher script imported as the module `launcher`.
     """
     if "launcher" in sys.modules:
         return sys.modules["launcher"]

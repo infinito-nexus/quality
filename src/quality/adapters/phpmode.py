@@ -27,9 +27,8 @@ def unhosted(data: bytes) -> bytes:
     Returns:
         The file at its length and with its line breaks, the markup outside
         PHP's tags blanked: an opener becomes spaces or `echo`, and a closing
-        tag the `;` it implies, so the code between the tags reads as one
-        statement list. Strings, heredocs and comments are lexed as PHP lexes
-        them, so a `?>` inside one never ends the code.
+        tag the `;` it implies. Strings, heredocs and comments are lexed as
+        PHP lexes them.
     """
     result = bytearray(data)
     position = 0
@@ -56,8 +55,7 @@ def opened(result: bytearray, data: bytes, opener) -> int:
 
     Returns:
         Offset where its code begins. A `<?=` becomes the `echo` it means
-        where echo_at finds room; else it is blanked too, which keeps a
-        single expression whole and leaves a list unparsed.
+        where echo_at finds room; else it is blanked too.
     """
     start, end = opener.span()
     result[start:end] = b" " * (end - start)
@@ -101,8 +99,7 @@ def code_end(result: bytearray, data: bytes, position: int) -> int:
 
     Returns:
         Offset of the `?>` that ends the code, or the end of the file. A line
-        comment that a `?>` ends is blanked, because the copy no longer ends
-        it there and it would swallow the code after the next opener.
+        comment that a `?>` ends is blanked.
     """
     token = CODE.search(data, position)
     while token is not None:

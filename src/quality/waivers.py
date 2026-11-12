@@ -17,8 +17,7 @@ def unused_nochecks(data: RuleData, snapshot, paths: list, applied: list) -> lis
     Returns:
         One finding per nocheck that waived nothing on its line although
         a rule it names ran on the file, or although no rule it names can
-        fire there in any run, since its reason would otherwise pass as
-        prose under any rule name.
+        fire there in any run.
     """
     rule = data.runner_rule(UNUSED_NOCHECK)
     used = {(item.path, item.line) for item in applied}

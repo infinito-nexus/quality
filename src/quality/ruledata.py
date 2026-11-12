@@ -61,9 +61,7 @@ class Rule:
         """
         Returns:
             True for a file-level changed_only rule, such as a file a tool read
-            only in part: it names each file once, and only a .qualityignore.yml
-            entry naming that very file, read from the base side, waives it. A
-            changed_only rule with lines keeps per-line nochecks and entries.
+            only in part.
         """
         return self.changed_only and self.file_level
 
@@ -72,7 +70,7 @@ class Rule:
         Returns:
             True for a hard rule and for a changed_only rule, a gap a tool
             left: `--base` reads their .qualityignore.yml entries from the
-            base side, so a pull request cannot waive its own finding or gap.
+            base side.
         """
         return self.hard or self.changed_only
 
@@ -209,9 +207,7 @@ def rule_bindings(rule: Rule, kind_map: KindMap) -> list:
         kind_map: File kind classification.
 
     Returns:
-        One binding per tool and distinct settings, so that kinds sharing
-        their settings share one tool run and kinds with their own pattern
-        or language keep it.
+        One binding per tool and distinct settings.
     """
     grouped = {}
     for kind, settings in rule.enforcer.items():
@@ -338,8 +334,7 @@ def anchor_rule_dirs(tools: dict, directory: Path, comments: dict) -> dict:
             the keys `placeholders`, `comments` and `nocheck_names`.
 
     Returns:
-        tools.yml with every `rule_dir` resolved against that directory, so a
-        tool reads this repository's rule files and never the target's, and
+        tools.yml with every `rule_dir` resolved against that directory, and
         given what its rule files compose their comment patterns from.
     """
     if not isinstance(tools, dict):

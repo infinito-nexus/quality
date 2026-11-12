@@ -20,8 +20,8 @@ def stat_line(raw: str) -> tuple:
         raw: Content of one /proc/<pid>/stat.
 
     Returns:
-        pid, parent pid, a key of pid and start time, so a reused pid starts
-        afresh, and the sample: name, CPU ticks, threads, resident bytes.
+        pid, parent pid, a key of pid and start time, and the sample: name,
+        CPU ticks, threads, resident bytes.
     """
     head, _, tail = raw.rpartition(")")
     pid, _, name = head.partition(" (")
@@ -34,7 +34,7 @@ def processes() -> list:
     """
     Returns:
         A stat_line() of every process /proc shows. Only stat is read, never
-        cmdline or environ, which can carry credentials.
+        cmdline or environ.
     """
     found = []
     for entry in os.scandir("/proc"):

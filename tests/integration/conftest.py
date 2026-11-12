@@ -33,7 +33,7 @@ def set_writable(root: Path, writable: bool) -> None:
     Args:
         root: Bundle directory.
         writable: True restores owner write access before an update, False takes
-            every write bit away, so each scan proves it reads the bundle only.
+            every write bit away.
     """
     if not root.exists():
         return

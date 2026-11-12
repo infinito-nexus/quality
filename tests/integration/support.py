@@ -91,8 +91,7 @@ def quality(
         args: Command line after the program name.
         path_value: PATH, or None for the caller's.
         extra_env: Variables added to or replacing PATH, TMPDIR and XDG_CACHE_HOME,
-            or None. XDG_CACHE_HOME names a directory without a bundle, so the
-            deep tier exits 2 unless a test brings the shared test bundle.
+            or None. XDG_CACHE_HOME names a directory without a bundle.
 
     Returns:
         The finished process.
@@ -228,7 +227,7 @@ def rules_copy(destination: Path, deep: bool = False) -> Path:
     """
     Args:
         destination: Directory for the copy of the rule data.
-        deep: True keeps the deep tier, which needs the shared test bundle.
+        deep: True keeps the deep tier and needs the shared test bundle.
 
     Returns:
         The copy.
@@ -243,8 +242,8 @@ def rules_copy(destination: Path, deep: bool = False) -> Path:
 def fast_rules() -> Path:
     """
     Returns:
-        The one copy of the fast-tier rule data of this test process, which
-        every target without --rules of its own reads and no test writes.
+        The one copy of the fast-tier rule data of this test process; every
+        target without --rules of its own reads it and no test writes it.
     """
     scratch = Path(tempfile.mkdtemp(prefix="quality-fast-rules-"))
     atexit.register(shutil.rmtree, scratch, True)
@@ -313,8 +312,8 @@ def rules_with_enforcers(destination: Path, rule_id: str, keep: set) -> Path:
         keep: Enforcer keys that stay.
 
     Returns:
-        The copy, so one tool's findings can be told from another's. An
-        enforcer another rule shares through a YAML alias goes there too.
+        The copy. An enforcer another rule shares through a YAML alias
+        goes there too.
     """
     rules_copy(destination, True)
     for path in sorted(destination.glob("*.yml")):

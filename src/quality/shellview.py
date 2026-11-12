@@ -108,26 +108,24 @@ def code_view(data: bytes, levels: int, window: int) -> bytes:
             interpreter it belongs to.
 
     Returns:
-        What the shell runs as code, line for line, so line numbers stay:
-        quotes are removed and the text they hold keeps its word characters
-        while blanks, operators and `#` become `_`, so a quoted string stays one
-        word; `$(…)` and backticks inside double quotes stay code; the code
-        argument of a shell, `su` or `runuser`, the first word after its
-        options when one of them holds `c`, is read as code once more, a
-        comment in it ending at its closing quote, with
-        POSITIONAL after it when words follow, since those are positional
-        parameters, unless a printing command (echo, printf, print, `:`)
-        stands before the interpreter in the same command, redirections and
-        substitutions skipped; so are the arguments of `eval` and `trap` in
-        command position. A line after one that ends inside a quote, also
-        inside a `$(…)` that quote holds, is read twice, from inside every
-        context still open there, up to
-        `levels` of them, and from code, see viewed(); only the first reading
-        carries on to the next line. A heredoc whose delimiter line follows
-        is read as a script of its own, from nothing open and carrying
-        nothing out; when the line opening it ends inside a quote or
-        substitution, its delimiter may be followed by a closing quote or
-        `)`, whose rest of the line is read in the context around the heredoc.
+        What the shell runs as code, line for line: quotes are removed and
+        the text they hold keeps its word characters while blanks, operators
+        and `#` become `_`; `$(…)` and backticks inside double quotes stay
+        code; the code argument of a shell, `su` or `runuser`, the first word
+        after its options when one of them holds `c`, is read as code once
+        more, a comment in it ending at its closing quote, with POSITIONAL
+        after it when words follow, unless a printing command (echo, printf,
+        print, `:`) stands before the interpreter in the same command,
+        redirections and substitutions skipped; so are the arguments of
+        `eval` and `trap` in command position. A line after one that ends
+        inside a quote, also inside a `$(…)` that quote holds, is read twice,
+        from inside every context still open there, up to `levels` of them,
+        and from code, see viewed(); only the first reading carries on to the
+        next line. A heredoc whose delimiter line follows is read as a script
+        of its own, from nothing open and carrying nothing out; when the line
+        opening it ends inside a quote or substitution, its delimiter may be
+        followed by a closing quote or `)`, whose rest of the line is read in
+        the context around the heredoc.
     """
     lines = data.split(b"\n")
     script = Script(lines, levels, window)
@@ -187,9 +185,7 @@ def piped_out(inner: Lex, carried: tuple | None, following: bytes) -> bool:
     Returns:
         Whether the line closes a code argument at its start and pipes the
         interpreter's output on, as `" | sh`, or as `" \\` before a line
-        that does, as `app 2>&1 | sh`, so the view of the line before, the argument's
-        last, is followed by a copy of itself, see continued(), that
-        continues into this one, as one logical line.
+        that does, as `app 2>&1 | sh`.
     """
     if carried is None or ARGUMENT not in carried or inner.closed_at < 0 or inner.line[: inner.closed_at].strip():
         return False
@@ -206,8 +202,7 @@ def continued(view: bytes) -> bytes:
 
     Returns:
         That view without a trailing comment or `;`, then a copy of it that
-        continues into the next line, so a fetch it ends with reaches the
-        pipe there while a match of its own still ends where it did.
+        continues into the next line.
     """
     code = TRAILING.sub(b"", view, count=1)
     return code + SEPARATOR + code + b" \\"
@@ -230,10 +225,9 @@ def viewed(lexes: list, carried: tuple | None, levels: int, window: int) -> byte
 
     Returns:
         The view of the line. Where the inside reading closes the carried
-        context, the reading from code stops at that quote, so it never reads
-        the rest of the line with its quotes flipped. Inside a code argument
-        only the reading from code counts, and on the line its quote closes
-        that reading up to the quote, a comment in it ending there, is
+        context, the reading from code stops at that quote. Inside a code
+        argument only the reading from code counts, and on the line its quote
+        closes that reading up to the quote, a comment in it ending there, is
         followed by the inside reading of the rest, as on one line.
     """
     if carried is None:
@@ -289,12 +283,9 @@ def argument_end(lex: Lex) -> bytes | None:
     Returns:
         None when the word starting at the quote, within the window of the
         view, is no code. Otherwise what follows its view: nothing after an
-        argument of `eval` or `trap` in command position, whose other words
-        are code too, and POSITIONAL, the unit separator 0x1F, after the code
-        argument of a shell, `su` or `runuser`, see code_argument(): the rule
-        reads it as the end of the code for an interpreter at its end while
-        the pipe the interpreter writes into stays, and unlike `)` it closes
-        no group simple_command() strips.
+        argument of `eval` or `trap` in command position, and POSITIONAL, the
+        unit separator 0x1F, after the code argument of a shell, `su` or
+        `runuser`, see code_argument().
     """
     tail = bytes(lex.out[-lex.window :])
     hinted = any(word in tail for word in HEAD_HINTS)
@@ -333,7 +324,7 @@ def code_argument(words: list) -> bool:
         Whether the quote starts the code argument of a shell, `su` or
         `runuser`: the words right before it are options, one holding `c`,
         and the nearest such interpreter before those options is no argument
-        of a printing command, as in `echo bash -c`, wherever it stands, so
+        of a printing command, as in `echo bash -c`, wherever it stands:
         `docker run --entrypoint sh img -c` and `find . -exec sh -c` count.
     """
     start = len(words)
