@@ -10,7 +10,7 @@ TEST_WORKERS := 4
 .PHONY: test-unit test-integration test-bench test-service test-egress up down verify-test verify-compose
 
 test-unit:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit tests/workflows
 
 # Param: TEST_WORKERS - pytest-xdist workers; with each tool's parallel work capped at TOOL_THREADS of tests/integration/support.py, the run stays near this many cores on a shared host
 test-integration:
