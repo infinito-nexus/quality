@@ -6,7 +6,7 @@ Quality Check is a hosted static quality scan. A visitor names a public Git repo
 
 ## Overview
 
-The role deploys three containers: the web app, an egress proxy, and the scan image that a host-side launcher starts once per job step. The launcher runs as a systemd timer, takes queued jobs from the web app's spool, and runs fetch, prepare and scan in separate sandboxed containers under the Kata runtime. Only the fetch step reaches the internet, and only through the proxy, which refuses internal and host addresses. Jobs and reports live on a tmpfs mount and expire after `retention_hours`.
+The role deploys the web app, an egress proxy, and an idle anchor of the scan image, which keeps core's image prune from removing it; a host-side launcher starts the scan image once per job step. The launcher runs as a systemd timer, takes queued jobs from the web app's spool, and runs fetch, prepare and scan in separate sandboxed containers under the Kata runtime. Only the fetch step reaches the internet, and only through the proxy, which refuses internal and host addresses. Jobs and reports live on a tmpfs mount and expire after `retention_hours`.
 
 ## Features
 
