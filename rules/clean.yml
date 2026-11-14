@@ -4,7 +4,6 @@
   metric:
     limit: 500
   exclude:
-    - /tests/
     - "*.lock"
     - package-lock.json
     - locales/
