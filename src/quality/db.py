@@ -252,6 +252,7 @@ def network_env(path_value: str, home: Path, environ: dict) -> dict:
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home),
         "XDG_CACHE_HOME": str(home),
+        "TMPDIR": str(home),
         "LC_ALL": "C.UTF-8",
         **passed,
     }
