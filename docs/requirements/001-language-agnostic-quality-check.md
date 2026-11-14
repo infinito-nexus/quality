@@ -210,6 +210,7 @@ flowchart TD
 - [ ] `quality check --staged --verbose` shows lizard receiving touched files only.
 - [ ] `time quality --version` stays at or below 0.15 s.
 - [ ] `quality check --all` on core, deep tier included, finishes within 120 s on 20 CPUs.
+- [ ] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
 
 ### Distribution
 

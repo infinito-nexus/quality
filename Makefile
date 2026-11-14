@@ -7,7 +7,7 @@ VERIFY_VARIANT := 0
 SERVICE_VENV := .venv/service
 TEST_WORKERS := 4
 
-.PHONY: test-unit test-integration test-service test-egress up down verify-test verify-compose
+.PHONY: test-unit test-integration test-bench test-service test-egress up down verify-test verify-compose
 
 test-unit:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit
@@ -15,6 +15,16 @@ test-unit:
 # Param: TEST_WORKERS - pytest-xdist workers; with each tool's parallel work capped at TOOL_THREADS of tests/integration/support.py, the run stays near this many cores on a shared host
 test-integration:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration -n $(TEST_WORKERS) --dist worksteal
+
+# Param: QUALITY_CORE_DIR (required) - core checkout the benchmarks read, never change
+# Param: QUALITY_DB_DIR (required) - fresh bundle of `quality db update` for the deep tier
+# Param: QUALITY_DEFAULTS_SCRIPT (required) - defaults.py of the kvb-code-clean skill, the reference of the recall bound
+test-bench:
+	@test -n "$(QUALITY_CORE_DIR)" || { echo "QUALITY_CORE_DIR is required" >&2; exit 2; }
+	@test -n "$(QUALITY_DB_DIR)" || { echo "QUALITY_DB_DIR is required" >&2; exit 2; }
+	@test -n "$(QUALITY_DEFAULTS_SCRIPT)" || { echo "QUALITY_DEFAULTS_SCRIPT is required" >&2; exit 2; }
+	QUALITY_CORE_DIR='$(QUALITY_CORE_DIR)' QUALITY_DB_DIR='$(QUALITY_DB_DIR)' QUALITY_DEFAULTS_SCRIPT='$(QUALITY_DEFAULTS_SCRIPT)' \
+		PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/bench tests/distribution/test_distribution.py::test_version_stays_within_its_budget -rs --durations=0
 
 $(SERVICE_VENV)/bin/pytest: service/web/requirements.txt
 	python3 -m venv $(SERVICE_VENV)
