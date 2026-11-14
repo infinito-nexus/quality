@@ -340,7 +340,8 @@ class Launcher:
 
     def bounded(self, argv, container, stdin, seconds):
         limit = self.limits["report_bytes"]
-        killer = threading.Timer(seconds + STOP_GRACE_SECONDS, self.remove, (container,))
+        overdue = threading.Event()
+        killer = threading.Timer(seconds + STOP_GRACE_SECONDS, self.remove_overdue, (container, overdue))
         killer.start()
         stdin_mode = subprocess.PIPE if stdin is not None else subprocess.DEVNULL
         try:
@@ -355,7 +356,11 @@ class Launcher:
                 code = process.wait()
         finally:
             killer.cancel()
-        return code, output
+        return (TIMEOUT_EXIT if overdue.is_set() else code), output
+
+    def remove_overdue(self, container, overdue):
+        overdue.set()
+        self.remove(container)
 
     def remove(self, container):
         self.cli("rm", "-f", container, timeout=120)

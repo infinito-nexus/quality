@@ -210,6 +210,15 @@ def test_fetch_script_exit(tmp_path, stderr, code, stdout):
     assert (done.returncode, done.stdout.strip()) == (code, stdout)
 
 
+def test_overdue_step_reports_timeout(harness, monkeypatch):
+    monkeypatch.setattr(launcher, "STOP_GRACE_SECONDS", 0)
+    removed = []
+    monkeypatch.setattr(launcher.Launcher, "remove", lambda _launcher, container: removed.append(container))
+    sleeper = [sys.executable, "-c", "import time; time.sleep(1)"]
+    assert launcher.Launcher(harness.config).bounded(sleeper, "quality-check-x-scan", None, 0.2) == (launcher.TIMEOUT_EXIT, b"")
+    assert removed == ["quality-check-x-scan"]
+
+
 def test_step_flags(harness):
     harness.submit(1, text_job())
     harness.run()
