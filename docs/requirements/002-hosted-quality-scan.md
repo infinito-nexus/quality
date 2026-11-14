@@ -174,9 +174,9 @@ flowchart TD
 ### Tests
 
 - **Unit**
-  - [ ] `make test-unit` covers the URL validator, the job parser, the report schema, the rate limiter and captcha verification.
+  - [ ] `make test-service` covers the URL validator, the job parser, the report schema, the rate limiter and captcha verification.
 - **Integration**
-  - [ ] `make test-integration` runs every named test above except the E2E ones against real containers, the real proxy and temporary git servers, and it reports each skipped `[internet]` test by name.
+  - [ ] `make test-egress` runs every named test above except the E2E ones against real containers, the real proxy and temporary git servers, and it reports each skipped `[internet]` test by name.
 - **E2E**
   - [ ] `make compose-deploy apps=web-app-cst-quality-check` from core with this role mounted ends green.
   - [ ] `test_live_no_socket`: on the deployed stack, `docker inspect` shows no container socket mount and exactly the role's own network on the web service.
