@@ -24,6 +24,8 @@ TIMESTAMP = "%Y-%m-%dT%H:%M:%SZ"
 UPDATE_HINT = "run `quality db update`"
 COPY_CHUNK = 1 << 20
 BUNDLE_MODE = 0o755
+CACHE_MODE = 0o700
+SHARED_WRITE = stat.S_IWGRP | stat.S_IWOTH
 NETWORK_VARIABLES = (
     "HTTPS_PROXY",
     "https_proxy",
@@ -311,6 +313,23 @@ def fetch_osv(work: Path, data: RuleData) -> None:
         destination = work / OSV_DIR / layout.format(ecosystem=ecosystem)
         destination.parent.mkdir(parents=True, exist_ok=True)
         download(url.format(ecosystem=ecosystem), destination, timeout)
+
+
+def guard_cache(directory: Path) -> None:
+    """
+    Args:
+        directory: Cache directory that holds the default bundle location.
+
+    Raises:
+        QualityError: It is a link, belongs to another user, or others may write to it.
+    """
+    directory.mkdir(mode=CACHE_MODE, parents=True, exist_ok=True)
+    info = os.lstat(directory)
+    if stat.S_ISLNK(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & SHARED_WRITE:
+        raise QualityError(
+            f"cache directory {directory} is a link, belongs to another user or is writable by others: "
+            "remove it or point --db at a directory only you can write"
+        )
 
 
 def refuse_foreign(root: Path) -> None:
