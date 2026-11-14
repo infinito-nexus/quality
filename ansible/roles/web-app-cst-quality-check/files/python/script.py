@@ -45,13 +45,16 @@ REPORT.update({"unchecked": "strings", "notes": "strings", "incomplete": "string
 LABEL = "quality-check.job"
 STEP_USER = "65534:65534"
 TIMEOUT_EXIT = 124
+TOO_LARGE_EXIT = 3
 CLEAN_ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 STOP_GRACE_SECONDS = 15
 STALE_TEMPORARY_SECONDS = 3600
 FETCH_SCRIPT = (
-    'git -c http.followRedirects=false -c transfer.fsckObjects=true -c "http.userAgent=$2" '
+    '{ git -c http.followRedirects=false -c transfer.fsckObjects=true -c "http.userAgent=$2" '
     'clone --quiet --depth 1 --no-checkout --single-branch -- "$1" /src/repo '
-    "&& git -C /src/repo read-tree HEAD && git -C /src/repo rev-parse HEAD"
+    "&& git -C /src/repo read-tree HEAD && git -C /src/repo rev-parse HEAD; } 2>/tmp/fetch.log "
+    '|| { while IFS= read -r line; do case "$line" in remote:*|*"remote error"*) ;; '
+    f'*"No space left on device"*) exit {TOO_LARGE_EXIT};; esac; done </tmp/fetch.log; exit 1; }}'
 )
 PREPARE_SCRIPT = 'git init -q /src/repo && cat > "/src/repo/$1" && git -C /src/repo add -- "$1"'
 SCAN_COMMAND = ("sh", "-c", 'cd "$1" && exec quality check --all --json --db "$2"', "sh")
@@ -366,7 +369,7 @@ class Launcher:
                 return output.decode("ascii", "replace").strip()[:64]
             if code == TIMEOUT_EXIT:
                 raise JobFailed("timeout")
-            if storage.full():
+            if code == TOO_LARGE_EXIT or storage.full():
                 raise JobFailed("too large")
         raise JobFailed("not reachable")
 
