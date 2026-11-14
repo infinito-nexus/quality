@@ -322,7 +322,7 @@ class Launcher:
             "--security-opt=no-new-privileges", f"--pids-limit={step['pids']}",
             f"--memory={step['memory']}", f"--memory-swap={step['memory']}", f"--cpus={step['cpus']}",
             f"--tmpfs=/tmp:size={step['tmp_bytes']}", f"--runtime={self.config['runtime']}",
-            f"--network={network}", "--env=HOME=/tmp", "--env=XDG_CACHE_HOME=/tmp", "--log-driver=none",  # nocheck: logging-driver -- a step's output is submitted code and its report, which the privacy page promises never reach the journal
+            f"--network={network}", "--env=HOME=/tmp", "--env=XDG_CACHE_HOME=/tmp", "--log-driver=none",  # nocheck: logging-driver (a step's output is submitted code and its report, which the privacy page promises never reach the journal); nocheck: clean.comment -- the marker before this one is core's lint directive
         ]
 
     def step(self, storage, step_name, command, stdin=None):
@@ -340,8 +340,8 @@ class Launcher:
 
     def bounded(self, argv, container, stdin, seconds):
         limit = self.limits["report_bytes"]
-        overdue = threading.Event()
-        killer = threading.Timer(seconds + STOP_GRACE_SECONDS, self.remove_overdue, (container, overdue))
+        deadline = time.monotonic() + seconds + STOP_GRACE_SECONDS
+        killer = threading.Timer(seconds + STOP_GRACE_SECONDS, self.remove, (container,))
         killer.start()
         stdin_mode = subprocess.PIPE if stdin is not None else subprocess.DEVNULL
         try:
@@ -356,11 +356,7 @@ class Launcher:
                 code = process.wait()
         finally:
             killer.cancel()
-        return (TIMEOUT_EXIT if overdue.is_set() else code), output
-
-    def remove_overdue(self, container, overdue):
-        overdue.set()
-        self.remove(container)
+        return (TIMEOUT_EXIT if time.monotonic() >= deadline else code), output
 
     def remove(self, container):
         self.cli("rm", "-f", container, timeout=120)

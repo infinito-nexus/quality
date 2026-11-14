@@ -204,7 +204,7 @@ def test_fetch_script_exit(tmp_path, stderr, code, stdout):
     git = tmp_path / "git"
     git.write_text(FAKE_GIT, encoding="utf-8")
     git.chmod(0o755)
-    script = launcher.FETCH_SCRIPT.replace("/tmp/fetch.log", str(tmp_path / "fetch.log"))
+    script = launcher.FETCH_SCRIPT.replace("/tmp/fetch.log", str(tmp_path / "fetch.log"))  # nocheck: security.temp-path -- the fetch step's log path inside its container, swapped for tmp_path here
     environment = {"PATH": f"{tmp_path}:/usr/bin:/bin", "STDERR": stderr, "SHA": SHA}
     done = subprocess.run(["sh", "-c", script, "sh", "https://example.org/a/b", "agent"], env=environment, capture_output=True, text=True, check=False)
     assert (done.returncode, done.stdout.strip()) == (code, stdout)
