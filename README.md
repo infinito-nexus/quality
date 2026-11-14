@@ -2,6 +2,40 @@
 
 Homepage: https://github.com/infinito-nexus/quality
 
+## Install
+
+`flake.lock` is the only pin source ([requirement 001](docs/requirements/001-language-agnostic-quality-check.md), decision 18). On a host with Nix, install `packages.default`, the runner wrapped with every tool by absolute store path, and call it by absolute path:
+
+```sh
+nix profile install github:infinito-nexus/quality/<release-tag>
+~/.nix-profile/bin/quality check --staged
+```
+
+## Dev stack
+
+Hosts without Nix, CI and dev stacks use `packages.image` (`nix build .#image`), the OCI image of the same closure, published to ghcr by digest; the digest is in the release notes. A dev stack adds it as a compose service under the profile `tools` and a make target that runs it:
+
+```yaml
+services:
+  quality:
+    image: ghcr.io/infinito-nexus/quality@sha256:<digest>
+    profiles: [tools]
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    user: "65534"
+    working_dir: /src
+    volumes:
+      - .:/src:ro
+```
+
+```make
+quality-check:
+	docker compose --profile tools run --rm quality check --staged
+```
+
+`--staged` needs no database. `--base` and `--all` add the deep tier, which reads the bundle of `quality db update`: mount it with `- <db>:/db:ro` and pass `--db /db`. Run the service from a main checkout, because a linked worktree's `.git` file points outside `/src`.
+
 ## Hosted scan
 
 The role `web-app-cst-quality-check` serves the scan as a web page ([requirement 002](docs/requirements/002-hosted-quality-scan.md)).
