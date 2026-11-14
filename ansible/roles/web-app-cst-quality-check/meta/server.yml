@@ -1,5 +1,8 @@
 ---
 client_max_body_size: 3m
+vhosts:
+  default:
+    extra_template: nginx/server.conf.j2
 status_codes:
   default:
     - 404

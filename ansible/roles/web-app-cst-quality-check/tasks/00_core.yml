@@ -88,10 +88,8 @@
 
 - name: "🧩 Load docker, proxy and TLS for '{{ application_id }}'"
   include_role:
-    name: sys-stk-full
-  vars:
-    compose_handlers_flush: true
-    webserver_extra_configuration: "{{ lookup('template', 'nginx/server.conf.j2') }}"
+    name: svc-stack
+    tasks_from: consumer.yml
 
 - name: "♻️ Recreate '{{ application_id }}' when its staged files changed"
   ansible.builtin.debug:
