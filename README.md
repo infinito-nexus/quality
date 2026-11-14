@@ -48,6 +48,13 @@ The role `web-app-cst-quality-check` serves the scan as a web page ([requirement
 | `make verify-test INFINITO_CORE_DIR=<core>` | Pulls the role into a core checkout with custom-role support and runs core's full test suite, lints included. |
 | `make verify-compose INFINITO_CORE_DIR=<core>` | Runs `verify-test` first, then deploys the role with Keycloak through that checkout and runs its Playwright spec. |
 
+## Distribution
+
+| Command | What it does |
+| --- | --- |
+| `make test-distribution` | Builds `packages.default` and `packages.image`, then checks pins, notices, `quality doctor` and the image. |
+| `make test-e2e QUALITY_E2E_SKILLS=<repo> QUALITY_E2E_PACKAGE_MANAGER=<repo> QUALITY_E2E_RUNTIME=<runtime>` | Builds both outputs and checks that the host binary and the image, run under that Docker runtime (core's `SANDBOX_RUNTIME`, such as `runsc`), print the same `quality doctor` output and report the same findings on both repositories; needs Docker and the test bundle `make test-integration` fetches. |
+
 ## Benchmarks
 
 The speed criteria of [requirement 001](docs/requirements/001-language-agnostic-quality-check.md) and its recall bound on core run apart from `test-unit` and `test-integration`. The core checkout is only read.

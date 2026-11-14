@@ -244,7 +244,7 @@ flowchart TD
 - **Unit**
   - [ ] `make test-unit` passes and covers fingerprints, message normalisation, metric compare, the ignore file parser, the suppression parser and exit codes.
 - **Integration**
-  - [ ] `make test-integration` passes and runs every named test above against real tools and temporary git repositories.
+  - [ ] `make test-integration` passes and runs every named test above against real tools and temporary git repositories, except `test_single_pin_source`, which `make test-distribution` runs against the flake outputs (operator, 2026-11-13).
 - **E2E**
   - [ ] `make test-e2e` runs host binary and image against clones of skills and package-manager, for `--staged`, `--base` and `--all`, on one database digest, with identical findings.
   - [ ] A test pull request on skills goes red through the reusable workflow on a new finding and green after its fix.

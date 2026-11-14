@@ -29,6 +29,7 @@ from tests.distribution.support import (
 IMAGE_LIMIT = 1 << 30
 NOBODY = "65534:65534"
 NOTICES = "share/doc/quality/NOTICES"
+TRUST_STORE = "etc/ssl/certs/ca-certificates.crt"
 PACKAGES = ("default", "image", "tools", "scan", "proxy")
 VERSION_BUDGET_S = 0.15
 VERSION_RUNS = 9
@@ -189,6 +190,12 @@ def test_image_is_at_most_1_gib_compressed(image):
 def test_image_runs_as_nobody(image):
     _tarball, _members, config = image
     assert config["config"]["User"] == NOBODY
+
+
+@needs_nix
+def test_image_holds_the_trust_store_where_semgrep_core_looks(image):
+    _tarball, members, _config = image
+    assert TRUST_STORE in members
 
 
 @needs_nix

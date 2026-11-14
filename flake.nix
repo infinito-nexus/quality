@@ -103,7 +103,7 @@
         default = quality;
         image = pkgs.dockerTools.buildLayeredImage {
           name = "quality";
-          contents = [ pkgs.dockerTools.fakeNss pkgs.cacert notices ];
+          contents = [ pkgs.dockerTools.fakeNss pkgs.dockerTools.caCertificates notices ];
           extraCommands = ''
             mkdir -p src tmp
             chmod 1777 tmp

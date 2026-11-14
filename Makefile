@@ -6,8 +6,9 @@ VERIFY_DISABLE :=
 VERIFY_VARIANT := 0
 SERVICE_VENV := .venv/service
 TEST_WORKERS := 4
+FLAKE_RESULT := build/flake/result
 
-.PHONY: test-unit test-integration test-bench test-service test-egress up down verify-test verify-compose
+.PHONY: test-unit test-integration test-bench test-service test-egress test-distribution test-e2e flake up down verify-test verify-compose
 
 test-unit:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit tests/workflows
@@ -33,6 +34,21 @@ $(SERVICE_VENV)/bin/pytest: service/web/requirements.txt tests/service/requireme
 
 test-service: $(SERVICE_VENV)/bin/pytest
 	PATH="$(abspath $(SERVICE_VENV))/bin:$$PATH" PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/service
+
+flake:
+	nix --extra-experimental-features "nix-command flakes" build path:.#default path:.#image --out-link $(FLAKE_RESULT)
+
+test-distribution: flake
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/distribution
+
+# Param: QUALITY_E2E_SKILLS (required) - path or URL of the skills repository the test clones
+# Param: QUALITY_E2E_PACKAGE_MANAGER (required) - path or URL of the package-manager repository the test clones
+# Param: QUALITY_E2E_RUNTIME (required) - docker runtime the image runs under, core's SANDBOX_RUNTIME (runsc) on a sandbox host
+test-e2e:
+	@test -n "$(QUALITY_E2E_RUNTIME)" || { echo "QUALITY_E2E_RUNTIME is required: the docker runtime test-e2e runs the image under" >&2; exit 2; }
+	$(MAKE) --no-print-directory flake
+	QUALITY_E2E_BINARY=$(abspath $(FLAKE_RESULT))/bin/quality QUALITY_E2E_IMAGE=$(abspath $(FLAKE_RESULT))-1 \
+		PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/e2e/test_host_vs_image.py
 
 # Fails without the running stack of `make up`: the tests join its images and fetch network
 test-egress:
