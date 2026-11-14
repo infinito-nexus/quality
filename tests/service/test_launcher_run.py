@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -168,6 +169,45 @@ def test_fetch_tries_dot_git(harness):
     tried = [call["argv"][-2] for call in harness.runs()]
     assert tried == ["https://example.org/a/b", "https://example.org/a/b.git"]
     assert harness.report(1)["reason"] == "not reachable"
+
+
+def test_fetch_too_large(harness):
+    harness.step(fetch=(launcher.TOO_LARGE_EXIT, ""))
+    harness.submit(1, {"kind": "url", "url": "https://example.org/a/b"})
+    harness.run()
+    assert [step_of(call) for call in harness.runs()] == ["fetch"]
+    assert harness.report(1)["reason"] == "too large"
+
+
+FAKE_GIT = """#!/bin/sh
+for word in "$@"; do
+  case "$word" in
+    clone) [ -z "$STDERR" ] || { printf '%s\\n' "$STDERR" >&2; exit 128; };;
+    rev-parse) echo "$SHA"; exit 0;;
+  esac
+done
+"""
+SHA = "0123456789abcdef0123456789abcdef01234567"
+
+
+@pytest.mark.parametrize(
+    ("stderr", "code", "stdout"),
+    [
+        ("", 0, SHA),
+        ("fatal: write error: No space left on device", launcher.TOO_LARGE_EXIT, ""),
+        ("fatal: repository not found", 1, ""),
+        ("remote: fatal: No space left on device", 1, ""),
+        ("fatal: remote error: No space left on device", 1, ""),
+    ],
+)
+def test_fetch_script_exit(tmp_path, stderr, code, stdout):
+    git = tmp_path / "git"
+    git.write_text(FAKE_GIT, encoding="utf-8")
+    git.chmod(0o755)
+    script = launcher.FETCH_SCRIPT.replace("/tmp/fetch.log", str(tmp_path / "fetch.log"))
+    environment = {"PATH": f"{tmp_path}:/usr/bin:/bin", "STDERR": stderr, "SHA": SHA}
+    done = subprocess.run(["sh", "-c", script, "sh", "https://example.org/a/b", "agent"], env=environment, capture_output=True, text=True, check=False)
+    assert (done.returncode, done.stdout.strip()) == (code, stdout)
 
 
 def test_step_flags(harness):
