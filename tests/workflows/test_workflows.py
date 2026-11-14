@@ -5,7 +5,8 @@ import pytest
 import yaml
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-FILES = ["quality.yml", "release.yml"]
+FILES = ["quality.yml", "release.yml", "tests.yml", "update.yml"]
+SUITE = "nix develop --command make test-unit test-integration test-service"
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
 VERSION_COMMENT = re.compile(r"^ # v\d+(?:\.\d+)*$")
@@ -114,7 +115,11 @@ def test_quality_jobs_add_no_permissions():
     assert all("permissions" not in job for job in load("quality.yml")["jobs"].values())
 
 
-@pytest.mark.parametrize(("name", "holders"), [("quality.yml", set()), ("release.yml", {"publish"})], ids=FILES)
+@pytest.mark.parametrize(
+    ("name", "holders"),
+    [("quality.yml", set()), ("release.yml", {"publish"}), ("tests.yml", set()), ("update.yml", set())],
+    ids=FILES,
+)
 def test_id_token_only_in_the_publish_job(name: str, holders: set):
     workflow = load(name)
     assert not grants_id_token(workflow["permissions"])
@@ -151,3 +156,22 @@ def test_image_is_gated_and_built_from_the_flake_for_both_architectures():
     assert "--digestfile" in script_of(image)
     assert jobs["image-index"]["outputs"]["digest"] == "${{ steps.index.outputs.digest }}"
     assert jobs["release"]["steps"][-1]["env"]["DIGEST"] == "${{ needs.image-index.outputs.digest }}"
+
+
+def test_pull_requests_and_main_run_the_suite():
+    workflow = load("tests.yml")
+    assert {"pull_request", "push"} <= triggers(workflow).keys()
+    assert all(SUITE in script_of(job) and "permissions" not in job for job in workflow["jobs"].values())
+
+
+def test_flake_lock_update_tests_the_new_pins_before_its_pull_request():
+    workflow = load("update.yml")
+    assert {"schedule", "workflow_dispatch"} <= triggers(workflow).keys()
+    job = workflow["jobs"]["flake-lock"]
+    update = step_index(job, lambda step: step.get("run") == "nix flake update")
+    suite = step_index(job, lambda step: step.get("run") == SUITE)
+    opened = step_index(job, lambda step: step.get("uses", "").startswith("peter-evans/create-pull-request@"))
+    assert update < suite < opened
+    assert job["steps"][opened]["with"]["add-paths"] == "flake.lock"
+    assert job["permissions"] == {"contents": "write", "pull-requests": "write"}
+    assert list(workflow["jobs"]) == ["flake-lock"]
