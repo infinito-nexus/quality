@@ -161,10 +161,12 @@ DEMO_CASES = (
     ("core-contact-on-own-domain", {**OPERATOR, "contact": CORE_DEFAULTS["contact"]}, "infinito.nexus", []),
     ("core-contact-on-foreign-domain", {**OPERATOR, "contact": CORE_DEFAULTS["contact"]}, "example.org", ["email"]),
 )
-STACK_INCLUDE = """    name: sys-stk-full
-  vars:
-    compose_handlers_flush: true
-    webserver_extra_configuration: "{{ lookup('template', 'nginx/server.conf.j2') }}"
+STACK_INCLUDE = """    name: svc-stack
+    tasks_from: consumer.yml
+"""
+SERVER_VHOST = """vhosts:
+  default:
+    extra_template: nginx/server.conf.j2
 """
 
 
@@ -231,6 +233,7 @@ def test_privacy_log_claims_match_the_code(tmp_path):
     directives = (ROLE / "templates" / "nginx" / "server.conf.j2").read_text(encoding="utf-8").splitlines()
     assert {line.strip() for line in directives if "log" in line.strip().split(" ")[0]} == LOG_DIRECTIVES
     assert STACK_INCLUDE in (ROLE / "tasks" / "00_core.yml").read_text(encoding="utf-8")
+    assert SERVER_VHOST in (ROLE / "meta" / "server.yml").read_text(encoding="utf-8")
     assert "--log-driver=none" in load_launcher().Launcher(BASE).sandbox("probe", "none")
     app, _state = build(tmp_path, **LEGAL)
     for language, claims in LOG_CLAIMS.items():

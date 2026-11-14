@@ -69,6 +69,17 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+# nocheck: dynamic-flag, playwright-service-flag  the role runs a compose project and declares the stack literally; no spec gates on it
+stack:
+  bond: 1
+  enabled: true
+  flush: true
+  shared: true
+# nocheck: dynamic-flag, playwright-service-flag  the role serves its vhost and declares it literally; no spec gates on it
+openresty:
+  bond: 1
+  enabled: true
+  shared: true
 # nocheck: dynamic-flag  plain HTTP onion visitors have no crypto.subtle for the captcha and would share one rate limit bucket
 # nocheck: playwright-service-flag  onion access is off by design
 # nocheck: sso-variant-tor  tor.enabled is pinned false: the role has no onion, so no variant can run SSO over one
@@ -99,7 +110,7 @@ quality-check:
     internal:
       http: 8080
     local:
-      http: 7994
+      http: 7995
   healthcheck:
     test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8080/healthz', headers={'X-Real-IP': '127.0.0.1'}), timeout=4)"]
   lifecycle: alpha
