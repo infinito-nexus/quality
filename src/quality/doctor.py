@@ -120,7 +120,9 @@ def probe(name: str, timeout: float, context: Context) -> tuple:
     env = tool_environment(context.path_value, context.scratch, None)
     result = run([found, "--version"], str(context.scratch), env, timeout)
     if result.code != 0:
-        raise QualityError(f"`{name} --version` exited {result.code}")
+        said = result.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        reason = f": {said[-1]}" if said else ""
+        raise QualityError(f"`{name} --version` exited {result.code}{reason}")
     return found, (result.stdout + result.stderr).decode("utf-8", errors="replace")
 
 
