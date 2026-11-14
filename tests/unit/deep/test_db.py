@@ -8,8 +8,8 @@ import pytest
 from quality import QualityError, db
 from quality.environment import tool_environment
 from quality.ruledata import load
+from tests.unit.deep.support import RULES
 
-RULES = Path(__file__).resolve().parents[2] / "rules"
 NOW = datetime(2026, 11, 11, 12, 0, 0, tzinfo=timezone.utc)
 
 
