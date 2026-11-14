@@ -16,13 +16,13 @@ test-unit:
 test-integration:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration -n $(TEST_WORKERS) --dist worksteal
 
-$(SERVICE_VENV)/bin/pytest: service/web/requirements.txt
+$(SERVICE_VENV)/bin/pytest: service/web/requirements.txt tests/service/requirements.txt
 	python3 -m venv $(SERVICE_VENV)
-	$(SERVICE_VENV)/bin/pip install --quiet -r service/web/requirements.txt pytest==9.2.0
+	$(SERVICE_VENV)/bin/pip install --quiet -r service/web/requirements.txt -r tests/service/requirements.txt
 	touch $@
 
 test-service: $(SERVICE_VENV)/bin/pytest
-	PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/service
+	PATH="$(abspath $(SERVICE_VENV))/bin:$$PATH" PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/service
 
 # Fails without the running stack of `make up`: the tests join its images and fetch network
 test-egress:
