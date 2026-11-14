@@ -1,0 +1,2 @@
+ansible-core==2.21.6
+pytest==9.2.0
