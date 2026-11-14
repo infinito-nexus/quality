@@ -1,7 +1,11 @@
 import json
+import statistics
+import subprocess
+import time
 
 import pytest
 
+from tests.bench.support import require_quiet_host
 from tests.distribution.support import (
     FLAKE,
     PIN_SOURCE,
@@ -9,6 +13,7 @@ from tests.distribution.support import (
     SYSTEM,
     SYSTEMS,
     built,
+    clean_env,
     flake_ref,
     image_contents,
     needs_nix,
@@ -25,6 +30,8 @@ IMAGE_LIMIT = 1 << 30
 NOBODY = "65534:65534"
 NOTICES = "share/doc/quality/NOTICES"
 PACKAGES = ("default", "image", "tools", "scan", "proxy")
+VERSION_BUDGET_S = 0.15
+VERSION_RUNS = 9
 
 
 def planted(tool: str, separator: str, version: str) -> str:
@@ -191,3 +198,18 @@ def test_image_holds_the_notices_and_no_medusa(image):
     assert [name for name in members if "medusa" in name.lower()] == []
     notices = (built("default") / NOTICES).read_text(encoding="utf-8")
     assert notices == nix_eval(ROOT, f"packages.{SYSTEM}.default.passthru.noticesText")
+
+
+@needs_nix
+def test_version_stays_within_its_budget():
+    quality = built("default") / "bin" / "quality"
+    durations = []
+    require_quiet_host("before")
+    for _ in range(VERSION_RUNS):
+        started = time.perf_counter()
+        result = subprocess.run([str(quality), "--version"], env=clean_env(), capture_output=True, text=True, check=False)
+        durations.append(time.perf_counter() - started)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith("quality "), result.stdout
+    require_quiet_host("after")
+    assert statistics.median(durations) <= VERSION_BUDGET_S, [round(duration, 3) for duration in durations]
