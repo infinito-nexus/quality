@@ -1,0 +1,95 @@
+name: quality
+
+on:
+  workflow_call:
+    inputs:
+      quality-ref:
+        description: Full commit SHA of infinito-nexus/quality whose flake builds the tool; pass the SHA this workflow is pinned to
+        required: true
+        type: string
+      base-ref:
+        description: Ref the differential gate compares against; empty means the pull request base, else the commit before the push
+        required: false
+        type: string
+        default: ""
+      db-cache-key:
+        description: Prefix of the cache key under which the vulnerability database bundle is kept between runs
+        required: false
+        type: string
+        default: quality-db
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the target with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+
+      - name: Build quality from its flake
+        env:
+          QUALITY_REF: ${{ inputs.quality-ref }}
+        run: |
+          if [[ ! "$QUALITY_REF" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::inputs.quality-ref must be a full commit SHA" >&2; exit 2; fi
+          nix build "github:infinito-nexus/quality/${QUALITY_REF}#default" --out-link "$RUNNER_TEMP/quality"
+
+      - name: Resolve the base and require full history
+        id: base
+        env:
+          BASE_INPUT: ${{ inputs.base-ref }}
+          PR_BASE: ${{ github.base_ref }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          base="${BASE_INPUT:-${PR_BASE:+origin/$PR_BASE}}"  # nocheck: clean.default-value -- precedence of the three event sources, an empty result fails below
+          base="${base:-$PUSH_BEFORE}"  # nocheck: clean.default-value -- precedence of the three event sources, an empty result fails below
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then echo "::error::no base for the differential gate: pass inputs.base-ref" >&2; exit 2; fi
+          test "$(git rev-parse --is-shallow-repository)" = false
+          sha="$(git rev-parse --verify "${base}^{commit}")"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp the database cache key
+        id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the vulnerability database
+        id: db
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/quality-db
+          key: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-${{ steps.day.outputs.day }}
+          restore-keys: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-
+
+      - name: Update the vulnerability database, the only step with network
+        id: update
+        if: steps.db.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: '"$RUNNER_TEMP/quality/bin/quality" db update --db "$RUNNER_TEMP/quality-db"'
+
+      - name: Keep the vulnerability database for the next run
+        if: steps.update.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/quality-db
+          key: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-${{ steps.day.outputs.day }}
+
+      - name: Gate base..HEAD and scan every commit of the range, without network
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: >-
+          sudo unshare --net --
+          setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups --
+          env PATH="$PATH" HOME="$HOME"
+          "$RUNNER_TEMP/quality/bin/quality" check --base "$BASE" --db "$RUNNER_TEMP/quality-db"

@@ -1,0 +1,203 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the tagged commit with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the tag signature against the signers on the default branch
+        env:
+          TAG: ${{ github.ref_name }}
+          SIGNERS: origin/${{ github.event.repository.default_branch }}:.github/release-signers.asc
+          GNUPGHOME: ${{ runner.temp }}/gnupg
+        run: |
+          install -d -m 700 "$GNUPGHOME"
+          git show "$SIGNERS" > "$RUNNER_TEMP/release-signers.asc"
+          gpg --batch --import "$RUNNER_TEMP/release-signers.asc"
+          git tag -v "$TAG"
+          tagged="$(git rev-parse --verify "refs/tags/${TAG}^{commit}")"
+          built="$(git rev-parse --verify "${GITHUB_SHA}^{commit}")"
+          test "$tagged" = "$built"
+
+  build:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+
+      - name: Build sdist and wheel with the Python of the flake's nixpkgs
+        env:
+          TAG: ${{ github.ref_name }}
+          BUILD_PYTHON: '(builtins.getFlake (toString ./.)).inputs.nixpkgs.legacyPackages.x86_64-linux.python3.withPackages (ps: [ ps.build ps.setuptools ps.wheel ])'
+        run: |
+          nix shell --impure --expr "$BUILD_PYTHON" --command python3 -m build --no-isolation --outdir dist .
+          test -f "dist/kvb_quality-${TAG#v}-py3-none-any.whl"
+          test -f "dist/kvb_quality-${TAG#v}.tar.gz"
+
+      - name: Hand the distributions to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/kvb-quality/
+    permissions:
+      id-token: write
+    steps:
+      - name: Fetch the distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI through Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  image:
+    needs: verify
+    if: vars.QUALITY_IMAGE_RELEASE == 'true'
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+
+      - name: Build the image from the flake
+        run: nix build .#image --out-link "$RUNNER_TEMP/image"
+
+      - name: Push the image and record its digest
+        env:
+          ARCH: ${{ matrix.arch }}
+          DESTINATION: docker://ghcr.io/${{ github.repository }}:${{ github.ref_name }}-${{ matrix.arch }}
+          GHCR_TOKEN: ${{ github.token }}
+          REGISTRY_AUTH_FILE: ${{ runner.temp }}/registry-auth.json
+        run: |
+          printf '%s' "$GHCR_TOKEN" | nix run --inputs-from . nixpkgs#skopeo -- login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          mkdir -p "$RUNNER_TEMP/digests"
+          nix run --inputs-from . nixpkgs#skopeo -- --insecure-policy copy --digestfile "$RUNNER_TEMP/digests/$ARCH" "docker-archive:$RUNNER_TEMP/image" "$DESTINATION"
+
+      - name: Hand the digest to the index job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          if-no-files-found: error
+
+  image-index:
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.index.outputs.digest }}
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+
+      - name: Fetch both digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+
+      - name: Join both architectures under the release tag
+        id: index
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | nix run --inputs-from . nixpkgs#crane -- auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          amd64="$(cat "$RUNNER_TEMP/digests/amd64")"
+          arm64="$(cat "$RUNNER_TEMP/digests/arm64")"
+          nix run --inputs-from . nixpkgs#crane -- index append --docker-empty-base --manifest "$IMAGE@$amd64" --manifest "$IMAGE@$arm64" --tag "$IMAGE:$TAG"
+          digest="$(nix run --inputs-from . nixpkgs#crane -- digest "$IMAGE:$TAG")"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: [publish, image, image-index]
+    if: >-
+      ${{ !cancelled() && needs.publish.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.image.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.image-index.result) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch the distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish the release notes with the image digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          IMAGE: ghcr.io/${{ github.repository }}
+          DIGEST: ${{ needs.image-index.outputs.digest }}
+        run: |
+          image="not published: vars.QUALITY_IMAGE_RELEASE is off"
+          if [[ -n "$DIGEST" ]]; then image="${IMAGE}@${DIGEST}"; fi
+          printf 'PyPI: https://pypi.org/project/kvb-quality/%s/\nImage: %s\n' "${TAG#v}" "$image" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" dist/*
