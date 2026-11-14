@@ -259,7 +259,10 @@ def update_database(option: str | None, rules: str | None) -> db.Bundle:
         The fetched bundle.
     """
     data = load(locate(rules))
-    return db.update(db.location(option, os.environ), data, validated_path(os.environ), os.environ)
+    root = db.location(option, os.environ)
+    if not option:
+        db.guard_cache(root.parent)
+    return db.update(root, data, validated_path(os.environ), os.environ)
 
 
 def parent_baseline(session: Session, plan: Plan, parent: str, index: int):

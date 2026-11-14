@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from quality import QualityError, db
+from quality import QualityError, db, modes
 from quality.environment import tool_environment
 from quality.ruledata import load
 
@@ -195,6 +195,37 @@ def test_failed_fetch_keeps_the_old_bundle(tmp_path):
         db.update(root, load(RULES), str(shims), {})
     assert db.tree_digest(root) == before
     assert sorted(path.name for path in tmp_path.iterdir()) == ["db", "shims"]
+
+
+def test_default_cache_is_created_private(tmp_path):
+    cache = tmp_path / "cache" / "quality"
+    db.guard_cache(cache)
+    assert cache.stat().st_mode & 0o777 == db.CACHE_MODE
+
+
+@pytest.mark.parametrize("unsafe", ["link", "shared"])
+def test_default_cache_refuses_a_link_or_shared_directory(tmp_path, unsafe):
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    cache = tmp_path / "quality"
+    if unsafe == "link":
+        cache.symlink_to(target)
+    else:
+        cache.mkdir()
+        cache.chmod(0o777)
+    with pytest.raises(QualityError, match="link, belongs to another user or is writable by others"):
+        db.guard_cache(cache)
+    assert list(target.iterdir()) == []
+
+
+def test_update_without_db_guards_the_default_cache(tmp_path, monkeypatch):
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    (tmp_path / "quality").symlink_to(target)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(db, "update", lambda *_args: pytest.fail("fetched into a linked cache"))
+    with pytest.raises(QualityError, match="is a link"):
+        modes.update_database(None, None)
 
 
 def test_network_env_passes_only_proxy_and_certificates(tmp_path):
