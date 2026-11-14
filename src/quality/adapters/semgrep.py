@@ -15,6 +15,7 @@ from quality.ruledata import require
 
 UNPARSED = ("Syntax error", "Other syntax error", "Lexical error")
 PARTIAL = "PartialParsing"
+UNFINISHED = ("Timeout",)
 
 
 def files_per_config(bound: list, configs: dict) -> dict:
@@ -106,10 +107,12 @@ def read_errors(errors: list, snapshot) -> tuple:
         snapshot: Snapshot the files came from.
 
     Returns:
-        The files Semgrep could not parse at all, and those it read only in part.
+        The files Semgrep could not parse at all, and those it read only in
+        part or gave up on within its time limit per file.
 
     Raises:
-        QualityError: An error other than a file it could not parse.
+        QualityError: An error other than such a file, also a timeout naming
+            no file.
     """
     unread = set()
     partial = set()
@@ -117,10 +120,11 @@ def read_errors(errors: list, snapshot) -> tuple:
         kind = error["type"] if isinstance(error["type"], str) else error["type"][0]
         if kind in UNPARSED:
             unread.add(reported_path(error["path"], snapshot))
-        elif kind == PARTIAL:
+        elif kind == PARTIAL or (kind in UNFINISHED and "path" in error):
             partial.add(reported_path(error["path"], snapshot))
         else:
-            raise QualityError("semgrep reported an error, so a file stays unchecked")
+            where = f" in {error['path']}" if "path" in error else ""
+            raise QualityError(f"semgrep reported {kind}{where}, so a file stays unchecked")
     return unread, partial
 
 
@@ -133,12 +137,12 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
 
     Returns:
         One finding per match, plus one per file Semgrep could not parse at all.
-        A file it read only in part, or did not scan, gets one file-level
-        security.partial-scan finding.
+        A file it read only in part, gave up on within its time limit per file,
+        or did not scan, gets one file-level security.partial-scan finding.
 
     Raises:
-        QualityError: Semgrep reported an error other than a file it could not parse,
-            such as a rule timeout.
+        QualityError: Semgrep reported an error other than such a file, such as
+            a timeout naming no file.
     """
     document = json.loads(stdout)
     rule = (checked_rules(command) or [command.bound[0].binding.rule])[0]  # nocheck: clean.default-value -- the bound rule when no checked rule ran

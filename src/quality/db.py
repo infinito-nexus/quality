@@ -23,6 +23,7 @@ CONTENT_DIRS = (TRIVY_DIR, OSV_DIR)
 TIMESTAMP = "%Y-%m-%dT%H:%M:%SZ"
 UPDATE_HINT = "run `quality db update`"
 COPY_CHUNK = 1 << 20
+BUNDLE_MODE = 0o755
 NETWORK_VARIABLES = (
     "HTTPS_PROXY",
     "https_proxy",
@@ -384,6 +385,7 @@ def update(root: Path, data: RuleData, path_value: str, environ: dict) -> Bundle
             "in the same directory swaps it whole: point --db at a directory inside a writable one"
         ) from None
     try:
+        work.chmod(BUNDLE_MODE)
         fetch_trivy(work, data, path_value, environ)
         fetch_osv(work, data)
         date = datetime.now(timezone.utc).replace(microsecond=0)

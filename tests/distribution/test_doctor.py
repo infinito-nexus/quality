@@ -66,6 +66,10 @@ def test_doctor_lists_every_tool_with_its_version(setup):
         (lambda directory, _pins: write_shim(directory, "trivy", f"echo 'Version: {VERSION}0'"), "trivy: pinned 1.2.3, but `trivy --version` reports 1.2.30"),
         (lambda directory, _pins: (directory / "jscpd").unlink(), "jscpd: missing tool"),
         (lambda directory, _pins: write_shim(directory, "lizard", "exit 3"), "lizard: `lizard --version` exited 3"),
+        (
+            lambda directory, _pins: write_shim(directory, "lizard", "echo first >&2\necho 'cannot write ~/.cache' >&2\nexit 3"),
+            "lizard: `lizard --version` exited 3: cannot write ~/.cache",
+        ),
         (lambda _directory, pins: pins.pop("semgrep"), "semgrep: no pinned version"),
         (lambda _directory, pins: pins.pop("git"), "git: no pinned version"),
         (lambda _directory, pins: pins["ruff"].pop("path"), "ruff: malformed pin, needs a version and a path"),
