@@ -1,4 +1,5 @@
 import os
+import stat
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -141,6 +142,14 @@ def test_update_stages_beside_the_bundle_inside_a_read_only_tree(tmp_path, monke
         (tmp_path / "ro").chmod(0o755)
     assert [path.name for path in mount.iterdir()] == ["bundle"]
     assert db.open_bundle(mount / "bundle", 7, datetime.now(timezone.utc)).handle is not None
+
+
+def test_update_leaves_the_bundle_readable_to_the_image_user(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "fetch_trivy", fake_fetch)
+    monkeypatch.setattr(db, "fetch_osv", fake_fetch)
+    root = tmp_path / "db"
+    db.update(root, load(RULES), os.environ["PATH"], {})
+    assert root.stat().st_mode & (stat.S_IROTH | stat.S_IXOTH) == stat.S_IROTH | stat.S_IXOTH
 
 
 def test_open_bundle_keeps_update_from_swapping_it(tmp_path):
