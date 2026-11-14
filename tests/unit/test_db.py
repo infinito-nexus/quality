@@ -205,6 +205,10 @@ def test_network_env_passes_only_proxy_and_certificates(tmp_path):
     assert "GITHUB_TOKEN" not in env
 
 
+def test_network_env_keeps_temporary_files_in_the_staging_home(tmp_path):
+    assert db.network_env("/bin", tmp_path, {"TMPDIR": "/tmp"})["TMPDIR"] == str(tmp_path)
+
+
 def test_scan_environment_has_no_network_and_no_semgrep_metrics(tmp_path):
     bundle = db.Bundle(tmp_path, NOW, "sha256:x", None)
     env = tool_environment("/bin", tmp_path / "home", bundle)
