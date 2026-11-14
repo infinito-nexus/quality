@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 COMPOSE = ROOT / "ansible" / "roles" / "web-app-cst-quality-check" / "templates" / "compose.yml.j2"
 REQUIRED = (
     'command: ["sleep", "infinity"]',
