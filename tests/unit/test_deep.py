@@ -109,8 +109,18 @@ def test_semgrep_finds_unparsed_partly_read_and_unscanned_files(tmp_path):
     with pytest.raises(QualityError, match="could not read all of bin/app"):
         semgrep.parse(json.dumps(document).encode(), unbound, snapshot)
     timeout = {"results": [], "errors": [{"type": "Timeout"}], "paths": {"scanned": []}}
-    with pytest.raises(QualityError, match="semgrep"):
+    with pytest.raises(QualityError, match="^semgrep reported Timeout, so a file stays unchecked$"):
         semgrep.parse(json.dumps(timeout).encode(), command, snapshot)
+    for kind in ("Timeout", ["Timeout", 3]):
+        shaped = {"results": [], "errors": [{"type": kind, "path": "c.js"}], "paths": {"scanned": list(kinds)}}
+        found = semgrep.parse(json.dumps(shaped).encode(), command, snapshot)
+        assert [(hit.rule.id, hit.path, hit.line) for hit in found] == [(PARTIAL_SCAN, "c.js", None)]
+    placed = {"results": [], "errors": [{"type": "Timeout", "path": "c.js"}], "paths": {"scanned": list(kinds)}}
+    with pytest.raises(QualityError, match="could not read all of c.js"):
+        semgrep.parse(json.dumps(placed).encode(), unbound, snapshot)
+    fatal = {"results": [], "errors": [{"type": "Fatal error", "path": "c.js"}], "paths": {"scanned": list(kinds)}}
+    with pytest.raises(QualityError, match="^semgrep reported Fatal error in c.js, so a file stays unchecked$"):
+        semgrep.parse(json.dumps(fatal).encode(), command, snapshot)
 
 
 def test_trivy_one_offline_command_per_lockfile(tmp_path):
