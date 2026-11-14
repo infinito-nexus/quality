@@ -150,7 +150,7 @@ quality-check:
       database: 900
     step:
       tmp_bytes: 268435456
-# nocheck: dynamic-flag  the scan image runs every fetch, prepare and scan step; the launcher starts it, compose does not
+# nocheck: dynamic-flag  the scan image runs every fetch, prepare and scan step; the launcher starts the steps, compose only keeps an idle anchor so core's prune never removes the image
 # nocheck: playwright-service-flag  the scan image has no UI; the specs prove it through finished reports
 scan:
   bond: 1

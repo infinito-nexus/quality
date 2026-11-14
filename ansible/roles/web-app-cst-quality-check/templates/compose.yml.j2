@@ -57,6 +57,24 @@
       {{ QUALITY_CHECK_PROXY.network }}:
         ipv4_address: {{ QUALITY_CHECK_PROXY.address }}
 
+  scan:
+    {{ lookup('container_image', application_id, 'scan') }}
+    {{ lookup('compose_only', 'container_name', QUALITY_CHECK_SCAN.name) }}
+    {% if QUALITY_CHECK_PULL_POLICY %}
+    {{ lookup('compose_only', 'pull_policy', QUALITY_CHECK_PULL_POLICY) }}
+    {% endif %}
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    user: "{{ QUALITY_CHECK_STEP_UID }}:{{ QUALITY_CHECK_STEP_UID }}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 16m
+    pids_limit: 4
+
 {{ lookup('compose_volumes') }}
 {{ lookup('compose_networks') }}
   {{ QUALITY_CHECK_PROXY.network }}:
