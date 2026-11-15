@@ -1,4 +1,4 @@
-FROM python:3.14-slim-trixie AS widget
+FROM python:3.15-slim-trixie AS widget
 ADD --checksum=sha256:55c563b7441c94b12ef2344636e06c84d66afd455db809735c13eab8253fbb38 \
     https://registry.npmjs.org/altcha/-/altcha-3.5.0.tgz /tmp/altcha.tgz
 RUN mkdir /widget \
@@ -7,7 +7,7 @@ RUN mkdir /widget \
  && cp /tmp/package/dist/external/altcha.min.js /tmp/package/dist/external/altcha.css /tmp/package/dist/workers/pbkdf2.js /widget/ \
  && cp /tmp/package/LICENSE.txt /widget/LICENSE.txt
 
-FROM python:3.14-slim-trixie
+FROM python:3.15-slim-trixie
 WORKDIR /app
 COPY service/web/requirements.txt ./
 RUN pip install --no-cache-dir --no-compile --root-user-action=ignore -r requirements.txt
