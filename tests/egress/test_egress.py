@@ -4,6 +4,7 @@ import pytest
 
 from tests.egress.support import (
     COMPOSE,
+    DEV_CONFIG,
     EGRESS_NETWORK,
     FETCH_NETWORK,
     LOW_PORTS,
@@ -45,34 +46,34 @@ def name(label):
     return f"{label}.egress.test"
 
 
-def statuses(proxy, *lines):
-    return json.loads(peer("request", proxy, *lines))
+def statuses(proxy, runtime, *lines):
+    return json.loads(peer("request", proxy, *lines, extra=[f"--runtime={runtime}"]))
 
 
 @pytest.fixture(scope="module")
-def proxy(tmp_path_factory):
+def proxy(tmp_path_factory, runtime):
     hosts = {name(label): value for label, value in {**INTERNAL, "own": OWN, "public": PUBLIC}.items()}
-    return start_proxy(site_conf(tmp_path_factory.mktemp("egress"), "127.0.0.11", OWN), hosts)
+    return start_proxy(site_conf(tmp_path_factory.mktemp("egress"), "127.0.0.11", OWN), hosts, runtime)
 
 
-def test_egress_blocks_internal(proxy):
+def test_egress_blocks_internal(proxy, runtime):
     labels = [*INTERNAL, "own"]
-    codes = statuses(proxy, *(f"CONNECT {name(label)}:443" for label in labels), f"CONNECT {name('public')}:443")
+    codes = statuses(proxy, runtime, *(f"CONNECT {name(label)}:443" for label in labels), f"CONNECT {name('public')}:443")
     assert dict(zip(labels, codes)) == dict.fromkeys(labels, 403)
     assert codes[-1] == 503
 
 
-def test_egress_connect_only(proxy):
-    assert statuses(proxy, f"GET http://{name('public')}/") == [403]
+def test_egress_connect_only(proxy, runtime):
+    assert statuses(proxy, runtime, f"GET http://{name('public')}/") == [403]
 
 
 @pytest.mark.usefixtures("internet")
-def test_egress_port_443_only():
-    codes = statuses(STACK_PROXY, "CONNECT example.org:80", "CONNECT example.org:25", "CONNECT example.org:443")
+def test_egress_port_443_only(runtime):
+    codes = statuses(STACK_PROXY, runtime, "CONNECT example.org:80", "CONNECT example.org:25", "CONNECT example.org:443")
     assert codes == [403, 403, 200]
 
 
-def test_egress_no_direct_route():
+def test_egress_no_direct_route(runtime):
     fetch = json.loads(docker("network", "inspect", FETCH_NETWORK))[0]
     assert fetch["Options"]["com.docker.network.bridge.inhibit_ipv4"] == "true"
     assert [config.get("Gateway") for config in fetch["IPAM"]["Config"]] == [None]
@@ -83,20 +84,20 @@ def test_egress_no_direct_route():
         if config.get("Gateway")
     ]
     targets = ["9.9.9.9:443", *(f"{host}:443" for host in hosts)]
-    results = json.loads(peer("direct", *targets, f"{STACK_PROXY}:3128"))
+    results = json.loads(peer("direct", *targets, f"{STACK_PROXY}:3128", extra=[f"--runtime={runtime}"]))
     assert results[-1] == "connected"
     assert len(hosts) == 2
     assert all(result in UNREACHABLE for result in results[:-1]), dict(zip(targets, results))
 
 
-def test_egress_rebinding(tmp_path):
+def test_egress_rebinding(tmp_path, runtime):
     listener = peer("listen", detach=True, extra=[LOW_PORTS])
     private = address(listener)
     resolver = peer("dns", UNROUTED, private, detach=True, extra=[LOW_PORTS])
     assert json.loads(peer("direct", f"{private}:443")) == ["connected"]
-    proxy = start_proxy(site_conf(tmp_path, address(resolver), "127.0.0.1"), {})
+    proxy = start_proxy(site_conf(tmp_path, address(resolver), "127.0.0.1"), {}, runtime)
     line = f"CONNECT {name('rebind')}:443"
-    codes = json.loads(peer("repeat", proxy, str(REBIND_SECONDS), line, timeout=REBIND_SECONDS + 60))
+    codes = json.loads(peer("repeat", proxy, str(REBIND_SECONDS), line, extra=[f"--runtime={runtime}"], timeout=REBIND_SECONDS + 60))
     assert set(codes) == {403, 503}
     assert docker("logs", listener).split().count("hit") == 1
     assert docker("logs", resolver).count("query") >= 2
@@ -113,4 +114,5 @@ def test_proxy_flags():
     (tmpfs_options,) = host["Tmpfs"].values()
     assert "size=" in tmpfs_options
     assert info["Config"]["User"] == "65534:65534"
+    assert host["Runtime"] == json.loads(DEV_CONFIG.read_text(encoding="utf-8"))["runtime"]
     assert set(info["NetworkSettings"]["Networks"]) == {FETCH_NETWORK, EGRESS_NETWORK}

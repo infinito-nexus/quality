@@ -32,6 +32,7 @@ services:
       target: proxy
       args:
         PACKAGE: proxy
+    runtime: runc
     read_only: true
     user: "65534:65534"
     cap_drop: [ALL]

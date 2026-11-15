@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PEER = Path(__file__).with_name("peer.py")
 COMPOSE = ROOT / "service" / "compose.yml"
+DEV_CONFIG = ROOT / "service" / "dev" / "config.json"
 SCAN_IMAGE = "quality-check/scan:local"
 PROXY_IMAGE = "quality-check/proxy:local"
 FETCH_NETWORK = "quality-check-fetch"
@@ -42,17 +43,18 @@ def peer(*args, network=FETCH_NETWORK, detach=False, extra=(), timeout=180):  # 
     return docker(*command, "python3", "/peer.py", *args, timeout=timeout)
 
 
-def start_proxy(site_conf, hosts):
+def start_proxy(site_conf, hosts, runtime):
     """
     Args:
         site_conf: Host path of the site.conf the production squid.conf includes.
         hosts: {name: address} entries for the proxy's /etc/hosts.
+        runtime: Container runtime the proxy runs under, one of EGRESS_RUNTIMES.
 
     Returns:
         The proxy's address on the fetch network.
     """
     entries = [f"--add-host={name}:{address}" for name, address in hosts.items()]
-    flags = ["--user=65534:65534", "--tmpfs=/tmp:size=16m", "--memory=256m", "--cpus=0.5"]
+    flags = [f"--runtime={runtime}", "--user=65534:65534", "--tmpfs=/tmp:size=16m", "--memory=256m", "--cpus=0.5"]
     mount = ["-v", f"{site_conf}:/etc/squid/site.conf:ro"]
     container = docker("run", "-d", "--label", LABEL, f"--network={FETCH_NETWORK}", *SANDBOX, *flags, *mount, *entries, PROXY_IMAGE)
     return address(container)
