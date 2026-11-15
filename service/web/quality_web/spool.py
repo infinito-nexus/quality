@@ -48,8 +48,8 @@ class Spool:
             job_id: Id from the report link.
 
         Returns:
-            ("report", document), ("queued", None) while the job waits in the spool,
-            ("running", None) once the launcher holds it, or (None, None) for an unknown id.
+            ("report", document), a failed document for an empty report file, ("queued", None) while the job
+            waits in the spool, ("running", None) once the launcher holds it, or (None, None) for an unknown id.
         """
         if not launcher.JOB_ID.match(job_id):
             return None, None
@@ -58,6 +58,8 @@ class Spool:
                 return "report", json.load(handle)
         except FileNotFoundError:
             pass
+        except ValueError:
+            return "report", launcher.failed("not checked")
         if any(os.path.exists(os.path.join(self.spool, f"{digit}-{job_id}.json")) for digit in TIER_DIGITS):
             return "queued", None
         if os.path.exists(os.path.join(self.reports, f"{job_id}.running")):

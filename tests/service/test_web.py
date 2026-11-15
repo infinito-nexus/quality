@@ -244,6 +244,17 @@ def test_report_escaped(tmp_path):
     assert "<a href" not in page.split("<main>")[1].split("</main>")[0]
 
 
+def test_report_without_digest(tmp_path):
+    app, state = build(tmp_path)
+    keys = ("findings", "ignored", "nocheck", "unchecked", "notes", "incomplete", "parse_incomplete")
+    document = {"status": "done", "reason": None, "kind": "url", "commit": "0123abc", "history": None, "quality": "local"}
+    document.update(database={"updated": 1794490239}, result={key: [] for key in keys}, finished=0)
+    (state / "reports" / f"{'c' * 32}.json").write_text(json.dumps(document), encoding="utf-8")
+    page = app.test_client(use_cookies=False).get(f"/r/{'c' * 32}", headers=headers()).get_data(as_text=True)
+    assert "<dd>updated 1794490239</dd>" in page
+    assert "digest" not in page
+
+
 def test_every_template_escapes(tmp_path):
     app, _state = build(tmp_path)
     environment = app.jinja_env

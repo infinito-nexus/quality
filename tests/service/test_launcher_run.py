@@ -1,4 +1,5 @@
 import base64
+import errno
 import json
 import os
 import subprocess
@@ -8,11 +9,13 @@ from pathlib import Path
 
 import pytest
 
+from tests.service import webapp
 from tests.service.support import ROOT, load_launcher
 
 launcher = load_launcher()
 FAKE = Path(__file__).with_name("fake_container.py")
 DEV_CONFIG = ROOT / "service" / "dev" / "config.json"
+BUNDLE_DIGEST = "sha256:" + "ab" * 32
 FINDING = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None}
 REPORT = {
     "findings": [FINDING],
@@ -350,10 +353,19 @@ def test_retention(harness):
 
 def database(harness, age_hours):
     harness.config["database"].update(update_hours=24, max_age_hours=168)
+    bundle = harness.root / "db" / "bundle"
+    bundle.mkdir(parents=True)
+    manifest = {"format": 1, "date": "2026-11-01T00:00:00Z", "digest": BUNDLE_DIGEST}
+    (bundle / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stamp = harness.root / "db" / ".updated"
-    stamp.parent.mkdir()
     stamp.write_text("", encoding="utf-8")
     os.utime(stamp, (time.time() - age_hours * 3600, time.time() - age_hours * 3600))
+
+
+def report_page(tmp_path, number):
+    app, _state = webapp.build(tmp_path)
+    response = app.test_client(use_cookies=False).get(f"/r/{ident(number)}", headers=webapp.headers())
+    return response.get_data(as_text=True)
 
 
 def test_db_too_old_job_fails(harness):
@@ -389,9 +401,73 @@ def test_steps_keep_no_container_log(harness):
     assert all("--log-driver=none" in call["argv"] for call in runs)
 
 
+def test_report_header(harness, tmp_path):
+    database(harness, 1)
+    harness.config["images"]["scan_version"] = "9.8.7"
+    exclusion = {"rule": "clean.folder-items", "paths": ["docs"], "reason": "canary-exclusion"}
+    harness.step(scan=(0, json.dumps({**REPORT, "ignored": [exclusion]})))
+    harness.submit(1, {"kind": "url", "url": "https://example.org/a/b"})
+    harness.run()
+    assert harness.report(1)["database"] == {"updated": "2026-11-01T00:00:00Z", "digest": BUNDLE_DIGEST}
+    page = report_page(tmp_path, 1)
+    database_line = f"updated 2026-11-01T00:00:00Z, digest <code>{BUNDLE_DIGEST}</code>"
+    for shown in ("0123abc", "9.8.7", database_line, "HEAD only: history not scanned"):
+        assert shown in page
+    assert "<code>clean.folder-items</code> off for docs: canary-exclusion" in page
+
+
 def test_submission_deleted(harness):
     harness.submit(1, text_job("canary-submission = 1\n"))
     harness.run()
     files = [path for path in harness.state.rglob("*") if path.is_file()]
     assert files and not any("canary-submission" in path.read_text(encoding="utf-8") for path in files)
     assert not any(b"Y2FuYXJ5" in path.read_bytes() for path in files)
+
+
+def full_mount(*_arguments):
+    raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+
+
+def partly_written(_document, handle, **_options):
+    handle.write('{"partial": ')
+    full_mount()
+
+
+@pytest.mark.parametrize("inodes", ["left", "exhausted"])
+def test_report_state_full(harness, tmp_path, monkeypatch, capsys, inodes):
+    monkeypatch.setattr(json, "dump", partly_written)
+    if inodes == "exhausted":
+        monkeypatch.setattr(os, "link", full_mount)
+    harness.submit(1, {"kind": "url", "url": "https://example.org/a/b"})
+    code = harness.run()
+    assert [path.name for path in (harness.state / "reports").iterdir()] == [f"{ident(1)}.json"]
+    assert "Not checked: not checked." in report_page(tmp_path, 1)
+    assert code == 1
+    logged = capsys.readouterr().err
+    assert f"job {ident(1)} " in logged and "No space left on device" in logged and "example.org" not in logged
+
+
+def test_report_state_full_keeps_report(harness, monkeypatch):
+    monkeypatch.setattr(json, "dump", partly_written)
+    (harness.state / "reports" / f"{ident(1)}.json").write_text('{"status": "done", "sentinel": true}', encoding="utf-8")
+    (harness.state / "reports" / f"{ident(1)}.running").write_text("", encoding="utf-8")
+    assert harness.run() == 1
+    assert harness.report(1) == {"status": "done", "sentinel": True}
+    assert list((harness.state / "reports").iterdir()) == [harness.state / "reports" / f"{ident(1)}.json"]
+
+
+def test_no_personal_data(harness, tmp_path):
+    app, _state = webapp.build(tmp_path)
+    client = app.test_client(use_cookies=False)
+    submitters = [("198.51.100.77", "canary-user"), ("2001:db8::77", "canary-mail@example.org")]
+    for address, user in submitters:
+        cookie = webapp.session_cookie(webapp.login(app, name=user))
+        job = webapp.text_job(email="canary-form@example.org")
+        assert client.post("/account/submit", data=job, headers=webapp.headers(address, **cookie)).status_code == 303
+    harness.run()
+    reports = sorted((harness.state / "reports").iterdir())
+    assert len(reports) == 2
+    for path in reports:
+        text = path.read_text(encoding="utf-8")
+        assert json.loads(text)["status"] == "done"
+        assert not any(personal in text for personal in ("198.51.100", "2001:db8", "canary", "example.org"))
