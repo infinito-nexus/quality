@@ -351,12 +351,16 @@ def test_retention(harness):
     assert not old.exists() and young.exists()
 
 
+def bundle(harness):
+    directory = harness.root / "db" / "bundle"
+    directory.mkdir(parents=True)
+    manifest = {"format": 1, "date": "2026-11-01T00:00:00Z", "digest": BUNDLE_DIGEST}
+    (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
 def database(harness, age_hours):
     harness.config["database"].update(update_hours=24, max_age_hours=168)
-    bundle = harness.root / "db" / "bundle"
-    bundle.mkdir(parents=True)
-    manifest = {"format": 1, "date": "2026-11-01T00:00:00Z", "digest": BUNDLE_DIGEST}
-    (bundle / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    bundle(harness)
     stamp = harness.root / "db" / ".updated"
     stamp.write_text("", encoding="utf-8")
     os.utime(stamp, (time.time() - age_hours * 3600, time.time() - age_hours * 3600))
@@ -389,6 +393,23 @@ def test_db_update_failure_alerts(harness):
     update = harness.runs()[2]["argv"]
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db" in update
     assert update[-4:] == ["db", "update", "--db", "/db/bundle"]
+
+
+def test_scan_mounts_database_with_updates_off(harness):
+    harness.submit(1, text_job())
+    harness.run()
+    assert [step_of(call) for call in harness.runs()] == ["prepare", "scan"]
+    scan = harness.runs()[1]["argv"]
+    assert f"--mount=type=bind,source={harness.root / 'db'},target=/db,readonly" in scan
+    assert scan[-6:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle"]
+    assert harness.report(1)["database"] is None
+
+
+def test_report_names_bundle_with_updates_off(harness):
+    bundle(harness)
+    harness.submit(1, text_job())
+    harness.run()
+    assert harness.report(1)["database"] == {"updated": "2026-11-01T00:00:00Z", "digest": BUNDLE_DIGEST}
 
 
 def test_steps_keep_no_container_log(harness):

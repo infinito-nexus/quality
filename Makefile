@@ -1,6 +1,11 @@
 SHELL := /bin/bash
 INSPECT_COMPOSE := docker compose -f service/compose.yml
 WEB_SECRET := build/web-secret
+DEV_CONFIG := build/dev-config.json
+QUALITY_DEV_DB := $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/quality-check/dev-db
+QUALITY_DEV_PORT := 18098
+export QUALITY_DEV_PORT
+export QUALITY_DEV_DB_DIR = $(abspath $(QUALITY_DEV_DB))
 VERIFY_APPS := web-app-keycloak,web-app-cst-quality-check
 VERIFY_DISABLE :=
 VERIFY_VARIANT := 0
@@ -63,10 +68,14 @@ $(WEB_SECRET):
 	@head -c 48 /dev/urandom | base64 > $@
 	@chmod 0644 $@
 
+# Param: QUALITY_DEV_DB - directory whose bundle/ every scan step of the stack mounts read-only at /db and whose manifest the launcher reads for the report header; the stack never updates it. Under the XDG cache by default, so one `quality db update --db <it>/bundle` serves every later stack
+# Param: QUALITY_DEV_PORT - port on 127.0.0.1 the stack serves on; 18098 is the port this repository's docs name, and a host where another stack holds it passes a free one
 up: $(WEB_SECRET)
+	@test -f $(QUALITY_DEV_DB)/bundle/manifest.json || { echo "no vulnerability database at $(QUALITY_DEV_DB)/bundle: run quality db update --db $(QUALITY_DEV_DB)/bundle" >&2; exit 2; }
+	python3 -c 'import json, sys; config = json.load(open(sys.argv[1])); config["database"]["dir"] = sys.argv[2]; config["public_url"] = sys.argv[3]; print(json.dumps(config))' service/dev/config.json $(QUALITY_DEV_DB_DIR) http://localhost:$(QUALITY_DEV_PORT) > $(DEV_CONFIG)
 	$(INSPECT_COMPOSE) --profile image build
 	$(INSPECT_COMPOSE) up -d --wait
-	@echo "Inspection mode: http://localhost:18098/"
+	@echo "Inspection mode: http://localhost:$(QUALITY_DEV_PORT)/"
 
 down:
 	$(INSPECT_COMPOSE) --profile image down -v
