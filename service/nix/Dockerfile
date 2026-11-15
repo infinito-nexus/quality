@@ -1,4 +1,4 @@
-FROM nixos/nix:2.35.2 AS closure
+FROM nixos/nix:2.35.6 AS closure
 ARG PACKAGE
 WORKDIR /build
 COPY flake.nix flake.lock ./
