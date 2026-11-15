@@ -1,0 +1,31 @@
+{
+  "plain": {
+    "answer": "repository",
+    "files": {
+      "README.md": "# Fixture\n",
+      "src/app.py": "import os\n",
+      "docs/guide.txt": "A guide.\n",
+      "data/nested/deep/value.json": "{\"value\": 1}\n"
+    },
+    "random": {},
+    "gitlinks": {}
+  },
+  "hold": {
+    "answer": "repository",
+    "files": {"probe.json": "{\"probe\": {\"hold\": 4}}\n"},
+    "random": {},
+    "gitlinks": {}
+  },
+  "submodule": {
+    "answer": "repository",
+    "files": {
+      "README.md": "# Submodule fixture\n",
+      ".gitmodules": "[submodule \"sub\"]\n\tpath = sub\n\turl = https://canary.fixture.test/sub.git\n"
+    },
+    "random": {},
+    "gitlinks": {"sub": "1111111111111111111111111111111111111111"}
+  },
+  "redirect": {"answer": "redirect", "location": "https://canary.fixture.test"},
+  "private": {"answer": "status", "status": 401},
+  "stall": {"answer": "stall"}
+}

@@ -51,8 +51,12 @@ test-e2e:
 		PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/e2e/test_host_vs_image.py
 
 # Fails without the running stack of `make up`: the tests join its images and fetch network
+# Param: INFINITO_CORE_DIR (required) - core checkout whose container wrapper test_stage_flags runs the step flags through
+# Param: EGRESS_RUNTIMES (required) - space-separated container runtimes, e.g. "runc sysbox-runc"; every launcher and test-proxy test runs once under each, and docker info must offer all of them
 test-egress:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/egress
+	@test -n "$(INFINITO_CORE_DIR)" || { echo "INFINITO_CORE_DIR is required" >&2; exit 2; }
+	@test -n "$(EGRESS_RUNTIMES)" || { echo "EGRESS_RUNTIMES is required" >&2; exit 2; }
+	EGRESS_RUNTIMES='$(EGRESS_RUNTIMES)' PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/egress -rs
 
 $(WEB_SECRET):
 	@mkdir -p $(dir $@)
