@@ -9,7 +9,7 @@
 <dl class="header">
   {% if report.commit %}<dt>Commit</dt><dd><code>{{ report.commit }}</code></dd>{% endif %}
   <dt>quality</dt><dd>{{ report.quality }}</dd>
-  <dt>Database</dt><dd>{% if report.database %}updated {{ report.database.updated }}{% else %}not used{% endif %}</dd>
+  <dt>Database</dt><dd>{% if report.database %}updated {{ report.database.updated }}{% if report.database.digest %}, digest <code>{{ report.database.digest }}</code>{% endif %}{% else %}not used{% endif %}</dd>
   {% if report.history %}<dt>History</dt><dd>{{ report.history }}</dd>{% endif %}
 </dl>
 <p>{{ report.result.findings | length }} finding(s) in the rules that ran. The submission controls its own exclusions, so this report is a claim, not proof.</p>

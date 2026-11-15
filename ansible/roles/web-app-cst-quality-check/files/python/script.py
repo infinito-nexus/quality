@@ -4,12 +4,12 @@ Args:
     argv[1]: path of the launcher configuration (JSON) the role renders.
 
 Exit codes:
-    0 the run worked, 1 the database update failed, 2 the sandbox runtime is not installed.
+    0 the run worked, 1 the database update failed or a report was not stored, 2 the sandbox runtime is not installed.
 """
 
 import base64
-import binascii
 import concurrent.futures
+import contextlib
 import ipaddress
 import json
 import os
@@ -59,7 +59,7 @@ FETCH_SCRIPT = (
 PREPARE_SCRIPT = 'git init -q /src/repo && cat > "/src/repo/$1" && git -C /src/repo add -- "$1"'
 SCAN_COMMAND = ("sh", "-c", 'cd "$1" && exec quality check --all --json --db "$2"', "sh")
 BUNDLE_DIR = "/db/bundle"
-FETCH_ENVIRONMENT = ("--env=GIT_ALLOW_PROTOCOL=https", "--env=GIT_TERMINAL_PROMPT=0")
+FETCH_ENVIRONMENT = ("--env=GIT_ALLOW_PROTOCOL=https", "--env=GIT_TERMINAL_PROMPT=0", "--env=LC_ALL=C")
 FETCH_ENVIRONMENT += ("--env=GIT_CONFIG_NOSYSTEM=1", "--env=GIT_CONFIG_GLOBAL=/dev/null")
 
 
@@ -84,9 +84,7 @@ def valid_url(url):
 
 def valid_host(host):
     labels = host.split(".")
-    if len(labels) < 2 or not all(HOST_LABEL.match(label) for label in labels):
-        return False
-    if not TOP_LABEL.match(labels[-1]):
+    if len(labels) < 2 or not all(HOST_LABEL.match(label) for label in labels) or not TOP_LABEL.match(labels[-1]):
         return False
     try:
         ipaddress.ip_address(host)
@@ -125,7 +123,7 @@ def decoded(text, limit):
         raise JobFailed("invalid content")
     try:
         content = base64.b64decode(text, validate=True)
-    except (binascii.Error, ValueError) as error:
+    except ValueError as error:
         raise JobFailed("invalid content") from error
     if len(content) > limit:
         raise JobFailed("too large")
@@ -164,11 +162,9 @@ def failed(reason):
 def feed(process, stdin):
     if stdin is None:
         return
-    try:
+    with contextlib.suppress(BrokenPipeError):
         process.stdin.write(stdin)
         process.stdin.close()
-    except BrokenPipeError:
-        pass
 
 
 def discard(directory, name):
@@ -185,6 +181,7 @@ class Launcher:
         self.limits = config["limits"]
         self.state = config["state_dir"]
         self.database = config["database"]
+        self.unstored = False
 
     def path(self, *parts):
         return os.path.join(self.state, *parts)
@@ -215,6 +212,10 @@ class Launcher:
         for name in os.listdir(self.config["jobs_dir"]):
             self.unmount(os.path.join(self.config["jobs_dir"], name))
 
+    def stop(self, *_signal):
+        self.reap()
+        os._exit(143)
+
     def unmount(self, path):
         if os.path.ismount(path):
             subprocess.run(["umount", path], env=CLEAN_ENV, check=False)
@@ -224,15 +225,13 @@ class Launcher:
     def recover(self):
         claimed = self.path("claimed")
         for name in os.listdir(claimed):
-            match = JOB_FILE.match(name)
-            if match:
+            if match := JOB_FILE.match(name):
                 self.write_report(match.group(2), failed("interrupted"))
             discard(claimed, name)
         for entry in os.scandir(self.path("reports")):
-            match = REPORT_FILE.match(entry.name)
-            if match and match.group(2) == "running":
+            if (match := REPORT_FILE.match(entry.name)) and match.group(2) == "running":
                 self.write_report(match.group(1), failed("interrupted"))
-                os.unlink(entry.path)
+                discard(self.path("reports"), entry.name)
             elif entry.name.startswith("."):
                 os.unlink(entry.path)
 
@@ -279,7 +278,6 @@ class Launcher:
 
     def run_job(self, name):
         tier, job_id = TIERS[int(name[0])], name[2:34]
-        marker = self.path("reports", f"{job_id}.running")
         try:
             if not os.path.lexists(self.path("reports", f"{job_id}.json")):
                 self.write_report(job_id, self.outcome(name, tier, job_id))
@@ -287,8 +285,7 @@ class Launcher:
             self.write_report(job_id, failed("not checked"))
         finally:
             discard(self.path("claimed"), name)
-            if os.path.lexists(marker):
-                os.unlink(marker)
+            discard(self.path("reports"), f"{job_id}.running")
 
     def outcome(self, name, tier, job_id):
         try:
@@ -308,10 +305,8 @@ class Launcher:
         return time.time() - os.path.getmtime(stamp) if os.path.exists(stamp) else None
 
     def require_fresh_database(self):
-        if self.database["update_hours"] is None:
-            return
         age = self.database_age()
-        if age is None or age > self.database["max_age_hours"] * 3600:
+        if self.database["update_hours"] is not None and (age is None or age > self.database["max_age_hours"] * 3600):
             raise JobFailed("database too old")
 
     def sandbox(self, name, network):
@@ -400,29 +395,35 @@ class Launcher:
         return {**report, "result": document, "finished": int(time.time())}
 
     def database_header(self):
-        age = self.database_age() if self.database["update_hours"] is not None else None
-        return None if age is None else {"updated": int(time.time() - age)}
+        if self.database["update_hours"] is None:
+            return None
+        with open(os.path.join(self.database["dir"], os.path.basename(BUNDLE_DIR), "manifest.json"), "rb") as handle:
+            manifest = json.load(handle)
+        return {"updated": manifest["date"], "digest": manifest["digest"]}
 
     def write_report(self, job_id, document):
         if not JOB_ID.match(job_id):
             return
         final = self.path("reports", f"{job_id}.json")
         temporary = self.path("reports", f".{job_id}.{threading.get_ident()}.tmp")
-        with open(temporary, "x", encoding="utf-8") as handle:
-            json.dump(document, handle, sort_keys=True)
-        os.chmod(temporary, 0o644)
         try:
-            os.link(temporary, final)
-        except FileExistsError:
-            pass
+            with open(temporary, "x", encoding="utf-8") as handle:
+                json.dump(document, handle, sort_keys=True)
+            os.chmod(temporary, 0o644)
+            with contextlib.suppress(FileExistsError):
+                os.link(temporary, final)
+        except OSError as error:
+            print(f"launcher: job {job_id} report not stored ({error.strerror}), shown as not checked", file=sys.stderr)
+            self.unstored = True
+            with contextlib.suppress(OSError):
+                if not os.path.lexists(final):
+                    os.rename(self.path("reports", f"{job_id}.running"), final)
         finally:
-            os.unlink(temporary)
+            discard(*os.path.split(temporary))
 
     def update_database(self):
-        if self.database["update_hours"] is None:
-            return True
         age = self.database_age()
-        if age is not None and age < self.database["update_hours"] * 3600:
+        if self.database["update_hours"] is None or (age is not None and age < self.database["update_hours"] * 3600):
             return True
         argv = self.sandbox("quality-check-database", self.config["fetch"]["network"])
         argv += [
@@ -439,9 +440,7 @@ class Launcher:
 
 class JobStorage:
     def __init__(self, launcher, job_id, tier):
-        self.launcher = launcher
-        self.job_id = job_id
-        self.tier = tier
+        self.launcher, self.job_id, self.tier = launcher, job_id, tier
         self.mode = launcher.config["job_storage"]
         self.volume = f"quality-check-job-{job_id}"
         self.mountpoint = os.path.join(launcher.config["jobs_dir"], job_id)
@@ -476,15 +475,10 @@ class JobStorage:
         return usage.f_bavail * usage.f_frsize < 1024 * 1024 or usage.f_favail < 16
 
 
-def stop(launcher):
-    launcher.reap()
-    os._exit(143)
-
-
 def main(argv):
     with open(argv[1], encoding="utf-8") as handle:
         launcher = Launcher(json.load(handle))
-    signal.signal(signal.SIGTERM, lambda *_signal: stop(launcher))
+    signal.signal(signal.SIGTERM, launcher.stop)
     launcher.reap()
     launcher.recover()
     launcher.require_runtime()
@@ -493,7 +487,7 @@ def main(argv):
     with concurrent.futures.ThreadPoolExecutor(launcher.limits["concurrency"]) as pool:
         list(pool.map(launcher.run_job, names))
     print(f"launcher: {len(names)} job(s)", file=sys.stderr)
-    return 0 if launcher.update_database() else 1
+    return 0 if launcher.update_database() and not launcher.unstored else 1
 
 
 if __name__ == "__main__":
