@@ -195,7 +195,7 @@ flowchart TD
 - [ ] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
 - [ ] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
 - [ ] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.
-- [ ] `test_size_limits`: a new 501-line shell file fails, JSON, locale, lockfile, generated and `tests/` files of that length pass.
+- [ ] `test_size_limits`: a new 501-line shell file fails, also under `tests/`; JSON, locale, lockfile and generated files of that length pass.
 - [ ] `test_folder_limit`: a thirteenth item fails under `--base`, and a folder already at 20 items that does not grow passes.
 - [ ] `test_prefix_groups`: two sibling files sharing a prefix fail, and dunder, numeric and `test` prefixes pass.
 - [ ] `test_inline_script_limit`: a `run:` block with 12 logical lines fails, with 11 it passes.

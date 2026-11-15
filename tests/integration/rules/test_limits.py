@@ -30,7 +30,7 @@ def test_size_limits(target, mode):
     target.advance(mode)
     result = target.judge(mode, "--json")
     assert result.returncode == 1, result.stderr
-    assert findings(result) == [("clean.file-lines", "run.sh", 501)]
+    assert sorted(findings(result)) == [("clean.file-lines", "run.sh", 501), ("clean.file-lines", "tests/long.sh", 501)]
 
 
 def test_folder_limit(target, mode):

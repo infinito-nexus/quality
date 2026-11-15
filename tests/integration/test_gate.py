@@ -192,12 +192,3 @@ def test_metric_limit_itself_passes(target, mode):
     target.write("new.py", "".join(f"value_{index} = {index}\n" for index in range(500)))
     target.advance(mode)
     assert_clean(target.judge(mode, "--json"))
-
-
-def test_metric_file_lines_excludes_tests(target, mode):
-    target.write("seed.py", "x = 1\n")
-    target.write("tests/__init__.py", "")
-    target.start_feature(mode)
-    target.write("tests/huge.py", "".join(f"value_{index} = {index}\n" for index in range(501)))
-    target.advance(mode)
-    assert_clean(target.judge(mode, "--json"))
