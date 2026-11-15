@@ -65,7 +65,7 @@ services:
       state:
         condition: service_completed_successfully
     volumes:
-      - ./dev/config.json:/etc/quality-web/config.json:ro
+      - ../build/dev-config.json:/etc/quality-web/config.json:ro
       - ../build/web-secret:/run/secrets/web:ro
       - ../ansible/roles/web-app-cst-quality-check/files/legal:/legal:ro
       - type: volume
@@ -92,7 +92,7 @@ services:
     volumes:
       - ./dev/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "127.0.0.1:18098:8080"
+      - "127.0.0.1:${QUALITY_DEV_PORT:?run the stack through make up}:8080"
     depends_on:
       web:
         condition: service_healthy
@@ -110,7 +110,8 @@ services:
       proxy:
         condition: service_started
     volumes:
-      - ./dev/config.json:/etc/quality-check/config.json:ro
+      - ../build/dev-config.json:/etc/quality-check/config.json:ro
+      - ${QUALITY_DEV_DB_DIR:?run the stack through make up}:${QUALITY_DEV_DB_DIR}:ro
       - state:/state
       - /var/run/docker.sock:/var/run/docker.sock
     network_mode: none

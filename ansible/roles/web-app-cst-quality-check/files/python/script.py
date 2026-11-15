@@ -328,7 +328,7 @@ class Launcher:
         if fetching:
             argv += [f"--env=https_proxy={self.config['fetch']['proxy']}", *FETCH_ENVIRONMENT]
         argv.append(storage.mount_flag(step_name == "scan"))
-        if step_name == "scan" and self.database["update_hours"] is not None:
+        if step_name == "scan":
             argv.append(f"--mount=type=bind,source={self.database['dir']},target=/db,readonly")
         argv += ["--workdir=/src", self.config["images"]["scan"], "timeout", str(seconds), *command]
         return self.bounded(argv, container, stdin, seconds)
@@ -395,10 +395,11 @@ class Launcher:
         return {**report, "result": document, "finished": int(time.time())}
 
     def database_header(self):
-        if self.database["update_hours"] is None:
+        try:
+            with open(os.path.join(self.database["dir"], os.path.basename(BUNDLE_DIR), "manifest.json"), "rb") as handle:
+                manifest = json.load(handle)
+        except FileNotFoundError:
             return None
-        with open(os.path.join(self.database["dir"], os.path.basename(BUNDLE_DIR), "manifest.json"), "rb") as handle:
-            manifest = json.load(handle)
         return {"updated": manifest["date"], "digest": manifest["digest"]}
 
     def write_report(self, job_id, document):

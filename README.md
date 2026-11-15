@@ -42,7 +42,7 @@ The role `web-app-cst-quality-check` serves the scan as a web page ([requirement
 
 | Command | What it does |
 | --- | --- |
-| `make up` | Builds the images and serves the page at <http://localhost:18098/>; `make down` removes the stack and its volumes. |
+| `make up` | Builds the images and serves the page at <http://localhost:18098/>, or on the port `QUALITY_DEV_PORT` names; `make down` removes the stack and its volumes. Needs a vulnerability bundle at `$QUALITY_DEV_DB/bundle` (default `~/.cache/quality-check/dev-db/bundle`), created once with `quality db update --db <that path>`. |
 | `make test-service` | Unit tests of the web app and the launcher, in a virtual environment under `.venv/service`. |
 | `make test-egress INFINITO_CORE_DIR=<core> EGRESS_RUNTIMES="<runtimes>"` | Egress tests against the stack of `make up`; the step flags run through that core checkout's container wrapper, and every launcher and test-proxy test runs once under each runtime of `EGRESS_RUNTIMES`, such as `"runc sysbox-runc"`, which `docker info` must offer. |
 | `make verify-test INFINITO_CORE_DIR=<core>` | Pulls the role into a core checkout with custom-role support and runs core's full test suite, lints included. |
