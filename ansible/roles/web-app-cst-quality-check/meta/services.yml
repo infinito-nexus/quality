@@ -59,6 +59,7 @@ dashboard:
 design:
   enabled: false
   shared: false
+# nocheck: playwright-service-flag  Semaphore controls the role from outside; no spec gates on it
 semaphore:
   bond: 0.5
   enabled: "{{ 'web-app-semaphore' in group_names }}"
