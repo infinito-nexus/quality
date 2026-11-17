@@ -40,7 +40,7 @@ UNREACHABLE = {"ENETUNREACH", "EHOSTUNREACH", "timeout"}
 WRITES = ("/src/probe-write", "/src/repo/probe-write", "/db/probe-write")
 STEP_ENVIRONMENT = ["HOME=/tmp", "XDG_CACHE_HOME=/tmp"]
 STEP_HOME = STEP_ENVIRONMENT[0].partition("=")[2]
-FETCH_ENVIRONMENT = ["GIT_ALLOW_PROTOCOL=https", "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"]
+FETCH_ENVIRONMENT = ["GIT_ALLOW_PROTOCOL=https", "GIT_TERMINAL_PROMPT=0", "LC_ALL=C", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"]
 
 
 @pytest.fixture(scope="module")
