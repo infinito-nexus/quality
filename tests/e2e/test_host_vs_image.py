@@ -12,7 +12,14 @@ import yaml
 from quality import QualityError
 from quality.db import open_bundle
 from tests.integration.repository.support import VULNERABLE, findings_of
-from tests.integration.support import RULES, TEST_DB, VULNERABLE_PIN, git_env, rule_for, rules_with_enforcers
+from tests.integration.support import (
+    RULES,
+    TEST_DB,
+    VULNERABLE_PIN,
+    git_env,
+    rule_for,
+    rules_with_enforcers,
+)
 
 BINARY_VARIABLE = "QUALITY_E2E_BINARY"
 IMAGE_VARIABLE = "QUALITY_E2E_IMAGE"
