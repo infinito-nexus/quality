@@ -58,5 +58,4 @@ def internet_reachable():
 @pytest.fixture
 def internet(internet_reachable, request):
     if not internet_reachable:
-        # pytest -rs groups skips by location and reason; the node id in the reason names every skipped test
         pytest.skip(f"[internet] {request.node.nodeid}: example.org:443 is not reachable from a container on the default bridge")
