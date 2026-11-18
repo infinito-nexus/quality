@@ -46,7 +46,7 @@ flowchart TD
 - [ ] `ls skills` lists exactly the eight `kvb-quality-*` folders of decision 1.
 - [ ] `grep -rnE 'kvb-(org|code|git|skill|think|agent|match|coach|dream|release)-' skills src` prints nothing: no moved file loads, runs or names a skill of the skills repository.
 - [ ] `grep -c 'def open_below' src/quality/agent/nofollow.py` prints 1, and the skills repository defines it nowhere (skills 022).
-- [ ] `tests/bench/test_recall.py` passes with `RECALL = 1.0` on core, then reads its reference from a committed hit list, and `QUALITY_DEFAULTS_SCRIPT` is gone from the `Makefile`.
+- [x] `tests/bench/test_recall.py` passes with `RECALL = 1.0` on core, then reads its reference from a committed hit list, and `QUALITY_DEFAULTS_SCRIPT` is gone from the `Makefile`.
 - [ ] Every `SKILL.md` frontmatter `name` equals its folder name.
 - [ ] The first commit of the move names the skills commit the files came from.
 - [ ] `quality --all` reports no hit in `skills/` and `tests/`.
