@@ -25,3 +25,52 @@ rule:
   regex: '^\$\{(?:[A-Za-z_]\w*|\d+):?[-=]'
   not:
     regex: '^\$\{(?:[A-Za-z_]\w*|\d+):?[-=]\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\}$'
+---
+id: clean.default-value/embedded
+language: bash
+severity: warning
+message: parameter expansion with a default in a script a shell runs; fail early with ${NAME:?set NAME in <where it is configured>}
+rule:
+  regex: '\$\{(?:[A-Za-z_]\w*|\d+):?[-=]'
+  any:
+    - kind: raw_string
+      follows:
+        kind: word
+        regex: '^-[A-Za-z]*c[A-Za-z]*$'
+      inside:
+        kind: command
+        has:
+          regex: '^(?:[^=]*/)?(?:(?:ba|da|z|k|a|mk|ya|tc|c|fi)?sh|su|runuser)$'
+        not:
+          has:
+            field: name
+            regex: '^(?:[^=]*/)?(?:echo|printf|print|:)$'
+    - kind: raw_string
+      inside:
+        kind: command
+        has:
+          field: name
+          regex: '^(?:eval|trap)$'
+    - kind: heredoc_body
+      regex: '\A#![ \t]*(?:\S*/)?(?:env[ \t]+(?:-\S+[ \t]+)*)?(?:ba|da|z|k)?sh\s'
+      follows:
+        kind: heredoc_start
+        regex: '[''"\\]'
+metadata:
+  rows: '(?m)^(?:[^#\n]|(?<=[^ \t\n])#)*?(?<!\\)\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})'
+---
+id: clean.default-value/escaped
+language: bash
+severity: warning
+message: parameter expansion with a default in a script a heredoc writes; fail early with ${NAME:?set NAME in <where it is configured>}
+rule:
+  kind: heredoc_body
+  all:
+    - regex: '\A#![ \t]*(?:\S*/)?(?:env[ \t]+(?:-\S+[ \t]+)*)?(?:ba|da|z|k)?sh\s'
+    - regex: '\\\$\{(?:[A-Za-z_]\w*|\d+):?[-=]'
+  follows:
+    kind: heredoc_start
+    not:
+      regex: '[''"\\]'
+metadata:
+  rows: '(?m)^(?:[^#\n]|(?<=[^ \t\n])#)*?(?<!\\)\\\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})'
