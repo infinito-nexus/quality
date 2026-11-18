@@ -1,14 +1,16 @@
+from types import SimpleNamespace
+
 import pytest
 
 from quality import QualityError, printable
 from quality.adapters import chunked
 from quality.cli import main
-from quality.report import Outcome, exit_code, public_finding
+from quality.report import Outcome, architecture_of, exit_code, public_finding
 from quality.snapshot import safe_path
 
 
 def outcome(findings: list, incomplete: list) -> Outcome:
-    return Outcome(findings, [], [], [], [], incomplete, [])
+    return Outcome(findings, [], [], [], [], incomplete, [], None)
 
 
 def test_clean_exits_0():
@@ -100,6 +102,7 @@ def test_public_finding_holds_only_the_allowed_fields():
         id = "coding.x"
         severity = "low"
         summary = "summary"
+        lens = "SRP"
 
     class FakeHit:
         rule = FakeRule()
@@ -112,5 +115,17 @@ def test_public_finding_holds_only_the_allowed_fields():
         entity = "CANARY"
 
     finding = public_finding(FakeHit())
-    assert set(finding) == {"rule", "path", "line", "severity", "summary", "value", "commit"}
+    assert set(finding) == {"rule", "path", "line", "severity", "summary", "value", "commit", "lens"}
+    assert finding["lens"] == "SRP"
     assert "CANARY" not in str(finding)
+
+
+def weighed(architecture: int | None) -> SimpleNamespace:
+    return SimpleNamespace(rule=SimpleNamespace(architecture=architecture))
+
+
+def test_architecture_subtracts_each_weight_and_stops_at_zero():
+    assert architecture_of([]) == 100
+    assert architecture_of([weighed(None)]) == 100
+    assert architecture_of([weighed(10), weighed(None), weighed(25)]) == 65
+    assert architecture_of([weighed(25)] * 5) == 0

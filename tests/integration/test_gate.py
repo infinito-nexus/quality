@@ -192,3 +192,43 @@ def test_metric_limit_itself_passes(target, mode):
     target.write("new.py", "".join(f"value_{index} = {index}\n" for index in range(500)))
     target.advance(mode)
     assert_clean(target.judge(mode, "--json"))
+
+
+def architecture(result) -> tuple:
+    document = report(result)
+    return document["architecture"], [(item["rule"], item["lens"]) for item in document["findings"]]
+
+
+def test_architecture_counts_a_function_the_change_pushes_over_the_limit(target, mode):
+    target.write("a.py", branchy("f", 5))
+    target.start_feature(mode)
+    target.write("a.py", "import os\n\n\n" + branchy("f", 12))
+    target.advance(mode)
+    assert architecture(target.judge(mode, "--json")) == (
+        90,
+        [(F401, None), ("clean.complexity", "SRP")],
+    )
+
+
+def test_architecture_skips_a_function_over_the_limit_at_the_base(target, mode):
+    target.write("a.py", branchy("f", 30))
+    target.start_feature(mode)
+    target.write("a.py", "x = 1\n\n\n" + branchy("f", 30))
+    target.advance(mode)
+    assert architecture(target.judge(mode, "--json")) == (100, [])
+    assert architecture(target.check("--all", "--json")) == (
+        None,
+        [("clean.complexity", "SRP"), ("clean.function-length", "SRP")],
+    )
+
+
+def test_architecture_counts_a_file_the_change_pushes_past_the_line_limit(target, mode):
+    lines = "".join(f"value_{index} = {index}\n" for index in range(500))
+    legacy = "".join(f"legacy_{index} = {index}\n" for index in range(600))
+    target.write("a.py", lines)
+    target.write("legacy.py", legacy)
+    target.start_feature(mode)
+    target.write("a.py", lines + "extra = 1\n")
+    target.write("legacy.py", legacy.replace("legacy_7 = 7", "legacy_7 = 77"))
+    target.advance(mode)
+    assert architecture(target.judge(mode, "--json")) == (75, [("clean.file-lines", "SRP")])

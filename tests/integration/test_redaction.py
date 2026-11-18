@@ -150,7 +150,7 @@ def test_finding_fields(target):
     target.commit()
     target.write("a.py", "import os\n")
     target.stage()
-    fields = {"rule", "path", "line", "severity", "summary", "value", "commit"}
+    fields = {"rule", "path", "line", "severity", "summary", "value", "commit", "lens"}
     for flags in (("--staged",), ("--all",)):
         findings = report(target.check(*flags, "--json"))["findings"]
         assert findings
