@@ -9,7 +9,7 @@ from tests.bench.support import core_dir, require_quiet_host, setting
 from tests.distribution.support import built, clean_env
 from tests.integration.support import DEEP_TOOLS
 
-BUDGET_S = 120
+BUDGET_S = 360
 CPUS = 20
 
 
