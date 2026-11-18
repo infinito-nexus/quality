@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from tests.service.support import load_launcher
+from tests.service.support import FINDING, REPORT, load_launcher
 
 launcher = load_launcher()
 
@@ -90,11 +90,7 @@ def test_parse_job_deep_nesting_raises():
 
 
 def report(**changes):
-    finding = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None}
-    document = {"findings": [finding], "ignored": [], "nocheck": [], "unchecked": [], "notes": [], "incomplete": []}
-    document["parse_incomplete"] = []
-    document.update(changes)
-    return document
+    return {**REPORT, "findings": [dict(FINDING)], **changes}
 
 
 def test_report_schema_accepts_runner_output():
@@ -102,6 +98,7 @@ def test_report_schema_accepts_runner_output():
     ignored = [{"rule": "clean.folder-items", "paths": ["."], "reason": "why"}]
     nocheck = [{"path": "a.py", "line": 3, "rule": "x"}]
     assert launcher.fits(report(ignored=ignored, nocheck=nocheck), launcher.REPORT)
+    assert launcher.fits(report(findings=[{**FINDING, "lens": "SRP"}], architecture=75), launcher.REPORT)
 
 
 @pytest.mark.parametrize(
@@ -112,6 +109,10 @@ def test_report_schema_accepts_runner_output():
         report(findings=[{**report()["findings"][0], "line": True}]),
         report(findings=[{**report()["findings"][0], "severity": "fatal"}]),
         report(findings=[{**report()["findings"][0], "message": "leak"}]),
+        report(findings=[{**report()["findings"][0], "lens": 1}]),
+        report(architecture="100"),
+        report(architecture=True),
+        {key: value for key, value in report().items() if key != "architecture"},
         report(notes=[1]),
         report(findings={}),
         [],

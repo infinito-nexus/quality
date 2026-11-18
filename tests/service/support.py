@@ -10,7 +10,7 @@ ROLE = ROOT / "ansible" / "roles" / "web-app-cst-quality-check"
 SCRIPT = ROLE / "files" / "python" / "script.py"
 FAKE = Path(__file__).with_name("fake_container.py")
 DEV_CONFIG = ROOT / "service" / "dev" / "config.json"
-FINDING = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None}
+FINDING = {"rule": "r", "path": "p", "line": 1, "severity": "high", "summary": "s", "value": None, "commit": None, "lens": None}
 REPORT = {
     "findings": [FINDING],
     "ignored": [],
@@ -19,6 +19,7 @@ REPORT = {
     "notes": [],
     "incomplete": [],
     "parse_incomplete": [],
+    "architecture": None,
 }
 
 

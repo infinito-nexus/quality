@@ -37,10 +37,10 @@ EXTENSIONS.update({"go": "go", "rust": "rs", "java": "java", "ruby": "rb", "yaml
 LANGUAGES = {**{name: f"snippet.{ext}" for name, ext in EXTENSIONS.items()}, "dockerfile": "Dockerfile"}
 TEXT, LINE, NOTHING = (str,), (int, type(None)), type(None)
 FINDING = {"rule": TEXT, "path": TEXT, "line": LINE, "summary": TEXT, "commit": (str, NOTHING)}
-FINDING.update({"severity": {"critical", "high", "medium", "low"}, "value": (int, float, NOTHING)})
+FINDING.update({"severity": {"critical", "high", "medium", "low"}, "value": (int, float, NOTHING), "lens": (str, NOTHING)})
 IGNORED = {"rule": TEXT, "paths": "strings", "reason": TEXT}
 NOCHECK = {"path": TEXT, "line": LINE, "rule": TEXT}
-REPORT = {"findings": [FINDING], "ignored": [IGNORED], "nocheck": [NOCHECK]}
+REPORT = {"findings": [FINDING], "ignored": [IGNORED], "nocheck": [NOCHECK], "architecture": (int, NOTHING)}
 REPORT.update({"unchecked": "strings", "notes": "strings", "incomplete": "strings", "parse_incomplete": "strings"})
 LABEL = "quality-check.job"
 STEP_USER = "65534:65534"
