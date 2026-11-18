@@ -11,7 +11,15 @@ import yaml
 
 from quality import QualityError
 from quality.db import open_bundle
-from tests.integration.support import RULES, TEST_DB, git_env, rule_for
+from tests.integration.repository.support import VULNERABLE, findings_of
+from tests.integration.support import (
+    RULES,
+    TEST_DB,
+    VULNERABLE_PIN,
+    git_env,
+    rule_for,
+    rules_with_enforcers,
+)
 
 BINARY_VARIABLE = "QUALITY_E2E_BINARY"
 IMAGE_VARIABLE = "QUALITY_E2E_IMAGE"
@@ -188,3 +196,42 @@ def test_host_and_image_agree(tmp_path, sides, name, mode):
     assert (PROBE, probe_rule) in {(item["path"], item["rule"]) for item in host_report["findings"]}
     if mode in DEEP_MODES:
         assert bundle.note() in host_report["notes"]
+
+
+def commit_file(repository: Path, name: str, text: str) -> None:
+    (repository / name).write_text(text, encoding="utf-8")
+    git(repository, "add", "--", name)
+    git(repository, "commit", "--quiet", "--no-verify", "--message", name)
+
+
+def vulnerable_repository(directory: Path) -> tuple:
+    """
+    Args:
+        directory: Path for a new repository.
+
+    Returns:
+        (the repository, the commit before the one that adds a vulnerable requirements.txt).
+    """
+    directory.mkdir()
+    git(directory, "init", "--quiet")
+    commit_file(directory, "seed.py", "x = 1\n")
+    base = git(directory, "rev-parse", "HEAD")
+    commit_file(directory, "requirements.txt", VULNERABLE_PIN)
+    return directory, base
+
+
+@pytest.mark.parametrize(
+    ("enforcer", "tool", "line"),
+    [("manifest", "trivy", 1), ("lockfile", "osv-scanner", None)],
+    ids=["trivy", "osv-scanner"],
+)
+def test_vuln_offline_image(tmp_path, sides, enforcer, tool, line):
+    _binary, image, bundle, runtime = sides
+    repository, base = vulnerable_repository(tmp_path / "repository")
+    rules = rules_with_enforcers(tmp_path / "rules", VULNERABLE, {enforcer})
+    mounts = ["-v", f"{repository}:/src:ro", "-v", f"{bundle.root}:/db:ro", "-v", f"{rules}:/rules:ro"]
+    result = image_quality(image, runtime, mounts, "check", "--base", base, "--json", "--verbose", "--db", "/db", "--rules", "/rules")
+    assert result.returncode == 1, result.stderr
+    assert findings_of(result, VULNERABLE) == [("requirements.txt", line)]
+    other = {"trivy": "osv-scanner", "osv-scanner": "trivy"}[tool]
+    assert f"tool {tool}:" in result.stderr and f"tool {other}:" not in result.stderr

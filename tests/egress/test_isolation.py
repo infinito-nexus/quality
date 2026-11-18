@@ -188,18 +188,42 @@ def test_job_separation(bench):
     assert bench.notes(second)["found"] == []
 
 
-def test_stop_mid_job(bench):
+def interrupted_mid_job(bench, signal: str) -> tuple:
+    """
+    Args:
+        bench: Bench whose launcher runs one held probe job.
+        signal: Signal docker kill sends the launcher once the job's scan step runs.
+
+    Returns:
+        The job id and the launcher's exit code.
+    """
     job = bench.submit(probe_job({"hold": 600}))
     launcher = bench.start()
     wait_until(lambda: f"quality-check-{job}-scan" in running_steps(), 180, "the scan step's start")
-    docker("kill", "--signal=TERM", launcher)
+    docker("kill", f"--signal={signal}", launcher)
     code, _journal = bench.finish(launcher)
-    assert code == 143
+    return job, code
+
+
+def assert_next_run_recovers(bench, job: str) -> None:
     bench.run()
     assert job_containers() == []
     assert bench.job_mounts() == []
     report = bench.report(job)
     assert (report["status"], report["reason"]) == ("failed", "interrupted")
+
+
+def test_stop_mid_job(bench):
+    job, code = interrupted_mid_job(bench, "TERM")
+    assert code == 143
+    assert_next_run_recovers(bench, job)
+
+
+def test_launcher_recovers(bench):
+    job, code = interrupted_mid_job(bench, "KILL")
+    assert code == 137
+    assert f"quality-check-{job}-scan" in running_steps()
+    assert_next_run_recovers(bench, job)
 
 
 def test_spool_full(tmp_path, runtime):

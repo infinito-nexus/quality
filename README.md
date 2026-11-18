@@ -61,7 +61,7 @@ The speed criteria of [requirement 001](docs/requirements/001-language-agnostic-
 
 | Command | What it does |
 | --- | --- |
-| `make test-bench QUALITY_CORE_DIR=<core> QUALITY_DB_DIR=<db> QUALITY_DEFAULTS_SCRIPT=<defaults.py>` | Times `quality --version` of the built `packages.default` against 0.15 s as the median of 9 runs and its `quality check --all` on core, deep tier included, against 120 s on 20 CPUs, both timings skipped with the measured load as the reason when 50 % or more of the CPUs are busy in the 5 s before or after them, and checks that `clean.default-value` finds at least 95 % of the shell, Python and JavaScript defaults that `defaults.py` of the kvb-code-clean skill reports on core. Needs `nix build .#default` of this tree and a fresh bundle of `quality db update`. |
+| `make test-bench QUALITY_CORE_DIR=<core> QUALITY_DB_DIR=<db> QUALITY_DEFAULTS_SCRIPT=<defaults.py>` | Times `quality --version` of the built `packages.default` against 0.15 s as the median of 9 runs and its `quality check --all` on core, deep tier included, against 360 s on 20 CPUs, both timings skipped with the measured load as the reason when 50 % or more of the CPUs are busy in the 5 s before or after them, and checks that `clean.default-value` finds at least 95 % of the shell, Python and JavaScript defaults that `defaults.py` of the kvb-code-clean skill reports on core. Needs `nix build .#default` of this tree and a fresh bundle of `quality db update`. |
 
 ## Author
 Kevin Veen-Birkenbach <kevin@veen.world>
