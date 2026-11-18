@@ -219,7 +219,7 @@ flowchart TD
 - [x] `nix build .#image` yields an OCI image, and its `quality doctor` output is identical to the host binary's.
 - [ ] The image is published for `linux/amd64` and `linux/arm64`, and its digest appears in the release notes.
 - [x] `docker run --rm --network none --read-only --tmpfs /tmp --user 65534 -v "$PWD:/src:ro" -v "$DB:/db:ro" <image> check --all --db /db` gives the same findings as `quality check --all --db "$DB"` on the host, both naming the same database digest.
-- [ ] `test_vuln_offline`: under `--network none`, a fixture lockfile with a known CVE is reported through trivy and through osv-scanner.
+- [ ] `test_vuln_offline`: a fixture lockfile with a known CVE is reported from the shared test bundle through trivy and through osv-scanner, each tool alone; `test_vuln_offline_image` reports it the same way from the image under `--network none`.
 - [x] `test_db_missing_exits_2`: the deep tier without a bundle exits 2 naming `quality db update`, and `--staged` needs no bundle.
 - [x] `test_db_too_old_exits_2`: a bundle older than the limit exits 2.
 - [ ] `test_update_without_db_guards_the_default_cache`: `quality db update` without `--db` creates `$XDG_CACHE_HOME/quality` with mode 0700 and refuses it, before any fetch, when it is a link, belongs to another user or is writable by group or others.
@@ -244,7 +244,7 @@ flowchart TD
 - **Unit**
   - [ ] `make test-unit` passes and covers fingerprints, message normalisation, metric compare, the ignore file parser, the suppression parser and exit codes.
 - **Integration**
-  - [ ] `make test-integration` passes and runs every named test above against real tools and temporary git repositories, except `test_single_pin_source`, which `make test-distribution` runs against the flake outputs (operator, 2026-11-13).
+  - [ ] Every named test above passes in the suite that owns it: `make test-unit` runs `test_update_without_db_guards_the_default_cache`, `make test-distribution` runs `test_single_pin_source` against the flake outputs (operator, 2026-11-13), `make test-e2e` runs `test_vuln_offline_image` against the image (operator, 2026-11-18), and `make test-integration` runs every other one against real tools and temporary git repositories.
 - **E2E**
   - [x] `make test-e2e` runs host binary and image against clones of skills and package-manager, for `--staged`, `--base` and `--all`, on one database digest, with identical findings.
   - [ ] A test pull request on skills goes red through the reusable workflow on a new finding and green after its fix.
