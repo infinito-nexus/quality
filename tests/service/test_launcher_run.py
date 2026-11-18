@@ -341,6 +341,40 @@ def test_launcher_recovers(harness):
     assert not (harness.state / "reports" / f"{ident(2)}.running").exists()
 
 
+class Exited(Exception):
+    pass
+
+
+def exited(code):
+    raise Exited(code)
+
+
+def vanished():
+    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT))
+
+
+def test_stop_exits_143_when_a_worker_removed_the_mount_first(harness, monkeypatch):
+    stopping = launcher.Launcher(harness.config)
+    monkeypatch.setattr(os, "_exit", exited)
+    monkeypatch.setattr(stopping, "reap", vanished)
+    with pytest.raises(Exited) as stopped:
+        stopping.stop()
+    assert stopped.value.args == (143,)
+
+
+def test_job_cut_by_stop_is_left_to_recovery(harness):
+    harness.step(scan=(137, ""))
+    harness.submit(1, text_job())
+    (harness.root / "behaviour.json").write_text(json.dumps(harness.behaviour), encoding="utf-8")
+    stopping = launcher.Launcher(harness.config)
+    (name,) = stopping.claim()
+    stopping.stopping = True
+    stopping.run_job(name)
+    assert harness.report(1) is None
+    harness.run()
+    assert harness.report(1)["reason"] == "interrupted"
+
+
 def test_retention(harness):
     harness.config["limits"]["retention_hours"] = 1
     old, young = (harness.state / "reports" / f"{ident(number)}.json" for number in (1, 2))

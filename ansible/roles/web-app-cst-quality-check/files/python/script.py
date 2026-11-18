@@ -182,6 +182,7 @@ class Launcher:
         self.state = config["state_dir"]
         self.database = config["database"]
         self.unstored = False
+        self.stopping = False
 
     def path(self, *parts):
         return os.path.join(self.state, *parts)
@@ -213,8 +214,11 @@ class Launcher:
             self.unmount(os.path.join(self.config["jobs_dir"], name))
 
     def stop(self, *_signal):
-        self.reap()
-        os._exit(143)
+        self.stopping = True
+        try:
+            self.reap()
+        finally:
+            os._exit(143)
 
     def unmount(self, path):
         if os.path.ismount(path):
@@ -285,7 +289,8 @@ class Launcher:
             self.write_report(job_id, failed("not checked"))
         finally:
             discard(self.path("claimed"), name)
-            discard(self.path("reports"), f"{job_id}.running")
+            if not self.stopping:
+                discard(self.path("reports"), f"{job_id}.running")
 
     def outcome(self, name, tier, job_id):
         try:
@@ -403,7 +408,7 @@ class Launcher:
         return {"updated": manifest["date"], "digest": manifest["digest"]}
 
     def write_report(self, job_id, document):
-        if not JOB_ID.match(job_id):
+        if not JOB_ID.match(job_id) or self.stopping:
             return
         final = self.path("reports", f"{job_id}.json")
         temporary = self.path("reports", f".{job_id}.{threading.get_ident()}.tmp")
