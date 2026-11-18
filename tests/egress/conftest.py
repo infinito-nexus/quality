@@ -51,6 +51,11 @@ def pair(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def internet():
-    if json.loads(peer("direct", "example.org:443", network="bridge")) != ["connected"]:
-        pytest.skip("[internet] example.org:443 is not reachable from a container on the default bridge")
+def internet_reachable():
+    return json.loads(peer("direct", "example.org:443", network="bridge")) == ["connected"]
+
+
+@pytest.fixture
+def internet(internet_reachable, request):
+    if not internet_reachable:
+        pytest.skip(f"[internet] {request.node.nodeid}: example.org:443 is not reachable from a container on the default bridge")
