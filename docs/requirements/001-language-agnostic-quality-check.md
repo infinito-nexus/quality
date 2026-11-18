@@ -96,139 +96,139 @@ flowchart TD
 
 ### Repository
 
-- [ ] `LICENSE` holds the MIT text and `pyproject.toml` declares MIT.
-- [ ] `pyproject.toml` has `name = "kvb-quality"` and `[project.scripts]` maps `quality`.
-- [ ] `MIRRORS` lists `https://pypi.org/project/kvb-quality/` and not `https://pypi.org/project/quality/`.
-- [ ] `[project] dependencies` lists only `PyYAML` and `pathspec`.
-- [ ] `quality check --all` on this repository exits 0.
-- [ ] `test_package_excludes_service`: the built wheel and the image hold no file from the hosted scan's paths named in requirement 002.
+- [x] `LICENSE` holds the MIT text and `pyproject.toml` declares MIT.
+- [x] `pyproject.toml` has `name = "kvb-quality"` and `[project.scripts]` maps `quality`.
+- [x] `MIRRORS` lists `https://pypi.org/project/kvb-quality/` and not `https://pypi.org/project/quality/`.
+- [x] `[project] dependencies` lists only `PyYAML` and `pathspec`.
+- [x] `quality check --all` on this repository exits 0.
+- [x] `test_package_excludes_service`: the built wheel and the image hold no file from the hosted scan's paths named in requirement 002.
 
 ### Modes
 
-- [ ] `test_staged_reads_index_text`: a partially staged file is judged by its index text, not its work tree text.
-- [ ] `test_check_changes_nothing`: `git status --porcelain` and `sha256sum .git/index` are identical before and after each mode.
-- [ ] `test_staged_name_status`: a rename, a mode change, a deleted file and `ü.py` are each classified correctly.
-- [ ] `test_staged_full_index_context`: a correct new `pkg/new.py` reports neither `I001` nor `INP001`.
-- [ ] `test_base_uses_merge_base`: on a branch behind `main`, `--base main` reports nothing from `main`'s newer commits.
-- [ ] `test_all_reports_legacy`: `--all` lists a legacy finding and exits 1.
-- [ ] `test_merge_both_parents`: during a merge, a finding present in either parent is not new.
-- [ ] `test_conflict_aborts`: an unresolved conflict exits 2.
-- [ ] `test_exit_codes`: no finding exits 0, findings exit 1, usage, config and missing-tool errors exit 2.
+- [x] `test_staged_reads_index_text`: a partially staged file is judged by its index text, not its work tree text.
+- [x] `test_check_changes_nothing`: `git status --porcelain` and `sha256sum .git/index` are identical before and after each mode.
+- [x] `test_staged_name_status`: a rename, a mode change, a deleted file and `ü.py` are each classified correctly.
+- [x] `test_staged_full_index_context`: a correct new `pkg/new.py` reports neither `I001` nor `INP001`.
+- [x] `test_base_uses_merge_base`: on a branch behind `main`, `--base main` reports nothing from `main`'s newer commits.
+- [x] `test_all_reports_legacy`: `--all` lists a legacy finding and exits 1.
+- [x] `test_merge_both_parents`: during a merge, a finding present in either parent is not new.
+- [x] `test_conflict_aborts`: an unresolved conflict exits 2.
+- [x] `test_exit_codes`: no finding exits 0, findings exit 1, usage, config and missing-tool errors exit 2.
 
 ### Differential gate
 
-- [ ] `test_gate_deleted_last_use`: deleting the last use of an import reports `F401` as new.
-- [ ] `test_gate_inline_reformat`: `foo(a,b)` to `foo(a, b)` reports nothing new.
-- [ ] `test_gate_multiline_reflow`: wrapping one call over several lines reports nothing new.
-- [ ] `test_gate_identical_lines`: copying a violating line twice reports 2 new findings.
-- [ ] `test_gate_rename_with_edit`: renaming a file and editing an unrelated line reports nothing new.
-- [ ] `test_gate_move_between_files`: moving a violating line to another file reports nothing new.
-- [ ] `test_gate_same_file_swap`: replacing one undefined name with another in the same file reports 1 new `F821`.
-- [ ] `test_gate_file_level_finding`: a finding without a line number passes the gate correctly in both directions.
-- [ ] `test_gate_new_rule_on_legacy`: a rule added by a newer version, matching only legacy code, exits 0 under `--base`.
-- [ ] `test_metric_growth`: CCN rising from 31 to 201 is a new finding.
-- [ ] `test_metric_legacy_unchanged`: an unchanged 800-line file is not a finding under `--base`.
-- [ ] `test_metric_new_entity`: a new 501-line code file is a finding.
+- [x] `test_gate_deleted_last_use`: deleting the last use of an import reports `F401` as new.
+- [x] `test_gate_inline_reformat`: `foo(a,b)` to `foo(a, b)` reports nothing new.
+- [x] `test_gate_multiline_reflow`: wrapping one call over several lines reports nothing new.
+- [x] `test_gate_identical_lines`: copying a violating line twice reports 2 new findings.
+- [x] `test_gate_rename_with_edit`: renaming a file and editing an unrelated line reports nothing new.
+- [x] `test_gate_move_between_files`: moving a violating line to another file reports nothing new.
+- [x] `test_gate_same_file_swap`: replacing one undefined name with another in the same file reports 1 new `F821`.
+- [x] `test_gate_file_level_finding`: a finding without a line number passes the gate correctly in both directions.
+- [x] `test_gate_new_rule_on_legacy`: a rule added by a newer version, matching only legacy code, exits 0 under `--base`.
+- [x] `test_metric_growth`: CCN rising from 31 to 201 is a new finding.
+- [x] `test_metric_legacy_unchanged`: an unchanged 800-line file is not a finding under `--base`.
+- [x] `test_metric_new_entity`: a new 501-line code file is a finding.
 
 ### Hard rules
 
-- [ ] `test_hard_new_secret`: an added secret exits 1 under `--staged`.
-- [ ] `test_hard_legacy_touched`: a legacy secret in a touched file exits 1 under `--staged`.
-- [ ] `test_hard_legacy_untouched`: a legacy secret in an untouched file exits 0 under `--staged` and 1 under `--all`.
-- [ ] `test_hard_noqa_ignored`: `X = eval(input())  # noqa: S307` exits 1.
-- [ ] `test_hard_secret_in_range`: a secret added and removed within `base..HEAD` exits 1 under `--base`.
-- [ ] `test_pragma_added`: each of `# noqa`, `# shellcheck disable`, `#lizard forgives` and `# ast-grep-ignore`, when newly added, is a finding.
-- [ ] `rules/*.yml` marks neither `S603` nor `S607` as `hard`.
+- [x] `test_hard_new_secret`: an added secret exits 1 under `--staged`.
+- [x] `test_hard_legacy_touched`: a legacy secret in a touched file exits 1 under `--staged`.
+- [x] `test_hard_legacy_untouched`: a legacy secret in an untouched file exits 0 under `--staged` and 1 under `--all`.
+- [x] `test_hard_noqa_ignored`: `X = eval(input())  # noqa: S307` exits 1.
+- [x] `test_hard_secret_in_range`: a secret added and removed within `base..HEAD` exits 1 under `--base`.
+- [x] `test_pragma_added`: each of `# noqa`, `# shellcheck disable`, `#lizard forgives` and `# ast-grep-ignore`, when newly added, is a finding.
+- [x] `rules/*.yml` marks neither `S603` nor `S607` as `hard`.
 
 ### Hardening
 
-- [ ] `test_repo_config_ignored`: `.shellcheckrc`, `actionlint.yaml`, `whitelizard.txt`, `.ignore` and `[tool.ruff]` in the target change no result.
-- [ ] `test_tracked_gitignored_file_checked`: a tracked file matched by `.gitignore`, and one under `venv/`, are both checked.
-- [ ] `test_export_ignore_checked`: a file with `export-ignore` is still checked.
-- [ ] `test_git_config_not_executed`: canaries in `core.fsmonitor` and a `filter.x.smudge` in the target's `.git/config` do not run.
-- [ ] `test_symlink_not_followed`: a canary behind a symlink pointing outside the tree never appears in any output.
-- [ ] `test_no_target_code_loaded`: a canary in `.quality/plugin.py` does not run.
-- [ ] `test_no_target_code_per_tool`: for every tool in `rules/tools.yml`, canaries in the files that tool could load (`build.rs`, `eslint.config.js`, a `phpstan.neon` bootstrap, `conftest.py`, `setup.py`, and any other its adapter names) do not run.
-- [ ] `test_tool_not_allowlisted`: an enforcer naming a tool outside `rules/tools.yml` exits 2.
-- [ ] `rg -n "clippy|cargo" rules/tools.yml` finds nothing.
+- [x] `test_repo_config_ignored`: `.shellcheckrc`, `actionlint.yaml`, `whitelizard.txt`, `.ignore` and `[tool.ruff]` in the target change no result.
+- [x] `test_tracked_gitignored_file_checked`: a tracked file matched by `.gitignore`, and one under `venv/`, are both checked.
+- [x] `test_export_ignore_checked`: a file with `export-ignore` is still checked.
+- [x] `test_git_config_not_executed`: canaries in `core.fsmonitor` and a `filter.x.smudge` in the target's `.git/config` do not run.
+- [x] `test_symlink_not_followed`: a canary behind a symlink pointing outside the tree never appears in any output.
+- [x] `test_no_target_code_loaded`: a canary in `.quality/plugin.py` does not run.
+- [x] `test_no_target_code_per_tool`: for every tool in `rules/tools.yml`, canaries in the files that tool could load (`build.rs`, `eslint.config.js`, a `phpstan.neon` bootstrap, `conftest.py`, `setup.py`, and any other its adapter names) do not run.
+- [x] `test_tool_not_allowlisted`: an enforcer naming a tool outside `rules/tools.yml` exits 2.
+- [x] `rg -n "clippy|cargo" rules/tools.yml` finds nothing.
 
 ### Redaction
 
-- [ ] `test_redaction_canary`: a canary secret on a secret finding's line, on a line with an unrelated finding, inside a string that `ruff` `S108` quotes, and in a file that fails to parse is absent from stdout, stderr and `--json`, with and without `--verbose`.
-- [ ] `test_finding_fields`: every `--json` finding holds only `rule`, `path`, `line`, `severity`, `summary`, `value` and `commit`.
-- [ ] `test_no_author_data`: a range scan with a secret prints its commit SHA and no author name, email or commit message.
-- [ ] `test_json_lists_exclusions`: `--json` lists every applied `.qualityignore.yml` entry and `nocheck` line.
+- [x] `test_redaction_canary`: a canary secret on a secret finding's line, on a line with an unrelated finding, inside a string that `ruff` `S108` quotes, and in a file that fails to parse is absent from stdout, stderr and `--json`, with and without `--verbose`.
+- [x] `test_finding_fields`: every `--json` finding holds only `rule`, `path`, `line`, `severity`, `summary`, `value` and `commit`.
+- [x] `test_no_author_data`: a range scan with a secret prints its commit SHA and no author name, email or commit message.
+- [x] `test_json_lists_exclusions`: `--json` lists every applied `.qualityignore.yml` entry and `nocheck` line.
 
 ### Bounds and failure
 
-- [ ] `test_tool_crash_exits_2`: a tool killed by a signal, or exiting with a code its adapter does not document, exits 2.
-- [ ] `test_tool_timeout_exits_2`: a tool exceeding its timeout is killed and the run exits 2.
-- [ ] `test_all_zero_files_exits_2`: `--all` on a `git clone --no-checkout` target exits 2, and after `git read-tree HEAD` it checks every file of `HEAD`.
-- [ ] `test_empty_staged_exits_0`: `--staged` with nothing staged exits 0.
-- [ ] `test_shallow_base_exits_2`: `--base` in a `--depth 1` clone exits 2 naming the missing merge base.
-- [ ] `test_shallow_all_labelled`: `--all` in a `--depth 1` clone prints `HEAD only: history not scanned`.
-- [ ] `test_large_blob_unread`: a blob over the size limit is not read into memory and is named as unchecked.
-- [ ] `test_large_code_file_is_a_hard_finding`: a changed `big.py`, `tool` and `.bashrc` over the limit exit 1 under every mode, while `logo.png`, `data.json` and `notes.v2` are only named.
+- [x] `test_tool_crash_exits_2`: a tool killed by a signal, or exiting with a code its adapter does not document, exits 2.
+- [x] `test_tool_timeout_exits_2`: a tool exceeding its timeout is killed and the run exits 2.
+- [x] `test_all_zero_files_exits_2`: `--all` on a `git clone --no-checkout` target exits 2, and after `git read-tree HEAD` it checks every file of `HEAD`.
+- [x] `test_empty_staged_exits_0`: `--staged` with nothing staged exits 0.
+- [x] `test_shallow_base_exits_2`: `--base` in a `--depth 1` clone exits 2 naming the missing merge base.
+- [x] `test_shallow_all_labelled`: `--all` in a `--depth 1` clone prints `HEAD only: history not scanned`.
+- [x] `test_large_blob_unread`: a blob over the size limit is not read into memory and is named as unchecked.
+- [x] `test_large_code_file_is_a_hard_finding`: a changed `big.py`, `tool` and `.bashrc` over the limit exit 1 under every mode, while `logo.png`, `data.json` and `notes.v2` are only named.
 
 ### Ignore file and suppression
 
-- [ ] `test_ignore_disables_rule`: an entry disables its rule for the project, and with `paths` only for those paths.
-- [ ] `test_ignore_reason_required`: an entry without `reason` exits 2.
-- [ ] `test_ignore_hard_needs_paths`: a hard rule without `paths`, or with `**`, `*.py`, `[a-z]*` or `*/a.py`, exits 2.
-- [ ] `test_ignore_hard_read_from_base`: a pull request adding an entry for a hard rule still exits 1 under `--base`.
-- [ ] `test_ignore_stale`: an entry matching nothing exits 2 under `--all` and is accepted under `--staged`.
-- [ ] `test_ignore_audit_line`: a changed `.qualityignore.yml` prints one audit line per change under `--base`.
-- [ ] `test_nocheck_needs_reason`: `# nocheck: rule` without `-- reason` does not suppress.
-- [ ] `test_nocheck_comment_only`: `x = "nocheck: rule -- reason"` does not suppress.
-- [ ] `test_unused_nocheck_is_a_finding`: a new nocheck that waives nothing exits 1, an old one in a touched file stays in the baseline, and `--all` names every one.
+- [x] `test_ignore_disables_rule`: an entry disables its rule for the project, and with `paths` only for those paths.
+- [x] `test_ignore_reason_required`: an entry without `reason` exits 2.
+- [x] `test_ignore_hard_needs_paths`: a hard rule without `paths`, or with `**`, `*.py`, `[a-z]*` or `*/a.py`, exits 2.
+- [x] `test_ignore_hard_read_from_base`: a pull request adding an entry for a hard rule still exits 1 under `--base`.
+- [x] `test_ignore_stale`: an entry matching nothing exits 2 under `--all` and is accepted under `--staged`.
+- [x] `test_ignore_audit_line`: a changed `.qualityignore.yml` prints one audit line per change under `--base`.
+- [x] `test_nocheck_needs_reason`: `# nocheck: rule` without `-- reason` does not suppress.
+- [x] `test_nocheck_comment_only`: `x = "nocheck: rule -- reason"` does not suppress.
+- [x] `test_unused_nocheck_is_a_finding`: a new nocheck that waives nothing exits 1, an old one in a touched file stays in the baseline, and `--all` names every one.
 - [ ] `test_nocheck_waives_one_line_of_an_unreadable_region`: a nocheck on the first line of a 34-line unreadable region leaves every other line a finding.
 
 ### Rules and languages
 
-- [ ] `test_catalogue_schema`: every entry of `rules/*.yml` has id, severity, summary and enforcer, and every id starts with `security.`, `coding.` or `clean.`.
-- [ ] `test_coverage_census`: `quality coverage` shows at least one rule each for Python, YAML, Markdown, JavaScript, TypeScript, TSX, Jinja, shell, JSON, env, conf, ini, nginx, GitHub workflows, Dockerfile, HTML, CSS, SQL, TOML, PHP, Make, Ruby, Rust, XML, Nix, systemd, TeX, Lua and HCL.
-- [ ] `test_coverage_names_gaps`: a file kind without rules is listed by name in `quality coverage`.
-- [ ] `test_shebang_mapping`: an extensionless script with a bash shebang gets the shell rules.
-- [ ] `test_jinja_inner_type`: `deploy.sh.j2` and `compose.yml.j2` get the Jinja rules and their inner type's rules.
-- [ ] `test_missing_tool_fails_closed`: a missing tool exits 2 naming it when its language is present, and is not required when absent.
+- [x] `test_catalogue_schema`: every entry of `rules/*.yml` has id, severity, summary and enforcer, and every id starts with `security.`, `coding.` or `clean.`.
+- [x] `test_coverage_census`: `quality coverage` shows at least one rule each for Python, YAML, Markdown, JavaScript, TypeScript, TSX, Jinja, shell, JSON, env, conf, ini, nginx, GitHub workflows, Dockerfile, HTML, CSS, SQL, TOML, PHP, Make, Ruby, Rust, XML, Nix, systemd, TeX, Lua and HCL.
+- [x] `test_coverage_names_gaps`: a file kind without rules is listed by name in `quality coverage`.
+- [x] `test_shebang_mapping`: an extensionless script with a bash shebang gets the shell rules.
+- [x] `test_jinja_inner_type`: `deploy.sh.j2` and `compose.yml.j2` get the Jinja rules and their inner type's rules.
+- [x] `test_missing_tool_fails_closed`: a missing tool exits 2 naming it when its language is present, and is not required when absent.
 - [ ] `test_defaults_parity`: every fixture of `skills/tests/test_defaults.py` yields the same hit from the new rules, and shell, Python and JavaScript recall against `defaults.py` on core is at least 95 %.
-- [ ] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
-- [ ] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
-- [ ] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.
-- [ ] `test_size_limits`: a new 501-line shell file fails, also under `tests/`; JSON, locale, lockfile and generated files of that length pass.
-- [ ] `test_folder_limit`: a thirteenth item fails under `--base`, and a folder already at 20 items that does not grow passes.
-- [ ] `test_prefix_groups`: two sibling files sharing a prefix fail, and dunder, numeric and `test` prefixes pass.
-- [ ] `test_inline_script_limit`: a `run:` block with 12 logical lines fails, with 11 it passes.
-- [ ] `test_function_limits`: CCN 11, 51 NLOC, 6 parameters and a 50-token clone each fail, the values below each pass.
-- [ ] `rg -n "500|MAX_" src/` finds no limit value in the runner.
-- [ ] `rg -n "utils\.cache|PROJECT_ROOT" src/ rules/` finds nothing.
+- [x] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
+- [x] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
+- [x] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.
+- [x] `test_size_limits`: a new 501-line shell file fails, also under `tests/`; JSON, locale, lockfile and generated files of that length pass.
+- [x] `test_folder_limit`: a thirteenth item fails under `--base`, and a folder already at 20 items that does not grow passes.
+- [x] `test_prefix_groups`: two sibling files sharing a prefix fail, and dunder, numeric and `test` prefixes pass.
+- [x] `test_inline_script_limit`: a `run:` block with 12 logical lines fails, with 11 it passes.
+- [x] `test_function_limits`: CCN 11, 51 NLOC, 6 parameters and a 50-token clone each fail, the values below each pass.
+- [x] `rg -n "500|MAX_" src/` finds no limit value in the runner.
+- [x] `rg -n "utils\.cache|PROJECT_ROOT" src/ rules/` finds nothing.
 
 ### Speed
 
 - [ ] `scripts/bench.sh` runs the full fast tier, secret scanner and hadolint included, over 43 sampled core commits on 20 CPUs: at least 90 % finish under 1 s.
-- [ ] `quality check --staged --verbose` lists neither jscpd, Semgrep, trivy nor osv-scanner.
-- [ ] `quality check --staged --verbose` shows lizard receiving touched files only.
-- [ ] `time quality --version` stays at or below 0.15 s.
+- [x] `quality check --staged --verbose` lists neither jscpd, Semgrep, trivy nor osv-scanner.
+- [x] `quality check --staged --verbose` shows lizard receiving touched files only.
+- [x] `time quality --version` stays at or below 0.15 s.
 - [ ] `quality check --all` on core, deep tier included, finishes within 120 s on 20 CPUs.
 - [ ] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
 
 ### Distribution
 
-- [ ] `test_single_pin_source`: no tool version appears outside `flake.lock` and the flake input URLs it locks, and the inputs of one tool name one version (decision 28).
-- [ ] `nix build .#default` yields `result/bin/quality`, and `env -i result/bin/quality doctor` lists every tool with its version.
-- [ ] `nix build .#image` yields an OCI image, and its `quality doctor` output is identical to the host binary's.
+- [x] `test_single_pin_source`: no tool version appears outside `flake.lock` and the flake input URLs it locks, and the inputs of one tool name one version (decision 28).
+- [x] `nix build .#default` yields `result/bin/quality`, and `env -i result/bin/quality doctor` lists every tool with its version.
+- [x] `nix build .#image` yields an OCI image, and its `quality doctor` output is identical to the host binary's.
 - [ ] The image is published for `linux/amd64` and `linux/arm64`, and its digest appears in the release notes.
-- [ ] `docker run --rm --network none --read-only --tmpfs /tmp --user 65534 -v "$PWD:/src:ro" -v "$DB:/db:ro" <image> check --all --db /db` gives the same findings as `quality check --all --db "$DB"` on the host, both naming the same database digest.
+- [x] `docker run --rm --network none --read-only --tmpfs /tmp --user 65534 -v "$PWD:/src:ro" -v "$DB:/db:ro" <image> check --all --db /db` gives the same findings as `quality check --all --db "$DB"` on the host, both naming the same database digest.
 - [ ] `test_vuln_offline`: under `--network none`, a fixture lockfile with a known CVE is reported through trivy and through osv-scanner.
-- [ ] `test_db_missing_exits_2`: the deep tier without a bundle exits 2 naming `quality db update`, and `--staged` needs no bundle.
-- [ ] `test_db_too_old_exits_2`: a bundle older than the limit exits 2.
+- [x] `test_db_missing_exits_2`: the deep tier without a bundle exits 2 naming `quality db update`, and `--staged` needs no bundle.
+- [x] `test_db_too_old_exits_2`: a bundle older than the limit exits 2.
 - [ ] `test_update_without_db_guards_the_default_cache`: `quality db update` without `--db` creates `$XDG_CACHE_HOME/quality` with mode 0700 and refuses it, before any fetch, when it is a link, belongs to another user or is writable by group or others.
-- [ ] `test_report_names_db`: every deep tier report prints the bundle's date and digest.
-- [ ] The compressed image size is at most 1 GiB.
-- [ ] The image holds a notices file listing every bundled tool with its licence.
-- [ ] Neither the flake nor the image contains `medusa`.
-- [ ] `README.md` holds the compose service and make target snippet for dev stacks.
-- [ ] A reusable workflow with `workflow_call` fetches full history, fetches the vulnerability database in its own step, runs `--base` and scans every commit of the range for secrets.
+- [x] `test_report_names_db`: every deep tier report prints the bundle's date and digest.
+- [x] The compressed image size is at most 1 GiB.
+- [x] The image holds a notices file listing every bundled tool with its licence.
+- [x] Neither the flake nor the image contains `medusa`.
+- [x] `README.md` holds the compose service and make target snippet for dev stacks.
+- [x] A reusable workflow with `workflow_call` fetches full history, fetches the vulnerability database in its own step, runs `--base` and scans every commit of the range for secrets.
 - [ ] `kvb-quality` publishes through PyPI Trusted Publishing and `git tag -v <release>` verifies.
 
 ### Rollout
@@ -246,5 +246,5 @@ flowchart TD
 - **Integration**
   - [ ] `make test-integration` passes and runs every named test above against real tools and temporary git repositories, except `test_single_pin_source`, which `make test-distribution` runs against the flake outputs (operator, 2026-11-13).
 - **E2E**
-  - [ ] `make test-e2e` runs host binary and image against clones of skills and package-manager, for `--staged`, `--base` and `--all`, on one database digest, with identical findings.
+  - [x] `make test-e2e` runs host binary and image against clones of skills and package-manager, for `--staged`, `--base` and `--all`, on one database digest, with identical findings.
   - [ ] A test pull request on skills goes red through the reusable workflow on a new finding and green after its fix.

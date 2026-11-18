@@ -71,113 +71,113 @@ flowchart TD
 
 ### Role
 
-- [ ] `ansible/roles/web-app-cst-quality-check/` holds `meta/main.yml`, `meta/domains.yml`, `meta/networks.yml`, `meta/services.yml`, `meta/server.yml`, `meta/rbac.yml`, `meta/volumes.yml`, `meta/csp.yml`, `meta/variants.yml`, `vars/main.yml`, `tasks/main.yml`, `tasks/00_core.yml`, `templates/compose.yml.j2`, `templates/keycloak/clients.json.j2`, `files/python/script.py` and `files/playwright/playwright.spec.js`.
-- [ ] `vars/main.yml` sets `application_id: "web-app-cst-quality-check"` and `system_service_id` to the same value.
-- [ ] `wc -l files/python/script.py` is at most 500.
-- [ ] `meta/domains.yml` declares `quality.{{ DOMAIN_PRIMARY }}` as canonical domain.
-- [ ] `meta/services.yml` declares `sso.flavor: oidc` and `sso.oidc.clients`, and `templates/keycloak/clients.json.j2` defines one public client with `S256` PKCE, `/account/callback` as its only redirect URI, `post.logout.redirect.uris`, and `{{ KEYCLOAK_RBAC_GROUP_CLAIM }}` in `defaultClientScopes`.
-- [ ] `meta/rbac.yml` names the role `member`, and `web.json`, which `tasks/00_core.yml` writes from `QUALITY_CHECK_WEB_CONFIG` and `meta/volumes.yml` mounts read-only, passes `/` plus its `rbac_group_path` to the web app and holds no client secret.
-- [ ] `meta/variants.yml` deploys the role once with both switches on and once with `access.anonymous: false`.
-- [ ] `rg -ni "x-forwarded-user|x-forwarded-groups|x-remote-user" service/web ansible/roles/web-app-cst-quality-check` finds nothing.
-- [ ] `meta/services.yml` sets `quality-check.modes.swarm.enabled: false`, `retention_hours: 48`, `access.anonymous: true`, `access.captcha: true`, and `css`, `javascript`, `matomo`, `logout`, `dashboard`, `design` and `tor` disabled.
-- [ ] `test_deploy_refuses_swarm`: `tasks/00_core.yml` fails under `DEPLOYMENT_MODE=swarm`, naming the mode.
-- [ ] `test_scan_anchor_holds_nothing`: the `scan` service of `templates/compose.yml.j2` runs `sleep infinity` with `network_mode: none`, `read_only: true`, the step uid, `cap_drop: ALL` and neither `env_file` nor `environment` nor volumes.
+- [x] `ansible/roles/web-app-cst-quality-check/` holds `meta/main.yml`, `meta/domains.yml`, `meta/networks.yml`, `meta/services.yml`, `meta/server.yml`, `meta/rbac.yml`, `meta/volumes.yml`, `meta/csp.yml`, `meta/variants.yml`, `vars/main.yml`, `tasks/main.yml`, `tasks/00_core.yml`, `templates/compose.yml.j2`, `templates/keycloak/clients.json.j2`, `files/python/script.py` and `files/playwright/playwright.spec.js`.
+- [x] `vars/main.yml` sets `application_id: "web-app-cst-quality-check"` and `system_service_id` to the same value.
+- [x] `wc -l files/python/script.py` is at most 500.
+- [x] `meta/domains.yml` declares `quality.{{ DOMAIN_PRIMARY }}` as canonical domain.
+- [x] `meta/services.yml` declares `sso.flavor: oidc` and `sso.oidc.clients`, and `templates/keycloak/clients.json.j2` defines one public client with `S256` PKCE, `/account/callback` as its only redirect URI, `post.logout.redirect.uris`, and `{{ KEYCLOAK_RBAC_GROUP_CLAIM }}` in `defaultClientScopes`.
+- [x] `meta/rbac.yml` names the role `member`, and `web.json`, which `tasks/00_core.yml` writes from `QUALITY_CHECK_WEB_CONFIG` and `meta/volumes.yml` mounts read-only, passes `/` plus its `rbac_group_path` to the web app and holds no client secret.
+- [x] `meta/variants.yml` deploys the role once with both switches on and once with `access.anonymous: false`.
+- [x] `rg -ni "x-forwarded-user|x-forwarded-groups|x-remote-user" service/web ansible/roles/web-app-cst-quality-check` finds nothing.
+- [x] `meta/services.yml` sets `quality-check.modes.swarm.enabled: false`, `retention_hours: 48`, `access.anonymous: true`, `access.captcha: true`, and `css`, `javascript`, `matomo`, `logout`, `dashboard`, `design` and `tor` disabled.
+- [x] `test_deploy_refuses_swarm`: `tasks/00_core.yml` fails under `DEPLOYMENT_MODE=swarm`, naming the mode.
+- [x] `test_scan_anchor_holds_nothing`: the `scan` service of `templates/compose.yml.j2` runs `sleep infinity` with `network_mode: none`, `read_only: true`, the step uid, `cap_drop: ALL` and neither `env_file` nor `environment` nor volumes.
 - [ ] After `container system prune -a -f` on the deployed host, the scan image still exists and the next scan job ends `done`.
 
 ### Inputs
 
 - [ ] `test_url_validation`: web app and launcher each accept `https://example.org/a/b` and reject `http://`, `ssh://`, `file://`, `ext::`, a plain path, user info, a port other than 443, an IPv4 literal, an IPv6 literal, `2130706433`, `0x7f.1`, a single label, a query, a fragment and a leading `-`.
-- [ ] `test_launcher_revalidates`: a job file placed directly into the spool with an invalid URL never reaches git.
-- [ ] `test_prepare_step`: a file job and a text job reach the scan through a `--network=none` prepare step, and `git ls-files` lists exactly the normalised name.
-- [ ] `test_upload_opaque`: an uploaded ZIP is scanned as one file, and a canary inside it appears nowhere.
+- [x] `test_launcher_revalidates`: a job file placed directly into the spool with an invalid URL never reaches git.
+- [x] `test_prepare_step`: a file job and a text job reach the scan through a `--network=none` prepare step, and `git ls-files` lists exactly the normalised name.
+- [x] `test_upload_opaque`: an uploaded ZIP is scanned as one file, and a canary inside it appears nowhere.
 - [ ] `test_text_language`: pasted Python text with language `python` is scanned as `snippet.py` and reports a known `ruff` rule.
-- [ ] `test_filename_normalised`: uploads named `../../x.py`, `.git/config` and `a<newline>b.py` each become one safe base name.
-- [ ] `test_submission_deleted`: after a job, no file on the state mount or the job's mount holds the submitted content.
+- [x] `test_filename_normalised`: uploads named `../../x.py`, `.git/config` and `a<newline>b.py` each become one safe base name.
+- [x] `test_submission_deleted`: after a job, no file on the state mount or the job's mount holds the submitted content.
 
 ### Access
 
-- [ ] `test_anonymous_needs_captcha`: with `access.captcha` on, a missing, invalid, expired or replayed solution creates no job.
-- [ ] `test_captcha_switch`: with `access.captcha` off, an anonymous submission needs no solution, no page loads the widget, and the rate limit still answers 429.
-- [ ] `test_registration_required`: with `access.anonymous` off, `/` holds no form, an anonymous `POST` creates no job, and a logged-in account's submission at `/account/` is accepted.
-- [ ] `test_registered_rate_limit`: an account outside the group needs no captcha, and its submission over `registered_per_user_hour` answers 429.
-- [ ] `test_anonymous_rate_limit`: the submission over the limit from one address answers 429, another address passes, and one IPv6 `/64` counts as one address.
-- [ ] `test_anonymous_hourly_total`: submissions from different addresses above `anonymous_hourly_total` answer 429, and a member's is accepted.
-- [ ] `test_target_host_limit`: URL jobs for one host above `per_host_hour` answer 429 for anonymous submitters.
-- [ ] `test_anonymous_queue_cap`: with a full anonymous queue an anonymous submission answers 429 and a member's is accepted.
-- [ ] `test_member_no_quota`: a group member submits more jobs than every other tier's limit without a captcha, and all are accepted.
-- [ ] `test_member_first`: a queued member job starts before an older job of any other tier.
-- [ ] `test_forged_identity`: a user or group header grants no logged-in tier on any path, and an unknown session cookie counts as anonymous.
-- [ ] `test_token_checks`: an ID token with a wrong issuer, audience or nonce is refused, one holding the slash-prefixed group path gives the member tier, and one without it gives the registered tier.
-- [ ] `test_session_cookie`: after login the cookie is `HttpOnly`, `Secure` and `SameSite=Lax` and holds no token, and an anonymous visit sets no cookie.
-- [ ] `test_foreign_origin_refused`: a logged-in `POST` with a foreign `Origin` creates no job.
-- [ ] `test_logout`: after `/account/logout` the old cookie grants no logged-in tier, and the browser was sent to the end-session endpoint.
-- [ ] `test_session_expires`: a session older than `limits.session_hours` grants no logged-in tier.
-- [ ] `test_login_state_bound`: a callback whose state belongs to another browser's login cookie is refused.
-- [ ] `test_missing_real_ip`: a request without `X-Real-IP` is refused.
+- [x] `test_anonymous_needs_captcha`: with `access.captcha` on, a missing, invalid, expired or replayed solution creates no job.
+- [x] `test_captcha_switch`: with `access.captcha` off, an anonymous submission needs no solution, no page loads the widget, and the rate limit still answers 429.
+- [x] `test_registration_required`: with `access.anonymous` off, `/` holds no form, an anonymous `POST` creates no job, and a logged-in account's submission at `/account/` is accepted.
+- [x] `test_registered_rate_limit`: an account outside the group needs no captcha, and its submission over `registered_per_user_hour` answers 429.
+- [x] `test_anonymous_rate_limit`: the submission over the limit from one address answers 429, another address passes, and one IPv6 `/64` counts as one address.
+- [x] `test_anonymous_hourly_total`: submissions from different addresses above `anonymous_hourly_total` answer 429, and a member's is accepted.
+- [x] `test_target_host_limit`: URL jobs for one host above `per_host_hour` answer 429 for anonymous submitters.
+- [x] `test_anonymous_queue_cap`: with a full anonymous queue an anonymous submission answers 429 and a member's is accepted.
+- [x] `test_member_no_quota`: a group member submits more jobs than every other tier's limit without a captcha, and all are accepted.
+- [x] `test_member_first`: a queued member job starts before an older job of any other tier.
+- [x] `test_forged_identity`: a user or group header grants no logged-in tier on any path, and an unknown session cookie counts as anonymous.
+- [x] `test_token_checks`: an ID token with a wrong issuer, audience or nonce is refused, one holding the slash-prefixed group path gives the member tier, and one without it gives the registered tier.
+- [x] `test_session_cookie`: after login the cookie is `HttpOnly`, `Secure` and `SameSite=Lax` and holds no token, and an anonymous visit sets no cookie.
+- [x] `test_foreign_origin_refused`: a logged-in `POST` with a foreign `Origin` creates no job.
+- [x] `test_logout`: after `/account/logout` the old cookie grants no logged-in tier, and the browser was sent to the end-session endpoint.
+- [x] `test_session_expires`: a session older than `limits.session_hours` grants no logged-in tier.
+- [x] `test_login_state_bound`: a callback whose state belongs to another browser's login cookie is refused.
+- [x] `test_missing_real_ip`: a request without `X-Real-IP` is refused.
 
 ### Fetch and egress
 
-- [ ] `test_fetch_argv`: the clone runs with `https_proxy` set to the proxy's fixed address, `no_proxy`, `NO_PROXY` and `all_proxy` absent, `GIT_ALLOW_PROTOCOL=https`, `GIT_TERMINAL_PROMPT=0`, `http.followRedirects=false`, `transfer.fsckObjects=true`, the fixed `http.userAgent`, empty global and system configuration, `--depth 1 --no-checkout --single-branch`, and `--` before the URL.
+- [x] `test_fetch_argv`: the clone runs with `https_proxy` set to the proxy's fixed address, `no_proxy`, `NO_PROXY` and `all_proxy` absent, `GIT_ALLOW_PROTOCOL=https`, `GIT_TERMINAL_PROMPT=0`, `http.followRedirects=false`, `transfer.fsckObjects=true`, the fixed `http.userAgent`, empty global and system configuration, `--depth 1 --no-checkout --single-branch`, and `--` before the URL.
 - [ ] `test_egress_blocks_internal`: from the fetch network, a name resolving into each range of decision 6 and each of the host's own addresses is refused by the proxy.
-- [ ] `test_egress_rebinding`: with a stub DNS server answering first a public and then a private address at TTL 0, the private listener sees zero hits in repeated connections across the cache's expiry.
+- [x] `test_egress_rebinding`: with a stub DNS server answering first a public and then a private address at TTL 0, the private listener sees zero hits in repeated connections across the cache's expiry.
 - [ ] `test_proxy_flags`: `docker inspect` of the proxy shows every setting of decision 8 except `--network=none`.
-- [ ] `test_proxy_version`: the flake build fails when Squid's major version is not 7.
-- [ ] `test_egress_no_direct_route`: from the fetch network, a direct connection that skips the proxy fails, to a public address, to the bridge's gateway address and to the host.
-- [ ] `test_egress_connect_only`: plain `GET http://` through the proxy is refused.
-- [ ] `test_egress_port_443_only` `[internet]`: `CONNECT` to a public host on port 80 or 25 is refused, and on port 443 it succeeds.
-- [ ] `test_redirect_not_followed` `[test proxy]`: a server redirecting to a canary listener causes zero hits there.
-- [ ] `test_submodule_not_fetched` `[test proxy]`: a `.gitmodules` pointing at a canary listener causes zero hits there.
-- [ ] `test_index_populated` `[test proxy]`: after the fetch, `git ls-files` equals `git ls-tree -r --name-only HEAD`.
-- [ ] `test_fetch_visible_in_scan` `[test proxy]`: the scan step sees every file the fetch step wrote.
-- [ ] `test_repo_too_large` `[test proxy]`: a repository over the tier's size limit ends as `failed: too large`, and its mount is gone.
-- [ ] `test_fetch_timeout` `[test proxy]`: a server that stalls ends as `failed: timeout`, and no container remains.
-- [ ] `test_private_same_as_missing` `[test proxy]`: a private and a missing repository yield the same `failed: not reachable`.
+- [x] `test_proxy_version`: the flake build fails when Squid's major version is not 7.
+- [x] `test_egress_no_direct_route`: from the fetch network, a direct connection that skips the proxy fails, to a public address, to the bridge's gateway address and to the host.
+- [x] `test_egress_connect_only`: plain `GET http://` through the proxy is refused.
+- [x] `test_egress_port_443_only` `[internet]`: `CONNECT` to a public host on port 80 or 25 is refused, and on port 443 it succeeds.
+- [x] `test_redirect_not_followed` `[test proxy]`: a server redirecting to a canary listener causes zero hits there.
+- [x] `test_submodule_not_fetched` `[test proxy]`: a `.gitmodules` pointing at a canary listener causes zero hits there.
+- [x] `test_index_populated` `[test proxy]`: after the fetch, `git ls-files` equals `git ls-tree -r --name-only HEAD`.
+- [x] `test_fetch_visible_in_scan` `[test proxy]`: the scan step sees every file the fetch step wrote.
+- [x] `test_repo_too_large` `[test proxy]`: a repository over the tier's size limit ends as `failed: too large`, and its mount is gone.
+- [x] `test_fetch_timeout` `[test proxy]`: a server that stalls ends as `failed: timeout`, and no container remains.
+- [x] `test_private_same_as_missing` `[test proxy]`: a private and a missing repository yield the same `failed: not reachable`.
 
 ### Launcher and isolation
 
-- [ ] `test_no_runtime_no_job`: with `SANDBOX_RUNTIME` absent from the runtimes of `docker info`, the launcher exits non-zero and starts no container.
-- [ ] `test_stage_flags`: through core's real `container` wrapper, with `CA_CONTAINER_ENABLED=1` in the calling environment, each step's container shows in `docker inspect` every setting of decision 8, read-only job and database mounts in the scan step, and no credential in its environment.
-- [ ] `test_image_not_from_job`: a job file naming an image has no effect on the image started.
-- [ ] `test_isolation_probe`: a probe image, set through the launcher's test configuration, reaches no network, cannot write `/src` or `/db`, sees no other job's mount, hits the process limit on a fork bomb and the size limit on `/tmp`.
-- [ ] `test_probe_cannot_stay`: a probe that never exits is killed at the timeout, no container remains, and the next job starts in a new container.
-- [ ] `test_job_separation`: a file left by job A's probe is absent in job B.
+- [x] `test_no_runtime_no_job`: with `SANDBOX_RUNTIME` absent from the runtimes of `docker info`, the launcher exits non-zero and starts no container.
+- [x] `test_stage_flags`: through core's real `container` wrapper, with `CA_CONTAINER_ENABLED=1` in the calling environment, each step's container shows in `docker inspect` every setting of decision 8, read-only job and database mounts in the scan step, and no credential in its environment.
+- [x] `test_image_not_from_job`: a job file naming an image has no effect on the image started.
+- [x] `test_isolation_probe`: a probe image, set through the launcher's test configuration, reaches no network, cannot write `/src` or `/db`, sees no other job's mount, hits the process limit on a fork bomb and the size limit on `/tmp`.
+- [x] `test_probe_cannot_stay`: a probe that never exits is killed at the timeout, no container remains, and the next job starts in a new container.
+- [x] `test_job_separation`: a file left by job A's probe is absent in job B.
 - [ ] `test_stop_mid_job`: after `systemctl stop` during a job, the next run leaves no step container and no job mount, and the job shows `failed`.
 - [ ] `test_launcher_recovers`: after `kill -9` during a job, the next run marks it `failed` and removes its container and mount.
-- [ ] `test_spool_hostile_file`: a symlink, a FIFO, a directory and an oversized file in the spool are skipped without blocking the run, and no target is read.
-- [ ] `test_job_id_hostile`: ids holding `../`, a leading `-` or uppercase hex are refused, and no path, container or mount is created from them.
-- [ ] `test_report_no_overwrite`: a job naming an existing report's id leaves that report unchanged.
-- [ ] `test_poison_job_isolated`: a job file with deeply nested JSON fails alone, and the next job in the same run completes.
+- [x] `test_spool_hostile_file`: a symlink, a FIFO, a directory and an oversized file in the spool are skipped without blocking the run, and no target is read.
+- [x] `test_job_id_hostile`: ids holding `../`, a leading `-` or uppercase hex are refused, and no path, container or mount is created from them.
+- [x] `test_report_no_overwrite`: a job naming an existing report's id leaves that report unchanged.
+- [x] `test_poison_job_isolated`: a job file with deeply nested JSON fails alone, and the next job in the same run completes.
 - [ ] `test_spool_full`: with the state mount full, an anonymous submission answers 429, the launcher still marks running jobs, and the host's root filesystem is unchanged.
-- [ ] `rg -n "shell=True|os\.system" ansible/roles/web-app-cst-quality-check/files/python/` finds nothing.
+- [x] `rg -n "shell=True|os\.system" ansible/roles/web-app-cst-quality-check/files/python/` finds nothing.
 
 ### Reports
 
-- [ ] `test_report_schema`: a probe printing an unknown field, invalid JSON or more than the size limit ends as `failed`.
-- [ ] `test_exit_mapping`: exit 0 and 1 give `done`; exit 2, a signal and a timeout give `failed` with no findings, shown as not checked.
-- [ ] `test_report_header`: a URL report shows commit, `quality` version, database date and digest, `HEAD only: history not scanned` and the applied exclusions.
-- [ ] `rg -ni "badge" service/web` finds nothing.
-- [ ] `test_report_escaped`: a path holding `<script>` renders as text and is no link.
-- [ ] `test_report_link`: report ids hold 128 random bits, an unknown id answers 404, no route lists reports, and pages send `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex`.
-- [ ] `test_no_personal_data`: a report file holds no address, user name or email.
-- [ ] `test_canary_end_to_end`: a canary secret in a fixture repository is absent from the report, the state mount, the launcher's journal and the web app's log.
+- [x] `test_report_schema`: a probe printing an unknown field, invalid JSON or more than the size limit ends as `failed`.
+- [x] `test_exit_mapping`: exit 0 and 1 give `done`; exit 2, a signal and a timeout give `failed` with no findings, shown as not checked.
+- [x] `test_report_header`: a URL report shows commit, `quality` version, database date and digest, `HEAD only: history not scanned` and the applied exclusions.
+- [x] `rg -ni "badge" service/web` finds nothing.
+- [x] `test_report_escaped`: a path holding `<script>` renders as text and is no link.
+- [x] `test_report_link`: report ids hold 128 random bits, an unknown id answers 404, no route lists reports, and pages send `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex`.
+- [x] `test_no_personal_data`: a report file holds no address, user name or email.
+- [x] `test_canary_end_to_end`: a canary secret in a fixture repository is absent from the report, the state mount, the launcher's journal and the web app's log.
 
 ### Retention and database
 
-- [ ] `test_retention`: with `retention_hours: 1`, a report older than one hour is deleted and a younger one stays.
-- [ ] `test_db_update_isolated` `[internet]`: the update container mounts no job directory and reaches the network only through the proxy.
-- [ ] `test_db_update_failure_alerts`: a failed update completes queued jobs first and then makes the unit fail.
-- [ ] `test_db_too_old_job_fails`: a database past the age limit ends jobs as `failed: database too old`.
+- [x] `test_retention`: with `retention_hours: 1`, a report older than one hour is deleted and a younger one stays.
+- [x] `test_db_update_isolated` `[internet]`: the update container mounts no job directory and reaches the network only through the proxy.
+- [x] `test_db_update_failure_alerts`: a failed update completes queued jobs first and then makes the unit fail.
+- [x] `test_db_too_old_job_fails`: a database past the age limit ends jobs as `failed: database too old`.
 
 ### Legal
 
-- [ ] `files/legal/en/privacy.html`, `files/legal/de/privacy.html`, `files/legal/en/terms.html` and `files/legal/de/terms.html` exist, and the privacy pages state the retention value from `meta/services.yml`.
-- [ ] A notices page lists every bundled tool with its licence.
+- [x] `files/legal/en/privacy.html`, `files/legal/de/privacy.html`, `files/legal/en/terms.html` and `files/legal/de/terms.html` exist, and the privacy pages state the retention value from `meta/services.yml`.
+- [x] A notices page lists every bundled tool with its licence.
 - [ ] `docs/review/002-go-live.md` records the `kvb-check-legal` and `kvb-check-security` results of the go-live commit with no open critical finding.
 
 ### Tests
 
 - **Unit**
-  - [ ] `make test-service` covers the URL validator, the job parser, the report schema, the rate limiter and captcha verification.
+  - [x] `make test-service` covers the URL validator, the job parser, the report schema, the rate limiter and captcha verification.
 - **Integration**
   - [ ] `make test-egress INFINITO_CORE_DIR=<core>` runs every named egress, `[test proxy]` and isolation test above against real containers, the real proxy and temporary git servers, and it reports each skipped `[internet]` test by name; `make test-integration` stays the container-free suite of requirement 001 (operator, 2026-11-13).
 - **E2E**
