@@ -209,7 +209,7 @@ flowchart TD
 - [x] `quality check --staged --verbose` lists neither jscpd, Semgrep, trivy nor osv-scanner.
 - [x] `quality check --staged --verbose` shows lizard receiving touched files only.
 - [x] `time quality --version` stays at or below 0.15 s.
-- [ ] `quality check --all` on core, deep tier included, finishes within 120 s on 20 CPUs.
+- [ ] `quality check --all` on core, deep tier included, finishes within 360 s on 20 CPUs (operator, 2026-11-18: raised from 120 s, because core tracks 995 MB, 960 MB of them translated `docs.po` catalogs under `locale/`, and the secret scanner alone needs 1,660 CPU seconds for them, already on about 14 cores; measured 302 to 317 s cold, 94 s without `locale/`).
 - [ ] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
 
 ### Distribution
