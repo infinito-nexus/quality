@@ -25,6 +25,8 @@ LEGAL = {
     "legal.dependency-license": ({"dependency-license"}, "critical", 50),
     "legal.external-request": ({"rg"}, "medium", 25),
     "legal.reuse": ({"reuse"}, "medium", 25),
+    "legal.foreign-origin": ({"scancode"}, "critical", 50),
+    "legal.foreign-copyright": ({"scancode"}, "medium", 25),
 }
 ARCHITECTURE = {
     "clean.complexity": ("SRP", 10),

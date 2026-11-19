@@ -59,6 +59,7 @@
         semgrep = semgrep;
         shellcheck = pkgs.shellcheck;
         trivy = pkgs.trivy;
+        scancode = pkgs.python3Packages.scancode-toolkit;
       };
       tools = builtins.attrValues toolPackages;
       gitMinimal = pkgs.gitMinimal;

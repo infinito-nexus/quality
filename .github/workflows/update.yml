@@ -31,6 +31,9 @@ jobs:
       - name: Update every input of flake.lock
         run: nix flake update
 
+      - name: Pin the newest ORT release by its digest
+        run: python3 .github/ort/pin.py update .github/ort/image
+
       - name: Run the tests on the updated tools before any pull request exists
         run: nix develop --command make test-unit test-integration test-service
 
@@ -38,8 +41,10 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           branch: update/flake-lock
-          add-paths: flake.lock
-          commit-message: "chore(deps): update flake.lock"
-          title: "chore(deps): update flake.lock"
-          body: "nix flake update bumped the pinned tools; make test-unit test-integration test-service passed on this lock in the update job before this pull request was opened."
+          add-paths: |
+            flake.lock
+            .github/ort/image
+          commit-message: "chore(deps): update the pinned tools"
+          title: "chore(deps): update the pinned tools"
+          body: "nix flake update bumped flake.lock and .github/ort/pin.py pinned the newest ORT release by digest in .github/ort/image; make test-unit test-integration test-service passed on these pins in the update job before this pull request was opened."
           delete-branch: true

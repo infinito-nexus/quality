@@ -17,6 +17,7 @@ CAPS = {
     "hadolint": ("Dockerfile", "dockerfile", ["+RTS", "-N2", "-RTS"]),
     "jscpd": ("a.c", "c", ["--workers", "2"]),
     "semgrep": ("a.js", "javascript", ["--jobs", "2"]),
+    "scancode": ("a.py", "any", ["--processes", "2"]),
 }
 
 

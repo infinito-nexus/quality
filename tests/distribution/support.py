@@ -28,6 +28,7 @@ INPUT_URL = re.compile(r'inputs\.(?P<name>[\w-]+)(?:\.url|\s*=\s*\{[^}]*?\burl)\
 PIN_SOURCE = "flake.lock"
 FLAKE = "flake.nix"
 IMAGE_MANIFEST = "manifest.json"
+STORE_ENTRY = re.compile(r"^/?nix/store/[0-9a-z]{32}-(?P<name>[^/]+)")
 
 
 def flake_ref(root: Path) -> str:
@@ -173,6 +174,22 @@ def image_contents(tarball: Path) -> tuple:
                 blobs[member.name] = archive.extractfile(member).read()
     (entry,) = json.loads(blobs[IMAGE_MANIFEST])
     return names, json.loads(blobs[entry["Config"]])
+
+
+def bundled_names(members: list) -> set:
+    """
+    Args:
+        members: Entry names of an image archive, as image_contents lists them.
+
+    Returns:
+        The name of every store path among them without its hash, and every
+        entry outside the store as it is.
+    """
+    names = set()
+    for member in members:
+        match = STORE_ENTRY.match(member)
+        names.add(match.group("name") if match else member)
+    return names
 
 
 def clean_env() -> dict:

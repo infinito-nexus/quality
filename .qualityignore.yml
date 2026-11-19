@@ -8,7 +8,8 @@
   paths:
     - ansible/roles/web-app-cst-quality-check/files/python/script.py
     - service/verify/extra_vars.py
-  reason: standalone scripts run by path; sys-service copies script.py alone, so a package file next to it would never ship
+    - .github/ort/pin.py
+  reason: standalone scripts run by path; sys-service copies script.py alone, so a package file next to it would never ship, and the ort and update workflows run .github/ort/pin.py by path
 - rule: clean.folder-items
   paths: ["src/quality"]
   reason: requirement 001 decision 24 adds db.py as the thirteenth item of the runner package, its Distribution criteria add doctor.py for `quality doctor`, and kinds.py, waivers.py and environment.py keep ruledata.py and modes.py under the file line limit, and requirement 004 adds the legal/ subpackage; moving modules into subpackages would change every import and is a refactor of its own
@@ -25,3 +26,9 @@
 - rule: legal.external-request
   paths: ["tests/integration/rules/test_legal.py"]
   reason: the fixtures of legal.external-request write the third-party web font link the rule must find into a template of the fixture repository; the test file itself requests nothing
+- rule: legal.foreign-origin
+  paths: ["tests/integration/rules/test_legal.py"]
+  reason: the legal fixtures write the GPL texts and headers the legal rules must find into files of the fixture repository; the test file itself holds no foreign code
+- rule: legal.foreign-origin
+  paths: ["service/web/quality_web/templates/notices.html.j2"]
+  reason: the notices page names the licence of every bundled package as its attribution; it carries no code under those licences

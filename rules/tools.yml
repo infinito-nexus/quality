@@ -107,3 +107,8 @@ osv-scanner:
   update_timeout: 1800
   loads:
     - osv-scanner.toml
+scancode:
+  timeout: 600
+  exit_codes: [0]
+  license_score: 80
+  loads: []
