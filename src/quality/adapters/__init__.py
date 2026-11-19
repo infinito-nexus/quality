@@ -17,12 +17,14 @@ from quality.adapters import (
     osvscanner,
     rg,
     ruff,
+    scancode,
     semgrep,
     shellcheck,
     trivy,
 )
 from quality.adapters.base import Bound, Skipped, gap_rule
 from quality.adapters.builtin import run_builtin
+from quality.architecture import depcruise, importlinter
 from quality.gate import code_hit
 from quality.process import run
 from quality.ruledata import BUILTIN, RuleData, gitignore_spec, require
@@ -37,9 +39,12 @@ REGISTRY = {
     "osv-scanner": osvscanner,
     "rg": rg,
     "ruff": ruff,
+    "scancode": scancode,
     "semgrep": semgrep,
     "shellcheck": shellcheck,
     "trivy": trivy,
+    "lint-imports": importlinter,
+    "depcruise": depcruise,
 }
 PARSE_FAILURES = (ValueError, LookupError, TypeError, csv.Error)
 

@@ -36,6 +36,23 @@ quality-check:
 
 `--staged` needs no database. `--base` and `--all` add the deep tier, which reads the bundle of `quality db update`: mount it with `- <db>:/db:ro` and pass `--db /db`. `quality db update --licenses <repo>`, repeatable, also stores the registry licences of the exact pins at each named repository's HEAD and in its staging index for `legal.dependency-license`; a pin without an SPDX licence there stays `unchecked`, and an update without `--licenses` keeps the stored licences. Run the service from a main checkout, because a linked worktree's `.git` file points outside `/src`.
 
+## Layer contracts
+
+A repository that holds `.quality/architecture.yml` gets the rules `architecture.layer` and `architecture.cycle` ([requirement 005](docs/requirements/005-architecture-score.md), decision 3); each new hit lowers the architecture score by 25. Python runs through `lint-imports` of import-linter, JavaScript through `depcruise` of dependency-cruiser, both bundled like every other tool. Each section is optional, every key inside it is required, and a malformed file stops the check with an error naming the key. `source` is the directory holding the code, `.` for the root, and for JavaScript also the scope of the cycle check; `layers` lists the highest layer first, and no layer may import one above it:
+
+```yaml
+python:
+  source: src
+  packages: [shop]
+  layers: [shop.web, shop.domain]
+  forbidden:
+    - {from: [shop.domain], to: [shop.web]}
+javascript:
+  source: web
+  layers: [web/ui, web/core]
+  forbidden: []
+```
+
 ## Hosted scan
 
 The role `web-app-cst-quality-check` serves the scan as a web page ([requirement 002](docs/requirements/002-hosted-quality-scan.md)).

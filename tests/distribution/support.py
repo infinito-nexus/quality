@@ -17,17 +17,20 @@ SYSTEMS = ("x86_64-linux", "aarch64-linux")
 NIX_FEATURES = ("--extra-experimental-features", "nix-command flakes")
 needs_nix = pytest.mark.skipif(NIX is None, reason="needs nix")
 
-TOOL_ALIASES = {"rg": ("ripgrep",)}
+TOOL_ALIASES = {"rg": ("ripgrep",), "lint-imports": ("import-linter", "import_linter"), "depcruise": ("dependency-cruiser",)}
 SEPARATOR = r'(?:_VERSION\s*(?:[:?]?=|:)\s*["\']?|\s*[=~!<>]=\s*|@|:|-|_|/v?|"?\s*[:=]\s*"[\^~>=<v]*)'
 VERSION = r"v?(?P<version>\d+\.\d+(?:\.\d+)*)"
+DERIVED_HASHES = ("npmDepsHash",)
 HAND_PINS = re.compile(
     r"\b(?:fetchurl|fetchzip|fetchgit|fetchFromGitHub|fetchTarball|fetchPypi)\b"
     r'|\b(?:version|hash|sha256|sha512|rev)\s*=\s*"'
+    rf'|\b(?!(?:{"|".join(DERIVED_HASHES)})\b)\w+Hash\s*=\s*"'
 )
 INPUT_URL = re.compile(r'inputs\.(?P<name>[\w-]+)(?:\.url|\s*=\s*\{[^}]*?\burl)\s*=\s*"(?P<url>[^"]+)"')
 PIN_SOURCE = "flake.lock"
 FLAKE = "flake.nix"
 IMAGE_MANIFEST = "manifest.json"
+STORE_ENTRY = re.compile(r"^/?nix/store/[0-9a-z]{32}-(?P<name>[^/]+)")
 
 
 def flake_ref(root: Path) -> str:
@@ -134,8 +137,9 @@ def pin_violations(texts: dict, names: dict) -> list:
 
     Returns:
         One line per tool version written outside flake.lock and the flake
-        inputs it locks, per hand-written version or hash in flake.nix, and
-        per tool whose inputs name more than one version.
+        inputs it locks, per hand-written version or hash in flake.nix other
+        than the DERIVED_HASHES .github/update/inputs.py recomputes from a
+        locked input, and per tool whose inputs name more than one version.
     """
     pattern = pin_pattern(names)
     violations = []
@@ -173,6 +177,22 @@ def image_contents(tarball: Path) -> tuple:
                 blobs[member.name] = archive.extractfile(member).read()
     (entry,) = json.loads(blobs[IMAGE_MANIFEST])
     return names, json.loads(blobs[entry["Config"]])
+
+
+def bundled_names(members: list) -> set:
+    """
+    Args:
+        members: Entry names of an image archive, as image_contents lists them.
+
+    Returns:
+        The name of every store path among them without its hash, and every
+        entry outside the store as it is.
+    """
+    names = set()
+    for member in members:
+        match = STORE_ENTRY.match(member)
+        names.add(match.group("name") if match else member)
+    return names
 
 
 def clean_env() -> dict:

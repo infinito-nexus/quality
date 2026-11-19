@@ -10,6 +10,22 @@
     url = "https://registry.npmjs.org/jscpd-linux-arm64-gnu/-/jscpd-linux-arm64-gnu-5.4.2.tgz";
     flake = false;
   };
+  inputs.grimp-x86_64-linux = {
+    url = "https://files.pythonhosted.org/packages/78/0e/bd28e0ab5fd3d356617a9d30aafbb872838be3865299f3af4be3244d51e2/grimp-3.20-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl";
+    flake = false;
+  };
+  inputs.grimp-aarch64-linux = {
+    url = "https://files.pythonhosted.org/packages/40/65/9875f637b413ea26ed0c042f0b7528bf1fc7b5abb6cb895581c2f5b5e162/grimp-3.20-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl";
+    flake = false;
+  };
+  inputs.import-linter = {
+    url = "https://files.pythonhosted.org/packages/b6/45/baf897d969b4e19d9e063ffb13bc12346b1af6b36e1774841d16d84cf3cc/import_linter-2.17-py3-none-any.whl";
+    flake = false;
+  };
+  inputs.dependency-cruiser = {
+    url = "https://github.com/sverweij/dependency-cruiser/archive/refs/tags/v18.8.0.tar.gz";
+    flake = false;
+  };
   outputs = { self, nixpkgs, nixpkgs-stable, ... }@inputs:
   let
     lib = nixpkgs.lib;
@@ -46,6 +62,41 @@
         meta.license = lib.licenses.mit;
         meta.mainProgram = "jscpd";
       };
+      wheelName = input: baseNameOf (lib.importJSON ./flake.lock).nodes.${input}.locked.url;
+      wheelOf = input: pkgs.runCommand (wheelName input) { } "cp ${inputs.${input}} $out";
+      wheelVersion = input: lib.elemAt (lib.splitString "-" (wheelName input)) 1;
+      grimp = assert lib.versions.majorMinor python.version == "3.14"; python.pkgs.buildPythonPackage {
+        pname = "grimp";
+        version = wheelVersion "grimp-${system}";
+        format = "wheel";
+        src = wheelOf "grimp-${system}";
+        nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+        buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+        pythonImportsCheck = [ "grimp" ];
+        meta.license = lib.licenses.bsd2;
+      };
+      import-linter = python.pkgs.buildPythonPackage {
+        pname = "import-linter";
+        version = wheelVersion "import-linter";
+        format = "wheel";
+        src = wheelOf "import-linter";
+        dependencies = [ grimp python.pkgs.click python.pkgs.rich ];
+        pythonImportsCheck = [ "importlinter" ];
+        meta.license = lib.licenses.bsd2;
+        meta.mainProgram = "lint-imports";
+      };
+      dependency-cruiser = pkgs.buildNpmPackage {
+        pname = "dependency-cruiser";
+        version = (lib.importJSON "${inputs.dependency-cruiser}/package.json").version;
+        src = inputs.dependency-cruiser;
+        npmDepsHash = "sha256-8KDeALHVS+XYWtmNjou3OcAZhRHfDRrZw6doabr6hhU=";
+        dontNpmBuild = true;
+        npmPackFlags = [ "--ignore-scripts" ];
+        doInstallCheck = true;
+        nativeInstallCheckInputs = [ pkgs.versionCheckHook ];
+        meta.license = lib.licenses.mit;
+        meta.mainProgram = "depcruise";
+      };
       toolPackages = {
         actionlint = pkgs.actionlint;
         ast-grep = pkgs.ast-grep;
@@ -59,6 +110,9 @@
         semgrep = semgrep;
         shellcheck = pkgs.shellcheck;
         trivy = pkgs.trivy;
+        lint-imports = import-linter;
+        depcruise = dependency-cruiser;
+        scancode = pkgs.python3Packages.scancode-toolkit;
       };
       tools = builtins.attrValues toolPackages;
       gitMinimal = pkgs.gitMinimal;
@@ -68,9 +122,9 @@
       pins = lib.mapAttrs pinOf (toolPackages // { git = gitMinimal; });
       noticesText = lib.concatLines ([
         "quality ${version}: MIT"
-        "The packages below are bundled with the licence nixpkgs declares for each. They come from nixpkgs revision ${nixpkgs.rev}, semgrep from nixpkgs revision ${nixpkgs-stable.rev}, and jscpd from its prebuilt release on npm, as flake.lock pins them."
+        "The packages below are bundled with the licence nixpkgs declares for each. They come from nixpkgs revision ${nixpkgs.rev}, semgrep from nixpkgs revision ${nixpkgs-stable.rev}, jscpd from its prebuilt release on npm, grimp from its prebuilt wheel on PyPI, one per platform, import-linter from its wheel on PyPI and dependency-cruiser from its release tag on GitHub, as flake.lock pins them."
         "nix build github:NixOS/nixpkgs/<revision>#<attribute>.src fetches the upstream source of a nixpkgs package."
-      ] ++ lib.mapAttrsToList noticeOf (toolPackages // runtimePackages));
+      ] ++ lib.mapAttrsToList noticeOf (toolPackages // runtimePackages // { inherit grimp; }));
       notices = pkgs.writeTextDir "share/doc/quality/NOTICES" noticesText;
       quality = python.pkgs.buildPythonApplication {
         pname = "kvb-quality";

@@ -1,0 +1,19 @@
+- id: architecture.layer
+  severity: medium
+  summary: Import breaks a layer or forbidden import of .quality/architecture.yml
+  lens: SRP
+  architecture: 25
+  enforcer:
+    python-contract:
+      tool: lint-imports
+      files: [.quality/architecture.yml]
+    javascript-contract: &depcruise-contract
+      tool: depcruise
+      files: [.quality/architecture.yml]
+- id: architecture.cycle
+  severity: medium
+  summary: Modules import each other in a cycle
+  lens: SRP
+  architecture: 25
+  enforcer:
+    javascript-contract: *depcruise-contract

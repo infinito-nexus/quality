@@ -107,3 +107,22 @@ osv-scanner:
   update_timeout: 1800
   loads:
     - osv-scanner.toml
+lint-imports:
+  timeout: 300
+  exit_codes: [0, 1]
+  whole_snapshot: true
+  loads:
+    - .importlinter
+    - setup.cfg
+    - pyproject.toml
+depcruise:
+  timeout: 300
+  exit_codes: [0]
+  whole_snapshot: true
+  loads:
+    - .dependency-cruiser.json
+scancode:
+  timeout: 600
+  exit_codes: [0]
+  license_score: 80
+  loads: []

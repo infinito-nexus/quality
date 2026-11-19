@@ -13,6 +13,7 @@ from tests.distribution.support import (
     SYSTEM,
     SYSTEMS,
     built,
+    bundled_names,
     clean_env,
     flake_ref,
     image_contents,
@@ -33,6 +34,7 @@ TRUST_STORE = "etc/ssl/certs/ca-certificates.crt"
 PACKAGES = ("default", "image", "tools", "scan", "proxy")
 VERSION_BUDGET_S = 0.15
 VERSION_RUNS = 9
+STORE = "/nix/store/" + "a" * 32
 
 
 def planted(tool: str, separator: str, version: str) -> str:
@@ -85,6 +87,8 @@ def test_single_pin_source_finds_a_pin_in_any_file(name, before, pin, after):
     [
         ("jscpd = mkDerivation { " + planted("version", ' = "', "5.4.2") + '"; };\n', "hand pin"),
         ("src = fetchurl { url = x; };\n", "hand pin 'fetchurl'"),
+        ('vendorHash = "sha256-x";\n', "hand pin 'vendorHash = \"'"),
+        ('cargoHash = "sha256-x";\n', "hand pin 'cargoHash = \"'"),
         (jscpd_input("a", "5.4.2") + jscpd_input("b", "5.4.3"), "jscpd inputs name ['5.4.2', '5.4.3']"),
     ],
 )
@@ -99,6 +103,7 @@ def test_single_pin_source_finds_hand_pins_in_the_flake(text, expected):
         "osv-scanner 2.7 confirms each lockfile\n",
         "db_repository: ghcr.io/aquasecurity/trivy-db:2\n",
         "ruff 0.10 s, ast-grep 0.25 s\n",
+        'npmDepsHash = "sha256-x";\n',
         jscpd_input("jscpd-x86_64-linux", "5.4.2") + jscpd_input("jscpd-aarch64-linux", "5.4.2"),
     ],
 )
@@ -202,9 +207,22 @@ def test_image_holds_the_trust_store_where_semgrep_core_looks(image):
 def test_image_holds_the_notices_and_no_medusa(image):
     _tarball, members, _config = image
     assert NOTICES in members
-    assert [name for name in members if "medusa" in name.lower()] == []
+    assert [name for name in bundled_names(members) if "medusa" in name.lower()] == []
     notices = (built("default") / NOTICES).read_text(encoding="utf-8")
     assert notices == nix_eval(ROOT, f"packages.{SYSTEM}.default.passthru.noticesText")
+
+
+@pytest.mark.parametrize(
+    ("member", "flagged"),
+    [
+        (f"{STORE}-medusa-1.0/bin/medusa", True),
+        (f"nix/store/{'a' * 32}-python3.14-medusa-1.0", True),
+        ("bin/medusa", True),
+        (f"{STORE}-python3.14-scancode-toolkit-32.5.0/lib/licensedcode/data/rules/historical_medusa_1.RULE", False),
+    ],
+)
+def test_bundled_names_judges_store_paths_by_their_name_only(member: str, flagged: bool):
+    assert any("medusa" in name for name in bundled_names([member])) is flagged
 
 
 @needs_nix

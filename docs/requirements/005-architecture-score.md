@@ -45,8 +45,8 @@ flowchart TD
 
 ### Stage C
 
-- [ ] A fixture Python module importing a forbidden layer gives one `architecture.layer` hit; removing the import removes it.
-- [ ] A fixture JavaScript import cycle gives one `architecture.cycle` hit.
+- [x] A fixture Python module importing a forbidden layer gives one `architecture.layer` hit; removing the import removes it.
+- [x] A fixture JavaScript import cycle gives one `architecture.cycle` hit.
 
 ### Tests
 
