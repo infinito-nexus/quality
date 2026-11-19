@@ -31,6 +31,7 @@ REASONS = {
 }
 FIELD = re.compile(r'^\s*"?license"?\s*[:=]')
 TOML_SUFFIX = ".toml"
+DEPENDENCY_LICENSE = "dependency-license"
 
 
 def settings_of(item) -> tuple:
@@ -288,6 +289,6 @@ def unchecked_notes(hits: list) -> list:
 BUILTINS = {
     "license-declared": license_declared,
     "vendored-license": vendored_license,
-    "dependency-license": dependency_license,
+    DEPENDENCY_LICENSE: dependency_license,
     "reuse": reuse,
 }

@@ -65,6 +65,20 @@
         package-json: [package.json]
         package-lock: [package-lock.json, npm-shrinkwrap.json]
         composer-lock: [composer.lock]
+      registries:
+        timeout: 20
+        max_bytes: 8388608
+        max_packages: 2000
+        unknown_values: [non-standard, NOASSERTION, unknown]
+        ecosystems:
+          PyPI: {shape: licenses, url: 'https://api.deps.dev/v3/systems/pypi/packages/{name}/versions/{version}'}
+          npm: {shape: licenses, url: 'https://api.deps.dev/v3/systems/npm/packages/{name}/versions/{version}'}
+          crates.io: {shape: licenses, url: 'https://api.deps.dev/v3/systems/cargo/packages/{name}/versions/{version}'}
+          Go: {shape: licenses, url: 'https://api.deps.dev/v3/systems/go/packages/{name}/versions/{version}'}
+          Maven: {shape: licenses, url: 'https://api.deps.dev/v3/systems/maven/packages/{name}/versions/{version}'}
+          NuGet: {shape: licenses, url: 'https://api.deps.dev/v3/systems/nuget/packages/{name}/versions/{version}'}
+          Packagist: {shape: composer, url: 'https://repo.packagist.org/p2/{name}.json'}
+          RubyGems: {shape: licenses, url: 'https://rubygems.org/api/v2/rubygems/{name}/versions/{version}.json'}
       exempt: [tests/, test/, "*dev*.txt", "*test*.txt"]
       reads:
         - "*requirements*.txt"
