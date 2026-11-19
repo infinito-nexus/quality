@@ -112,6 +112,7 @@
         trivy = pkgs.trivy;
         lint-imports = import-linter;
         depcruise = dependency-cruiser;
+        scancode = pkgs.python3Packages.scancode-toolkit;
       };
       tools = builtins.attrValues toolPackages;
       gitMinimal = pkgs.gitMinimal;

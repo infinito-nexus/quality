@@ -52,11 +52,11 @@
       builtin: dependency-license
       config: *config
       project: *project
-      groups:
+      groups: &groups
         permissive: [MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0, 0BSD, CC0-1.0]
         lgpl: [LGPL-2.1-only, LGPL-2.1-or-later, LGPL-2.1, LGPL-2.1+, LGPL-3.0-only, LGPL-3.0-or-later, LGPL-3.0, LGPL-3.0+]
         gpl-3.0: [GPL-3.0-only, GPL-3.0-or-later, GPL-3.0, GPL-3.0+]
-      allow:
+      allow: &allow
         MIT: [permissive]
         GPL-3.0: [permissive, lgpl, gpl-3.0]
       formats:
@@ -130,3 +130,27 @@
       sidecar: .license
       licenses_dir: LICENSES
       skip: [LICENSES/, .reuse/, "*.license", REUSE.toml, .quality/, "LICENSE*", "LICENCE*", "COPYING*"]
+- id: legal.foreign-origin
+  severity: critical
+  summary: Changed file holds a licence text or notice outside the allowlist of the project licence, such as a GPL header pasted into an MIT project
+  legal: 50
+  tier: deep
+  enforcer:
+    any: &origin
+      tool: scancode
+      reports: licence
+      config: *config
+      project: *project
+      groups: *groups
+      allow: *allow
+      neutral: [LicenseRef-scancode-unknown-license-reference, LicenseRef-scancode-warranty-disclaimer, LicenseRef-scancode-generic-cla]
+      skip: [LICENSES/, .reuse/, "*.license", .quality/, .qualityignore.yml, "LICENSE*", "LICENCE*", "COPYING*"]
+- id: legal.foreign-copyright
+  severity: medium
+  summary: Changed file adds a copyright line of a holder the nearest licence file does not name, under an allowed licence; keep the notice and name the holder in NOTICE
+  legal: 25
+  tier: deep
+  enforcer:
+    any:
+      <<: *origin
+      reports: holder

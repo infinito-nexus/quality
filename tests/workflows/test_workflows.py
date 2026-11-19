@@ -5,7 +5,12 @@ import pytest
 import yaml
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-FILES = ["quality.yml", "release.yml", "tests.yml", "update.yml"]
+FILES = ["ort.yml", "quality.yml", "release.yml", "tests.yml", "update.yml"]
+ORT_PIN = WORKFLOWS.parent / "ort" / "image"
+ORT_IMAGE = re.compile(r"^ghcr\.io/oss-review-toolkit/ort:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}\n$")
+ORT_COMMANDS = (" analyze ", " evaluate ", " report ")
+PIN_CHECK = 'image="$(python3 .github/ort/pin.py check .github/ort/image)"'
+PIN_UPDATE = "python3 .github/ort/pin.py update .github/ort/image"
 SUITE = "nix develop --command make test-unit test-integration test-service"
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
@@ -117,7 +122,7 @@ def test_quality_jobs_add_no_permissions():
 
 @pytest.mark.parametrize(
     ("name", "holders"),
-    [("quality.yml", set()), ("release.yml", {"publish"}), ("tests.yml", set()), ("update.yml", set())],
+    [("ort.yml", set()), ("quality.yml", set()), ("release.yml", {"publish"}), ("tests.yml", set()), ("update.yml", set())],
     ids=FILES,
 )
 def test_id_token_only_in_the_publish_job(name: str, holders: set):
@@ -170,11 +175,13 @@ def test_flake_lock_update_tests_the_new_pins_before_its_pull_request():
     job = workflow["jobs"]["flake-lock"]
     inputs = step_index(job, lambda step: step.get("run", "").endswith("python3 .github/update/inputs.py flake.nix"))
     update = step_index(job, lambda step: step.get("run") == "nix flake update")
+    pin = step_index(job, lambda step: step.get("run") == PIN_UPDATE)
     suite = step_index(job, lambda step: step.get("run") == SUITE)
     handed = step_index(job, lambda step: step.get("uses", "").startswith("actions/upload-artifact@"))
-    assert inputs < update < suite < handed == len(job["steps"]) - 1
+    assert inputs < update < pin < suite < handed == len(job["steps"]) - 1
     assert "--inputs-from ." in job["steps"][inputs]["run"]
-    assert job["steps"][handed]["with"]["path"].split() == ["flake.nix", "flake.lock"]
+    assert job["steps"][handed]["with"]["path"].split() == ["flake.nix", "flake.lock", ".github/ort/image"]
+    assert job["steps"][handed]["with"]["include-hidden-files"] is True
     assert "permissions" not in job
     assert list(workflow["jobs"]) == ["flake-lock", "pull-request"]
 
@@ -185,5 +192,32 @@ def test_the_update_pull_request_job_runs_no_tool_its_token_could_leak_to():
     assert job["permissions"] == {"contents": "write", "pull-requests": "write"}
     uses = [step["uses"].split("@")[0] for step in job["steps"] if "uses" in step]
     assert uses == ["actions/checkout", "actions/download-artifact", "peter-evans/create-pull-request"]
-    assert script_of(job).split() == ["cp", "--", '"$RUNNER_TEMP/flake-lock/flake.nix"', '"$RUNNER_TEMP/flake-lock/flake.lock"', "."]
-    assert job["steps"][-1]["with"]["add-paths"] == "flake.lock,flake.nix"
+    assert script_of(job).split() == [
+        "cp", "--", '"$RUNNER_TEMP/flake-lock/flake.nix"', '"$RUNNER_TEMP/flake-lock/flake.lock"', ".",
+        "cp", "--", '"$RUNNER_TEMP/flake-lock/.github/ort/image"', ".github/ort/image",
+    ]
+    assert job["steps"][-1]["with"]["add-paths"] == "flake.lock,flake.nix,.github/ort/image"
+
+
+def test_ort_runs_only_on_pushes_to_the_default_branch():
+    assert triggers(load("ort.yml")) == {"push": {"branches": ["main"]}}
+
+
+def test_ort_runs_a_digest_pinned_image_and_uploads_its_report():
+    job = load("ort.yml")["jobs"]["dependency-tree"]
+    assert "permissions" not in job
+    assert ORT_IMAGE.match(ORT_PIN.read_text(encoding="utf-8"))
+    assert "ORT_IMAGE" not in job["env"]
+    read = step_index(job, lambda step: PIN_CHECK in step.get("run", ""))
+    assert read == 1 and '>> "$GITHUB_ENV"' in job["steps"][read]["run"]
+    assert job["steps"][0]["uses"].startswith("actions/checkout@")
+    runs = [step["run"] for step in job["steps"][read + 1 :] if "docker run " in step.get("run", "")]
+    assert runs and all('"$ORT_IMAGE" ' in run for run in runs)
+    assert not any("docker run " in step.get("run", "") for step in job["steps"][:read])
+    assert [command for command in ORT_COMMANDS if not any(f'"$ORT_IMAGE"{command}' in run for run in runs)] == []
+    report = step_index(job, lambda step: '"$ORT_IMAGE" report ' in step.get("run", ""))
+    upload = step_index(job, lambda step: step.get("uses", "").startswith("actions/upload-artifact@"))
+    assert report < upload
+    assert job["steps"][upload]["with"]["path"] == "${{ runner.temp }}/ort"
+    assert job["steps"][upload]["with"]["if-no-files-found"] == "error"
+    assert "!cancelled()" in job["steps"][upload]["if"]

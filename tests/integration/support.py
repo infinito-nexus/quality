@@ -20,7 +20,7 @@ TEST_CACHE = Path(tempfile.gettempdir()) / "quality-test-cache"
 TEST_DB = TEST_CACHE / "quality" / "db"
 NO_BUNDLE_CACHE = Path(tempfile.gettempdir()) / "quality-test-no-bundle"
 TOOL_THREADS = 1
-DEEP_TOOLS = ("jscpd", "osv-scanner", "semgrep", "trivy")
+DEEP_TOOLS = ("jscpd", "osv-scanner", "scancode", "semgrep", "trivy")
 VULNERABLE_PIN = "requests==2.19.0\n"
 AUTHOR_NAME = "QualityAuthorCanary"
 AUTHOR_EMAIL = "quality-author-canary@example.invalid"

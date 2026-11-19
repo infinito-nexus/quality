@@ -121,3 +121,8 @@ depcruise:
   whole_snapshot: true
   loads:
     - .dependency-cruiser.json
+scancode:
+  timeout: 600
+  exit_codes: [0]
+  license_score: 80
+  loads: []

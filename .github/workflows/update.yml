@@ -31,16 +31,21 @@ jobs:
       - name: Update every input of flake.lock
         run: nix flake update
 
+      - name: Pin the newest ORT release by its digest
+        run: python3 .github/ort/pin.py update .github/ort/image
+
       - name: Run the tests on the updated tools before any pull request exists
         run: nix develop --command make test-unit test-integration test-service
 
-      - name: Hand only the updated flake to the pull request job
+      - name: Hand only the updated pins to the pull request job
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flake-lock
           path: |
             flake.nix
             flake.lock
+            .github/ort/image
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
@@ -57,21 +62,23 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Fetch the flake the update job tested
+      - name: Fetch the pins the update job tested
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: flake-lock
           path: ${{ runner.temp }}/flake-lock
 
-      - name: Take over flake.nix and flake.lock only
-        run: cp -- "$RUNNER_TEMP/flake-lock/flake.nix" "$RUNNER_TEMP/flake-lock/flake.lock" .
+      - name: Take over flake.nix, flake.lock and the ORT image pin only
+        run: |
+          cp -- "$RUNNER_TEMP/flake-lock/flake.nix" "$RUNNER_TEMP/flake-lock/flake.lock" .
+          cp -- "$RUNNER_TEMP/flake-lock/.github/ort/image" .github/ort/image
 
       - name: Open or refresh the update pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           branch: update/flake-lock
-          add-paths: flake.lock,flake.nix
-          commit-message: "chore(deps): update flake.lock"
-          title: "chore(deps): update flake.lock"
-          body: "nix flake update bumped the pinned tools; make test-unit test-integration test-service passed on this lock in the read-only update job before this pull request was opened."
+          add-paths: flake.lock,flake.nix,.github/ort/image
+          commit-message: "chore(deps): update the pinned tools"
+          title: "chore(deps): update the pinned tools"
+          body: ".github/update/inputs.py moved the versioned registry inputs of flake.nix, nix flake update bumped flake.lock and .github/ort/pin.py pinned the newest ORT release by digest in .github/ort/image; make test-unit test-integration test-service passed on these pins in the read-only update job before this pull request was opened."
           delete-branch: true

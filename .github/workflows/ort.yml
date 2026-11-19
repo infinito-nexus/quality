@@ -1,0 +1,55 @@
+name: ort
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dependency-tree:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PROJECT_LICENSE: MIT
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read the digest-pinned ORT image from .github/ort/image
+        run: |
+          image="$(python3 .github/ort/pin.py check .github/ort/image)"
+          echo "ORT_IMAGE=${image}" >> "$GITHUB_ENV"
+
+      - name: Write the allowlist of the project licence from rules/legal.yml
+        run: |
+          mkdir -p "$RUNNER_TEMP/ort/config"
+          yq -o=json 'explode(.)' rules/legal.yml | jq -r --arg project "$PROJECT_LICENSE" '.[] | select(.id == "legal.dependency-license") | .enforcer.any as $e | $e.allow[$project][] | $e.groups[.][]' > "$RUNNER_TEMP/ort/config/allowed.txt"
+          test -s "$RUNNER_TEMP/ort/config/allowed.txt"
+          chmod -R a+rwX "$RUNNER_TEMP/ort"
+
+      - name: Analyze the full dependency tree
+        id: analyze
+        run: docker run --rm --volume "$GITHUB_WORKSPACE:/project:ro" --volume "$RUNNER_TEMP/ort:/ort" "$ORT_IMAGE" analyze --input-dir /project --output-dir /ort/analyzer
+
+      - name: Evaluate every licence against the allowlist
+        run: docker run --rm --volume "$GITHUB_WORKSPACE:/project:ro" --volume "$RUNNER_TEMP/ort:/ort" --env ORT_ALLOWED_LICENSES=/ort/config/allowed.txt "$ORT_IMAGE" evaluate --ort-file /ort/analyzer/analyzer-result.yml --rules-file /project/.github/ort/evaluator.rules.kts --output-dir /ort/evaluator
+
+      - name: Report the evaluation
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: docker run --rm --volume "$RUNNER_TEMP/ort:/ort" "$ORT_IMAGE" report --ort-file /ort/evaluator/evaluation-result.yml --report-formats WebApp --output-dir /ort/report
+
+      - name: Upload the ORT results and report
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ort-report
+          path: ${{ runner.temp }}/ort
+          if-no-files-found: error
