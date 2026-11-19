@@ -36,11 +36,11 @@ flowchart TD
 
 ### Stage B
 
-- [ ] A function the change pushes over the complexity limit lowers 🏛️ by 10; the same function over the limit already at the base lowers nothing.
-- [ ] A file the change pushes past 500 lines lowers it by 25.
-- [ ] A new JavaScript clone found by jscpd lowers it by 10.
-- [ ] Every counted rule in `rules/*.yml` has a `lens`.
-- [ ] `quality --staged --json` reports `architecture` (number) and per counted hit its rule and lens.
+- [x] A function the change pushes over the complexity limit lowers 🏛️ by 10; the same function over the limit already at the base lowers nothing.
+- [x] A file the change pushes past 500 lines lowers it by 25.
+- [x] A new JavaScript clone found by jscpd lowers it by 10.
+- [x] Every counted rule in `rules/*.yml` has a `lens`.
+- [x] `quality --staged --json` reports `architecture` (number) and per counted hit its rule and lens.
 - [ ] `kvb-quality-score` takes `--architecture <n>`.
 
 ### Stage C

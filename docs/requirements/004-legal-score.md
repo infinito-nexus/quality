@@ -40,17 +40,17 @@ flowchart TD
 
 ### Rules
 
-- [ ] `rules/legal.yml` defines the five stage-B ids of decision 1 with tool and severity.
-- [ ] A fixture adding an Apache-2.0 runtime dependency to an MIT project gives no hit; one adding a GPL-3.0 runtime dependency gives one `legal.dependency-license` blocker; the same GPL-3.0 dependency in a GPL-3.0 project gives no hit.
+- [x] `rules/legal.yml` defines the five stage-B ids of decision 1 with tool and severity.
+- [x] A fixture adding an Apache-2.0 runtime dependency to an MIT project gives no hit; one adding a GPL-3.0 runtime dependency gives one `legal.dependency-license` blocker; the same GPL-3.0 dependency in a GPL-3.0 project gives no hit.
 - [ ] A fixture dependency without licence data in the bundle gives one `unchecked` note, `legal_unchecked` 1 and a ⚖️ value with `~`; it is never reported clean.
-- [ ] `quality db update --licenses <fixture repo>` against stubbed registries stores the registry licence of each exact pin at HEAD or only staged, so a GPL-3.0 pin staged in an MIT fixture gives one `legal.dependency-license` blocker, while a pin the registries do not answer for or answer `non-standard` stays `unchecked`; a later `quality db update` without `--licenses` keeps the index and its digest, so the blocker stays; a first update without `--licenses` writes no index; a non-https registry URL is refused before any request.
-- [ ] A fixture adding a web-font URL to a template gives one `legal.external-request` finding.
-- [ ] A fixture vendor folder without a licence file gives one `legal.vendored-license` blocker.
-- [ ] Hits on unchanged lines never count under `--staged` or `--base`.
+- [x] `quality db update --licenses <fixture repo>` against stubbed registries stores the registry licence of each exact pin at HEAD or only staged, so a GPL-3.0 pin staged in an MIT fixture gives one `legal.dependency-license` blocker, while a pin the registries do not answer for or answer `non-standard` stays `unchecked`; a later `quality db update` without `--licenses` keeps the index and its digest, so the blocker stays; a first update without `--licenses` writes no index; a non-https registry URL is refused before any request.
+- [x] A fixture adding a web-font URL to a template gives one `legal.external-request` finding.
+- [x] A fixture vendor folder without a licence file gives one `legal.vendored-license` blocker.
+- [x] Hits on unchanged lines never count under `--staged` or `--base`.
 
 ### Score
 
-- [ ] `quality --staged --json` reports `legal` (number), `legal_blockers` and `legal_unchecked` (counts).
+- [x] `quality --staged --json` reports `legal` (number), `legal_blockers` and `legal_unchecked` (counts).
 - [ ] `kvb-quality-score` takes `--legal <n|~n>` and `--legal-blockers <count>`; one blocker exits 4.
 
 ### Stage C
