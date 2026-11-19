@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quality import QualityError, db
-from quality.adapters import Collector, Runtime, reads_by_name, refuse_inside
+from quality.adapters import Collector, Runtime, reads_by_name
 from quality.adapters.base import thread_environment
 from quality.adapters.builtin import (
     changed_folders,
@@ -15,19 +15,14 @@ from quality.adapters.builtin import (
     prefix_groups,
     tree_children,
 )
-from quality.environment import (
-    enclosing_roots,
-    tool_environment,
-    trusted_worktree,
-    validated_path,
-)
+from quality.environment import open_repository, tool_environment, validated_path
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.history import finding_key, history_hits
 from quality.ignorefile import audit_lines, refuse_stale, stale_names
 from quality.ignorefile import parse as parse_ignore
-from quality.legal import index
+from quality.legal import index, registry
 from quality.legal.checks import split_unchecked, unchecked_notes
-from quality.repo import Repo, hardened_env
+from quality.repo import Repo
 from quality.report import Outcome, architecture_of, legal_of, unchecked_of
 from quality.ruledata import (
     BINARY_GUARD,
@@ -218,13 +213,7 @@ def open_session(options: Options, scratch: Path) -> Session:
     rules_dir = locate(options.rules)
     data = load(rules_dir)
     path_value = validated_path(os.environ)
-    git = shutil.which("git", path=path_value)
-    if git is None:
-        raise QualityError("missing tool: git")
-    refuse_inside(git, "git", enclosing_roots(options.cwd))
-    env = hardened_env(path_value, os.environ, trusted_worktree(options.cwd))
-    repo = Repo.open(options.cwd, env, data.limit("git_timeout"), git)
-    refuse_inside(git, "git", [Path(repo.root).resolve()])
+    repo = open_repository(options.cwd, data.limit("git_timeout"), path_value, os.environ)
     tiers = MODE_TIERS[options.mode]
     bundle = open_database(options, data, tiers)
     home = scratch / "home"
@@ -252,20 +241,29 @@ def open_session(options: Options, scratch: Path) -> Session:
     return Session(data, repo, Collector(data, runtime), scratch, tiers, bundle, [])
 
 
-def update_database(option: str | None, rules: str | None) -> db.Bundle:
+def update_database(option: str | None, rules: str | None, repositories: list | None = None) -> tuple:
     """
     Args:
         option: The --db value, or None for the default location.
         rules: The --rules value, or None for the packaged rule data.
+        repositories: The --licenses repositories whose pins get their
+            registry licences in a rebuilt licence index, or None to carry
+            the previous bundle's index over unchanged.
 
     Returns:
-        The fetched bundle.
+        The fetched bundle and one line per count of pins left without
+        licence data.
     """
     data = load(locate(rules))
     root = db.location(option, os.environ)
     if not option:
         db.guard_cache(root.parent)
-    return db.update(root, data, validated_path(os.environ), os.environ)
+    path_value = validated_path(os.environ)
+    if repositories is None:
+        return db.update(root, data, path_value, os.environ, index.carried(root)), []
+    packages, skipped = registry.licence_packages(data, path_value, repositories, os.environ)
+    bundle = db.update(root, data, path_value, os.environ, lambda work: index.write_index(work, packages))
+    return bundle, skipped
 
 
 def parent_baseline(session: Session, plan: Plan, parent: str, index: int):

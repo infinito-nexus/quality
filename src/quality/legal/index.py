@@ -12,7 +12,6 @@ from quality.db import (
     LICENSE_INDEX,
     LICENSE_KEY,
     MANIFEST,
-    UPDATE_HINT,
     file_digest,
     location,
     locked_manifest,
@@ -21,6 +20,7 @@ from quality.db import (
 )
 
 LATEST = "*"
+REBUILD_HINT = "run `quality db update --licenses <repo>`, which rebuilds it"
 
 
 def write_index(root: Path, packages: dict) -> str:
@@ -36,10 +36,34 @@ def write_index(root: Path, packages: dict) -> str:
     Returns:
         The file_digest() of the written index, for db.write_manifest().
     """
+    return written(root, (json.dumps({"format": FORMAT, "packages": packages}, sort_keys=True) + "\n").encode("utf-8"))
+
+
+def written(root: Path, data: bytes) -> str:
     path = root / LICENSE_DIR / LICENSE_INDEX
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"format": FORMAT, "packages": packages}, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_bytes(data)
     return file_digest(path)
+
+
+def carried(root: Path):
+    """
+    Args:
+        root: Bundle directory an update without --licenses replaces.
+
+    Returns:
+        A function for db.update() that writes the bundle's licence index
+        unchanged into the staging directory and returns its file_digest(),
+        so the new manifest keeps the old digest; None when root holds no
+        index. Licence data never ages, so a refresh keeps it.
+
+    Raises:
+        QualityError: As verified_index().
+    """
+    data = verified_index(root)
+    if data is None:
+        return None
+    return lambda work: written(work, data)
 
 
 def read_index(root: Path) -> dict | None:
@@ -54,8 +78,32 @@ def read_index(root: Path) -> dict | None:
         a scan of staged changes still needs no bundle.
 
     Raises:
-        QualityError: The bundle is a link, or its index is no regular file,
-            does not match the digest or holds no packages map.
+        QualityError: As verified_index(), or the index holds no packages map.
+    """
+    data = verified_index(root)
+    if data is None:
+        return None
+    try:
+        packages = json.loads(data)["packages"]
+    except (ValueError, LookupError, TypeError):
+        raise unreadable(root) from None
+    if not isinstance(packages, dict):
+        raise unreadable(root)
+    return packages
+
+
+def verified_index(root: Path) -> bytes | None:
+    """
+    Args:
+        root: Bundle directory.
+
+    Returns:
+        The licence index file, matched against the manifest's licenses
+        digest; None when root holds no bundle or the bundle no index.
+
+    Raises:
+        QualityError: The bundle is a link, or its index is no regular file
+            or does not match the digest.
     """
     if root.is_symlink():
         raise QualityError(f"vulnerability database at {root} is a link: point --db at the directory itself")
@@ -68,14 +116,8 @@ def read_index(root: Path) -> dict | None:
     if data is None:
         return None
     if f"sha256:{hashlib.sha256(data).hexdigest()}" != expected:
-        raise QualityError(f"licence index at {root} does not match its digest: {UPDATE_HINT}")
-    try:
-        packages = json.loads(data)["packages"]
-    except (ValueError, LookupError, TypeError):
-        raise unreadable(root) from None
-    if not isinstance(packages, dict):
-        raise unreadable(root)
-    return packages
+        raise QualityError(f"licence index at {root} does not match its digest: {REBUILD_HINT}")
+    return data
 
 
 def index_bytes(path: Path, root: Path) -> bytes:

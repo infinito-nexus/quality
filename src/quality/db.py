@@ -261,8 +261,19 @@ def tree_digest(root: Path) -> str:
     return f"sha256:{outer.hexdigest()}"
 
 
+def network_variables(environ: dict) -> dict:
+    """
+    Args:
+        environ: The caller's environment.
+
+    Returns:
+        Only its proxy and certificate variables, the one part of it a fetch may see.
+    """
+    return {name: environ[name] for name in NETWORK_VARIABLES if name in environ}
+
+
 def network_env(path_value: str, home: Path, environ: dict) -> dict:
-    passed = {name: environ[name] for name in NETWORK_VARIABLES if name in environ}
+    passed = network_variables(environ)
     return {
         "PATH": path_value,
         "HOME": str(home),
@@ -392,13 +403,16 @@ def retire(work: Path, root: Path) -> None:
     shutil.rmtree(retired)
 
 
-def update(root: Path, data: RuleData, path_value: str, environ: dict) -> Bundle:
+def update(root: Path, data: RuleData, path_value: str, environ: dict, licenses=None) -> Bundle:
     """
     Args:
         root: Bundle directory to create or replace.
         data: Rule data naming the trivy repository and the osv-scanner ecosystems.
         path_value: Validated PATH the tools are resolved from.
         environ: The caller's environment; only proxy and certificate variables pass.
+        licenses: Function that writes the licence index into the staging
+            directory it is given and returns the index's file_digest(), or
+            None for a bundle without licence index.
 
     Returns:
         The new bundle. The old one stays in place until the new one is complete.
@@ -421,9 +435,10 @@ def update(root: Path, data: RuleData, path_value: str, environ: dict) -> Bundle
         work.chmod(BUNDLE_MODE)
         fetch_trivy(work, data, path_value, environ)
         fetch_osv(work, data)
+        index_digest = None if licenses is None else licenses(work)
         date = datetime.now(timezone.utc).replace(microsecond=0)
         digest = tree_digest(work)
-        write_manifest(work, date, digest)
+        write_manifest(work, date, digest, index_digest)
         replace_bundle(work, root)
     finally:
         shutil.rmtree(work, ignore_errors=True)

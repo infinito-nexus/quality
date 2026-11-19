@@ -6,6 +6,7 @@ from quality import QualityError
 from quality.ruledata import require
 
 TOKEN = re.compile(r"\(|\)|[^\s()]+")
+LICENSE_ID = re.compile(r"(?:DocumentRef-[A-Za-z0-9.-]+:)?(?:LicenseRef-)?[A-Za-z0-9][A-Za-z0-9.+-]*")
 OPERATORS = {"AND", "OR", "WITH"}
 PARENTHESES = {"(", ")"}
 CONFIG_LISTS = ("allow", "deny", "vendored")
@@ -33,9 +34,38 @@ def expression_of(value) -> str | None:
         composer records it. None for anything but a non-empty string or a
         non-empty list of strings.
     """
+    return joined(value, "OR")
+
+
+def joined(value, operator: str) -> str | None:
+    """
+    Args:
+        value: A licence field: one expression or a list of them.
+        operator: AND when every listed licence applies, OR for a choice.
+
+    Returns:
+        One SPDX expression with each listed one in parentheses; None for
+        anything but a non-empty string or a non-empty list of strings.
+    """
     if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
-        return " OR ".join(f"({item})" for item in value)
+        return f" {operator} ".join(f"({item})" for item in value)
     return value if isinstance(value, str) and value else None
+
+
+def well_formed(expression: str, unknown: set) -> bool:
+    """
+    Args:
+        expression: A licence expression as a registry returned it.
+        unknown: Casefolded values registries give where they know no SPDX
+            licence, such as noassertion.
+
+    Returns:
+        True when it parses and every id it names has the SPDX id form and
+        is none of those values.
+    """
+    ids = license_ids(expression)
+    spdx = all(LICENSE_ID.fullmatch(item) and item.casefold() not in unknown for item in ids)
+    return spdx and allowed(expression, set()) is not None
 
 
 def agrees(expression: str, ids: list) -> bool:

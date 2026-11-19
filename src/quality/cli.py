@@ -42,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = actions.add_parser("update", allow_abbrev=False)
     update.add_argument("--db", metavar="DIR")
     update.add_argument("--rules", metavar="DIR")
+    update.add_argument("--licenses", metavar="REPO", action="append")
     coverage = commands.add_parser("coverage", allow_abbrev=False)
     coverage.add_argument("--json", action="store_true", dest="as_json")
     coverage.add_argument("--rules", metavar="DIR")
@@ -68,7 +69,10 @@ def execute(args: argparse.Namespace) -> int:
     from quality.report import exit_code, render_json, render_text
 
     if args.command == "db":
-        print(printable(update_database(args.db, args.rules).note()))
+        bundle, skipped = update_database(args.db, args.rules, args.licenses)
+        for line in skipped:
+            print(f"quality: unchecked: {printable(line)}", file=sys.stderr)
+        print(printable(bundle.note()))
         return 0
     mode = selected_mode(args)
     options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd(), args.threads)

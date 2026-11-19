@@ -1,7 +1,10 @@
 import os
+import shutil
 from pathlib import Path
 
 from quality import QualityError, db
+from quality.adapters import refuse_inside
+from quality.repo import Repo, hardened_env
 
 
 def validated_path(environ: dict) -> str:
@@ -77,3 +80,28 @@ def trusted_worktree(cwd: str) -> Path | None:
     if start.name == "*" or not (start / ".git").exists():
         return None
     return start
+
+
+def open_repository(cwd: str, timeout: float, path_value: str, inherited: dict) -> Repo:
+    """
+    Args:
+        cwd: Directory inside the work tree.
+        timeout: Seconds each git command may take.
+        path_value: Validated PATH git is resolved from.
+        inherited: Environment whose git location variables pass to git.
+
+    Returns:
+        The repository, read by a git that lives outside it.
+
+    Raises:
+        QualityError: git is missing or resolves inside the target, or cwd is
+            no git work tree.
+    """
+    git = shutil.which("git", path=path_value)
+    if git is None:
+        raise QualityError("missing tool: git")
+    refuse_inside(git, "git", enclosing_roots(cwd))
+    env = hardened_env(path_value, inherited, trusted_worktree(cwd))
+    repo = Repo.open(cwd, env, timeout, git)
+    refuse_inside(git, "git", [Path(repo.root).resolve()])
+    return repo
