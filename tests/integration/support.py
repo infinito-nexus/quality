@@ -28,6 +28,10 @@ SECRET = "ghp_" + "8fK2mQ7xL4pN9sV1" + "tB6yR3wZ0cH5jD2gA7eU"
 SECRET_ENV_LINE = f"GITHUB_TOKEN={SECRET}\n"
 UNTAGGED_DOCKERFILE = "FROM debian\n"
 RAW_GITLEAKS = ("--no-banner", "--report-format", "json", "--report-path", "-")
+EVERY_KIND_CONTRACT = (
+    "python: {source: ., packages: [pkg], layers: [pkg.code, pkg.copy], forbidden: []}\n"
+    "javascript: {source: web, layers: [], forbidden: []}\n"
+)
 LAUNCHER = (
     "import sys\n"
     f"sys.path.insert(0, {str(SRC)!r})\n"
@@ -361,6 +365,7 @@ def write_every_kind(target: Target) -> None:
     )
     target.write("Dockerfile", UNTAGGED_DOCKERFILE)
     target.write(".env", SECRET_ENV_LINE)
+    target.write(".quality/architecture.yml", EVERY_KIND_CONTRACT)
 
 
 EVERY_KIND_RULES = {

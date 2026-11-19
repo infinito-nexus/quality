@@ -17,12 +17,14 @@ SYSTEMS = ("x86_64-linux", "aarch64-linux")
 NIX_FEATURES = ("--extra-experimental-features", "nix-command flakes")
 needs_nix = pytest.mark.skipif(NIX is None, reason="needs nix")
 
-TOOL_ALIASES = {"rg": ("ripgrep",)}
+TOOL_ALIASES = {"rg": ("ripgrep",), "lint-imports": ("import-linter", "import_linter"), "depcruise": ("dependency-cruiser",)}
 SEPARATOR = r'(?:_VERSION\s*(?:[:?]?=|:)\s*["\']?|\s*[=~!<>]=\s*|@|:|-|_|/v?|"?\s*[:=]\s*"[\^~>=<v]*)'
 VERSION = r"v?(?P<version>\d+\.\d+(?:\.\d+)*)"
+DERIVED_HASHES = ("npmDepsHash",)
 HAND_PINS = re.compile(
     r"\b(?:fetchurl|fetchzip|fetchgit|fetchFromGitHub|fetchTarball|fetchPypi)\b"
     r'|\b(?:version|hash|sha256|sha512|rev)\s*=\s*"'
+    rf'|\b(?!(?:{"|".join(DERIVED_HASHES)})\b)\w+Hash\s*=\s*"'
 )
 INPUT_URL = re.compile(r'inputs\.(?P<name>[\w-]+)(?:\.url|\s*=\s*\{[^}]*?\burl)\s*=\s*"(?P<url>[^"]+)"')
 PIN_SOURCE = "flake.lock"
@@ -134,8 +136,9 @@ def pin_violations(texts: dict, names: dict) -> list:
 
     Returns:
         One line per tool version written outside flake.lock and the flake
-        inputs it locks, per hand-written version or hash in flake.nix, and
-        per tool whose inputs name more than one version.
+        inputs it locks, per hand-written version or hash in flake.nix other
+        than the DERIVED_HASHES .github/update/inputs.py recomputes from a
+        locked input, and per tool whose inputs name more than one version.
     """
     pattern = pin_pattern(names)
     violations = []

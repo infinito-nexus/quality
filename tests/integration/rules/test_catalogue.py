@@ -18,7 +18,7 @@ from tests.integration.support import (
     rules_without_tool,
 )
 
-PREFIXES = ("security.", "coding.", "clean.", "legal.")
+PREFIXES = ("security.", "coding.", "clean.", "legal.", "architecture.")
 LEGAL = {
     "legal.license-declared": ({"license-declared"}, "medium", 25),
     "legal.vendored-license": ({"vendored-license"}, "critical", 50),
@@ -34,6 +34,8 @@ ARCHITECTURE = {
     "coding.structural": ("fail fast", 10),
     "clean.file-lines": ("SRP", 25),
     "clean.folder-items": ("SRP", 25),
+    "architecture.layer": ("SRP", 25),
+    "architecture.cycle": ("SRP", 25),
 }
 PRINT_CALL = {"python": {"tool": "ruff", "codes": ["T201"]}}
 

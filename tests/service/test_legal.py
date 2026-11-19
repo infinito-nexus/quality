@@ -331,7 +331,7 @@ def test_notices_list_every_flake_package_at_its_locked_revision(tmp_path):
     lock = json.loads((ROOT / "flake.lock").read_text(encoding="utf-8"))
     for name in lock["nodes"]["root"]["inputs"].values():
         locked = lock["nodes"][name]["locked"]
-        if locked["type"] == "tarball":
+        if locked["type"] in ("tarball", "file"):
             assert f"<code>{name}</code>" in page, name
         else:
             assert locked["rev"] in page, name

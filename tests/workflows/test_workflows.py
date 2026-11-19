@@ -168,10 +168,22 @@ def test_flake_lock_update_tests_the_new_pins_before_its_pull_request():
     workflow = load("update.yml")
     assert {"schedule", "workflow_dispatch"} <= triggers(workflow).keys()
     job = workflow["jobs"]["flake-lock"]
+    inputs = step_index(job, lambda step: step.get("run", "").endswith("python3 .github/update/inputs.py flake.nix"))
     update = step_index(job, lambda step: step.get("run") == "nix flake update")
     suite = step_index(job, lambda step: step.get("run") == SUITE)
-    opened = step_index(job, lambda step: step.get("uses", "").startswith("peter-evans/create-pull-request@"))
-    assert update < suite < opened
-    assert job["steps"][opened]["with"]["add-paths"] == "flake.lock"
+    handed = step_index(job, lambda step: step.get("uses", "").startswith("actions/upload-artifact@"))
+    assert inputs < update < suite < handed == len(job["steps"]) - 1
+    assert "--inputs-from ." in job["steps"][inputs]["run"]
+    assert job["steps"][handed]["with"]["path"].split() == ["flake.nix", "flake.lock"]
+    assert "permissions" not in job
+    assert list(workflow["jobs"]) == ["flake-lock", "pull-request"]
+
+
+def test_the_update_pull_request_job_runs_no_tool_its_token_could_leak_to():
+    job = load("update.yml")["jobs"]["pull-request"]
+    assert job["needs"] == "flake-lock"
     assert job["permissions"] == {"contents": "write", "pull-requests": "write"}
-    assert list(workflow["jobs"]) == ["flake-lock"]
+    uses = [step["uses"].split("@")[0] for step in job["steps"] if "uses" in step]
+    assert uses == ["actions/checkout", "actions/download-artifact", "peter-evans/create-pull-request"]
+    assert script_of(job).split() == ["cp", "--", '"$RUNNER_TEMP/flake-lock/flake.nix"', '"$RUNNER_TEMP/flake-lock/flake.lock"', "."]
+    assert job["steps"][-1]["with"]["add-paths"] == "flake.lock,flake.nix"

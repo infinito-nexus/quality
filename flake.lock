@@ -1,5 +1,54 @@
 {
   "nodes": {
+    "dependency-cruiser": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794867513,
+        "narHash": "sha256-RRluKLffSpAUcZ+Fi/Lm+CtakSplz26uW+a6QuwLbh0=",
+        "type": "tarball",
+        "url": "https://github.com/sverweij/dependency-cruiser/archive/refs/tags/v18.8.0.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/sverweij/dependency-cruiser/archive/refs/tags/v18.8.0.tar.gz"
+      }
+    },
+    "grimp-aarch64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-zJf122gAARojBnpI88BJ2DZF1ik6EzeNls6Kcu0UTXs=",
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/40/65/9875f637b413ea26ed0c042f0b7528bf1fc7b5abb6cb895581c2f5b5e162/grimp-3.20-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/40/65/9875f637b413ea26ed0c042f0b7528bf1fc7b5abb6cb895581c2f5b5e162/grimp-3.20-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl"
+      }
+    },
+    "grimp-x86_64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-v3aOM5fDaw39xMxK/RPe3Uj1WIpWHfXqgFiCn5RVCnk=",
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/78/0e/bd28e0ab5fd3d356617a9d30aafbb872838be3865299f3af4be3244d51e2/grimp-3.20-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/78/0e/bd28e0ab5fd3d356617a9d30aafbb872838be3865299f3af4be3244d51e2/grimp-3.20-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+      }
+    },
+    "import-linter": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-sljZGyQfBWt733yshxQrGvETebHFjwOnDKHmYF2yz54=",
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/b6/45/baf897d969b4e19d9e063ffb13bc12346b1af6b36e1774841d16d84cf3cc/import_linter-2.17-py3-none-any.whl"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://files.pythonhosted.org/packages/b6/45/baf897d969b4e19d9e063ffb13bc12346b1af6b36e1774841d16d84cf3cc/import_linter-2.17-py3-none-any.whl"
+      }
+    },
     "jscpd-aarch64-linux": {
       "flake": false,
       "locked": {
@@ -60,6 +109,10 @@
     },
     "root": {
       "inputs": {
+        "dependency-cruiser": "dependency-cruiser",
+        "grimp-aarch64-linux": "grimp-aarch64-linux",
+        "grimp-x86_64-linux": "grimp-x86_64-linux",
+        "import-linter": "import-linter",
         "jscpd-aarch64-linux": "jscpd-aarch64-linux",
         "jscpd-x86_64-linux": "jscpd-x86_64-linux",
         "nixpkgs": "nixpkgs",

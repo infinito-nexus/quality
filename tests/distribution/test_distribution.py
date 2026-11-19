@@ -85,6 +85,8 @@ def test_single_pin_source_finds_a_pin_in_any_file(name, before, pin, after):
     [
         ("jscpd = mkDerivation { " + planted("version", ' = "', "5.4.2") + '"; };\n', "hand pin"),
         ("src = fetchurl { url = x; };\n", "hand pin 'fetchurl'"),
+        ('vendorHash = "sha256-x";\n', "hand pin 'vendorHash = \"'"),
+        ('cargoHash = "sha256-x";\n', "hand pin 'cargoHash = \"'"),
         (jscpd_input("a", "5.4.2") + jscpd_input("b", "5.4.3"), "jscpd inputs name ['5.4.2', '5.4.3']"),
     ],
 )
@@ -99,6 +101,7 @@ def test_single_pin_source_finds_hand_pins_in_the_flake(text, expected):
         "osv-scanner 2.7 confirms each lockfile\n",
         "db_repository: ghcr.io/aquasecurity/trivy-db:2\n",
         "ruff 0.10 s, ast-grep 0.25 s\n",
+        'npmDepsHash = "sha256-x";\n',
         jscpd_input("jscpd-x86_64-linux", "5.4.2") + jscpd_input("jscpd-aarch64-linux", "5.4.2"),
     ],
 )

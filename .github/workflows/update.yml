@@ -16,9 +16,6 @@ jobs:
   flake-lock:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Check out main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,18 +25,53 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
 
+      - name: Move every versioned registry input of flake.nix to its newest stable release
+        run: nix shell --inputs-from . nixpkgs#python3 nixpkgs#prefetch-npm-deps --command python3 .github/update/inputs.py flake.nix
+
       - name: Update every input of flake.lock
         run: nix flake update
 
       - name: Run the tests on the updated tools before any pull request exists
         run: nix develop --command make test-unit test-integration test-service
 
+      - name: Hand only the updated flake to the pull request job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flake-lock
+          path: |
+            flake.nix
+            flake.lock
+          if-no-files-found: error
+          retention-days: 1
+
+  pull-request:
+    needs: flake-lock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch the flake the update job tested
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flake-lock
+          path: ${{ runner.temp }}/flake-lock
+
+      - name: Take over flake.nix and flake.lock only
+        run: cp -- "$RUNNER_TEMP/flake-lock/flake.nix" "$RUNNER_TEMP/flake-lock/flake.lock" .
+
       - name: Open or refresh the update pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           branch: update/flake-lock
-          add-paths: flake.lock
+          add-paths: flake.lock,flake.nix
           commit-message: "chore(deps): update flake.lock"
           title: "chore(deps): update flake.lock"
-          body: "nix flake update bumped the pinned tools; make test-unit test-integration test-service passed on this lock in the update job before this pull request was opened."
+          body: "nix flake update bumped the pinned tools; make test-unit test-integration test-service passed on this lock in the read-only update job before this pull request was opened."
           delete-branch: true
