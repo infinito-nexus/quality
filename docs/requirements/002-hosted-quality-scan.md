@@ -141,8 +141,8 @@ flowchart TD
 - [x] `test_isolation_probe`: a probe image, set through the launcher's test configuration, reaches no network, cannot write `/src` or `/db`, sees no other job's mount, hits the process limit on a fork bomb and the size limit on `/tmp`.
 - [x] `test_probe_cannot_stay`: a probe that never exits is killed at the timeout, no container remains, and the next job starts in a new container.
 - [x] `test_job_separation`: a file left by job A's probe is absent in job B.
-- [ ] `test_stop_mid_job`: after `systemctl stop` during a job, the next run leaves no step container and no job mount, and the job shows `failed`.
-- [ ] `test_launcher_recovers`: after `kill -9` during a job, the next run marks it `failed` and removes its container and mount.
+- [x] `test_stop_mid_job`: after `systemctl stop` during a job, the next run leaves no step container and no job mount, and the job shows `failed`.
+- [x] `test_launcher_recovers`: after `kill -9` during a job, the next run marks it `failed` and removes its container and mount.
 - [x] `test_spool_hostile_file`: a symlink, a FIFO, a directory and an oversized file in the spool are skipped without blocking the run, and no target is read.
 - [x] `test_job_id_hostile`: ids holding `../`, a leading `-` or uppercase hex are refused, and no path, container or mount is created from them.
 - [x] `test_report_no_overwrite`: a job naming an existing report's id leaves that report unchanged.
