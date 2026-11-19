@@ -17,7 +17,7 @@ def rule_named(rule_id: str):
 
 
 def hit(rule_id: str, path: str) -> Hit:
-    return Hit(rule_named(rule_id), path, 1, "", "", None, "", None, False, frozenset())
+    return Hit(rule_named(rule_id), path, 1, "", "", None, "", None, False, frozenset(), ())
 
 
 def test_parse_absent_and_empty_files():

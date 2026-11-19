@@ -22,6 +22,7 @@ class Hit:
     commit: str | None
     absolute: bool
     ids: frozenset
+    group: tuple
 
 
 def code_hit(rule: Rule, path: str, row: int | None, message: str, snapshot) -> Hit:
@@ -38,7 +39,7 @@ def code_hit(rule: Rule, path: str, row: int | None, message: str, snapshot) -> 
     """
     line = None if rule.file_level or row is None else row
     source = "" if line is None else snapshot.source_key(path, line)
-    return Hit(rule, path, line, message, source, None, "", None, False, frozenset())
+    return Hit(rule, path, line, message, source, None, "", None, False, frozenset(), ())
 
 
 def package_name(ecosystem: str, name: str) -> str:
@@ -74,7 +75,7 @@ def package_hit(rule: Rule, path: str, row: int | None, name: str, ids: set) -> 
         its lockfile on the base side did not.
     """
     line = None if rule.file_level or row is None else row
-    return Hit(rule, path, line, name, "", None, name, None, False, frozenset(ids))
+    return Hit(rule, path, line, name, "", None, name, None, False, frozenset(ids), ())
 
 
 def unread_hit(rule: Rule, path: str) -> Hit:
@@ -86,11 +87,11 @@ def unread_hit(rule: Rule, path: str) -> Hit:
     Returns:
         A finding the differential gate does not filter.
     """
-    return Hit(rule, path, None, "", "", None, "", None, True, frozenset())
+    return Hit(rule, path, None, "", "", None, "", None, True, frozenset(), ())
 
 
 def metric_hit(rule: Rule, path: str, row: int | None, value: int, entity: str) -> Hit:
-    return Hit(rule, path, row, "", "", value, entity, None, False, frozenset())
+    return Hit(rule, path, row, "", "", value, entity, None, False, frozenset(), ())
 
 
 def normalise_message(message: str) -> str:

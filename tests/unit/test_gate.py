@@ -21,7 +21,7 @@ METRIC = make_rule("clean.fixture", {"limit": 10})
 
 
 def plain_hit(path: str, source: str, message: str) -> Hit:
-    return Hit(PLAIN, path, 1, message, source, None, "", None, False, frozenset())
+    return Hit(PLAIN, path, 1, message, source, None, "", None, False, frozenset(), ())
 
 
 @dataclass(frozen=True)
