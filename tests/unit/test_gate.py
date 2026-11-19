@@ -13,7 +13,7 @@ from quality.ruledata import Rule
 
 
 def make_rule(rule_id: str, metric: dict | None) -> Rule:
-    return Rule(rule_id, "low", "summary", {}, False, metric, False, False, False, None, None, False, None, None)
+    return Rule(rule_id, "low", "summary", {}, False, metric, False, False, False, None, None, False, None, None, None)
 
 
 PLAIN = make_rule("coding.fixture", None)

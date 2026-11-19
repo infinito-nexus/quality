@@ -48,6 +48,7 @@ def test_repo_config_ignored(target):
     )
     target.write("Dockerfile", UNTAGGED_DOCKERFILE)
     target.write(".env", SECRET_ENV_LINE)
+    target.write("LICENSE", "Permission is hereby granted, free of charge, to any person obtaining a copy\n")
     target.commit()
     plain = findings_without_folder_size(target.check("--all", "--json"))
     assert EVERY_KIND_RULES <= {item[0] for item in plain}

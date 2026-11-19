@@ -19,7 +19,10 @@ MANIFEST = "manifest.json"
 FORMAT = 1
 TRIVY_DIR = "trivy"
 OSV_DIR = "osv"
-CONTENT_DIRS = (TRIVY_DIR, OSV_DIR)
+LICENSE_DIR = "licenses"
+LICENSE_INDEX = "index.json"
+LICENSE_KEY = "licenses"
+CONTENT_DIRS = (TRIVY_DIR, OSV_DIR, LICENSE_DIR)
 TIMESTAMP = "%Y-%m-%dT%H:%M:%SZ"
 UPDATE_HINT = "run `quality db update`"
 COPY_CHUNK = 1 << 20
@@ -90,8 +93,18 @@ def location(option: str | None, environ: dict) -> Path:
     return Path(home) / ".cache" / "quality" / "db"
 
 
-def write_manifest(root: Path, date: datetime, digest: str) -> None:
+def write_manifest(root: Path, date: datetime, digest: str, licenses: str | None = None) -> None:
+    """
+    Args:
+        root: Bundle directory.
+        date: Fetch time.
+        digest: tree_digest() of the content directories.
+        licenses: file_digest() of LICENSE_DIR/LICENSE_INDEX, or None for a
+            bundle without licence data.
+    """
     document = {"format": FORMAT, "date": date.strftime(TIMESTAMP), "digest": digest}
+    if licenses is not None:
+        document[LICENSE_KEY] = f"sha256:{licenses}"
     (root / MANIFEST).write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
 
 

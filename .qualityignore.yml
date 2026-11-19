@@ -11,7 +11,7 @@
   reason: standalone scripts run by path; sys-service copies script.py alone, so a package file next to it would never ship
 - rule: clean.folder-items
   paths: ["src/quality"]
-  reason: requirement 001 decision 24 adds db.py as the thirteenth item of the runner package, its Distribution criteria add doctor.py for `quality doctor`, and kinds.py, waivers.py and environment.py keep ruledata.py and modes.py under the file line limit; moving modules into subpackages would change every import and is a refactor of its own
+  reason: requirement 001 decision 24 adds db.py as the thirteenth item of the runner package, its Distribution criteria add doctor.py for `quality doctor`, and kinds.py, waivers.py and environment.py keep ruledata.py and modes.py under the file line limit, and requirement 004 adds the legal/ subpackage; moving modules into subpackages would change every import and is a refactor of its own
 - rule: clean.clones
   paths:
     - tests/integration/hard/test_code.py
@@ -22,3 +22,6 @@
 - rule: clean.clones
   paths: ["tests/service/test_web.py"]
   reason: each rate-limit test spells out its own request sequence, so the repeated client setup and first two submissions keep every test readable on its own
+- rule: legal.external-request
+  paths: ["tests/integration/rules/test_legal.py"]
+  reason: the fixtures of legal.external-request write the third-party web font link the rule must find into a template of the fixture repository; the test file itself requests nothing

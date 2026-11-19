@@ -99,6 +99,7 @@ def test_report_schema_accepts_runner_output():
     nocheck = [{"path": "a.py", "line": 3, "rule": "x"}]
     assert launcher.fits(report(ignored=ignored, nocheck=nocheck), launcher.REPORT)
     assert launcher.fits(report(findings=[{**FINDING, "lens": "SRP"}], architecture=75), launcher.REPORT)
+    assert launcher.fits(report(legal=50, legal_blockers=1, legal_unchecked=2), launcher.REPORT)
 
 
 @pytest.mark.parametrize(
@@ -113,6 +114,12 @@ def test_report_schema_accepts_runner_output():
         report(architecture="100"),
         report(architecture=True),
         {key: value for key, value in report().items() if key != "architecture"},
+        report(legal="100"),
+        report(legal=True),
+        report(legal_blockers=True),
+        report(legal_unchecked="1"),
+        report(legal_unchecked=1.0),
+        *({key: value for key, value in report().items() if key != name} for name in ("legal", "legal_blockers", "legal_unchecked")),
         report(notes=[1]),
         report(findings={}),
         [],

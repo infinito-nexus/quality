@@ -1,3 +1,5 @@
+import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -6,17 +8,20 @@ from quality import QualityError, printable
 from quality.adapters import chunked
 from quality.cli import main
 from quality.report import (
+    Legal,
     Outcome,
     architecture_of,
     exit_code,
+    legal_of,
     public_finding,
+    render_json,
     render_text,
 )
 from quality.snapshot import safe_path
 
 
 def outcome(findings: list, incomplete: list) -> Outcome:
-    return Outcome(findings, [], [], [], [], incomplete, [], None)
+    return Outcome(findings, [], [], [], [], incomplete, [], None, None)
 
 
 def test_clean_exits_0():
@@ -144,13 +149,33 @@ def test_architecture_weighs_the_fragments_of_one_clone_once():
     assert architecture_of([weighed(10, pair), weighed(10, pair[::-1])]) == 80
 
 
+def legal_hit(weight: int | None, severity: str) -> SimpleNamespace:
+    return SimpleNamespace(rule=SimpleNamespace(legal=weight, severity=severity))
+
+
+def test_legal_subtracts_each_weight_counts_blockers_and_stops_at_zero():
+    blocker, finding = legal_hit(50, "critical"), legal_hit(25, "medium")
+    assert legal_of([], []) == Legal(100, 0, 0)
+    assert legal_of([legal_hit(None, "critical")], [object()]) == Legal(100, 0, 1)
+    assert legal_of([finding], []) == Legal(75, 0, 0)
+    assert legal_of([blocker, finding, legal_hit(None, "high")], []) == Legal(25, 1, 0)
+    assert legal_of([blocker] * 3, [object(), object()]) == Legal(0, 3, 2)
+
+
+def test_report_carries_the_legal_keys_and_null_without_a_score():
+    scored = json.loads(render_json(replace(outcome([], []), legal=Legal(75, 0, 1))))
+    assert (scored["legal"], scored["legal_blockers"], scored["legal_unchecked"]) == (75, 0, 1)
+    whole = json.loads(render_json(outcome([], [])))
+    assert (whole["legal"], whole["legal_blockers"], whole["legal_unchecked"]) == (None, None, None)
+
+
 def text_finding(rule_id: str, lens: str | None, line: int) -> SimpleNamespace:
     rule = SimpleNamespace(id=rule_id, severity="medium", summary="summary", lens=lens)
     return SimpleNamespace(rule=rule, path="a.py", line=line, value=None, commit=None)
 
 
 def scored(findings: list, architecture: int | None) -> list:
-    return render_text(Outcome(findings, [], [], [], [], [], [], architecture)).splitlines()
+    return render_text(Outcome(findings, [], [], [], [], [], [], architecture, None)).splitlines()
 
 
 def test_text_report_prints_the_architecture_score_and_each_lens_only_in_diff_modes():

@@ -1,0 +1,118 @@
+- id: legal.license-declared
+  severity: medium
+  summary: No licence file, or a manifest licence field or SPDX header that names another licence than the nearest licence file
+  legal: 25
+  enforcer:
+    any:
+      builtin: license-declared
+      project: &project
+        files: [LICENSE, LICENSE.md, LICENSE.txt, LICENCE, LICENCE.md, LICENCE.txt, COPYING, COPYING.md, COPYING.txt]
+        licenses:
+          MIT:
+            text: 'Permission is hereby granted, free of charge, to any person obtaining a copy'
+            ids: [MIT]
+          Apache-2.0:
+            text: 'Apache License\s+Version 2\.0, January 2004'
+            ids: [Apache-2.0]
+          GPL-3.0:
+            text: 'GNU GENERAL PUBLIC LICENSE\s+Version 3, 29 June 2007'
+            ids: [GPL-3.0-only, GPL-3.0-or-later, GPL-3.0, GPL-3.0+]
+          LGPL-3.0:
+            text: 'GNU LESSER GENERAL PUBLIC LICENSE\s+Version 3, 29 June 2007'
+            ids: [LGPL-3.0-only, LGPL-3.0-or-later, LGPL-3.0, LGPL-3.0+]
+          AGPL-3.0:
+            text: 'GNU AFFERO GENERAL PUBLIC LICENSE\s+Version 3, 19 November 2007'
+            ids: [AGPL-3.0-only, AGPL-3.0-or-later, AGPL-3.0]
+          MPL-2.0:
+            text: 'Mozilla Public License Version 2\.0'
+            ids: [MPL-2.0]
+      manifests:
+        pyproject.toml: [project, license]
+        Cargo.toml: [package, license]
+        package.json: [license]
+        composer.json: [license]
+      header: '(?m)SPDX-License-Identifier:[ \t]*([A-Za-z0-9.+:()-]+(?:[ \t]+[A-Za-z0-9.+:()-]+)*)'
+      header_bytes: 4096
+- id: legal.vendored-license
+  severity: critical
+  summary: Vendored or third-party folder named in .quality/legal.yml holds no licence file
+  legal: 50
+  file_level: true
+  enforcer:
+    any:
+      builtin: vendored-license
+      config: &config .quality/legal.yml
+      project: *project
+- id: legal.dependency-license
+  severity: critical
+  summary: Added or changed runtime dependency carries a licence outside the allowlist of the project licence
+  legal: 50
+  enforcer:
+    any:
+      builtin: dependency-license
+      config: *config
+      project: *project
+      groups:
+        permissive: [MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0, 0BSD, CC0-1.0]
+        lgpl: [LGPL-2.1-only, LGPL-2.1-or-later, LGPL-2.1, LGPL-2.1+, LGPL-3.0-only, LGPL-3.0-or-later, LGPL-3.0, LGPL-3.0+]
+        gpl-3.0: [GPL-3.0-only, GPL-3.0-or-later, GPL-3.0, GPL-3.0+]
+      allow:
+        MIT: [permissive]
+        GPL-3.0: [permissive, lgpl, gpl-3.0]
+      formats:
+        requirements: ["*requirements*.txt", "**/requirements/*.txt"]
+        pyproject: [pyproject.toml]
+        package-json: [package.json]
+        package-lock: [package-lock.json, npm-shrinkwrap.json]
+        composer-lock: [composer.lock]
+      exempt: [tests/, test/, "*dev*.txt", "*test*.txt"]
+      reads:
+        - "*requirements*.txt"
+        - "**/requirements/*.txt"
+        - pyproject.toml
+        - package.json
+        - package-lock.json
+        - npm-shrinkwrap.json
+        - composer.lock
+        - Pipfile.lock
+        - poetry.lock
+        - uv.lock
+        - pdm.lock
+        - pylock.toml
+        - "pylock.*.toml"
+        - yarn.lock
+        - pnpm-lock.yaml
+        - bun.lock
+        - go.mod
+        - Cargo.lock
+        - Gemfile.lock
+        - gems.locked
+- id: legal.external-request
+  severity: medium
+  summary: New request to a third-party host (CDN, web font, analytics, embed or API); self-host it or name it in the privacy notice
+  legal: 25
+  enforcer:
+    code:
+      tool: rg
+      pattern: &third-party '(?i)(?:https?:)?//(?:[a-z0-9-]+\.)*(?:fonts\.googleapis\.com|fonts\.gstatic\.com|use\.typekit\.net|fonts\.bunny\.net|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com|code\.jquery\.com|ajax\.googleapis\.com|(?:stackpath|maxcdn)\.bootstrapcdn\.com|cdn\.tailwindcss\.com|google-analytics\.com|googletagmanager\.com|connect\.facebook\.net|platform\.twitter\.com|youtube(?:-nocookie)?\.com/embed|player\.vimeo\.com|maps\.googleapis\.com|api\.mapbox\.com|js\.stripe\.com|cdn\.segment\.com|static\.hotjar\.com|plausible\.io|static\.cloudflareinsights\.com|recaptcha\.net)'
+    html: &markup-request
+      tool: rg
+      pattern:
+        - *third-party
+        - '(?i)<(?:script|link|img|iframe|source|video|audio)\b[^>]*\b(?:src|href)[ \t]*=[ \t]*["'']?(?:https?:)?//|url\([ \t]*["'']?(?:https?:)?//|@import[ \t]+["'']?(?:https?:)?//'
+    css: *markup-request
+    jinja: *markup-request
+- id: legal.reuse
+  severity: medium
+  summary: Changed file lacks REUSE data (SPDX-License-Identifier and SPDX-FileCopyrightText in the file or its .license file, and the named licence under LICENSES/) in a repository that opts into REUSE
+  legal: 25
+  file_level: true
+  enforcer:
+    any:
+      builtin: reuse
+      config: *config
+      header: '(?m)SPDX-License-Identifier:[ \t]*([A-Za-z0-9.+:()-]+(?:[ \t]+[A-Za-z0-9.+:()-]+)*)'
+      copyright: 'SPDX-FileCopyrightText:'
+      sidecar: .license
+      licenses_dir: LICENSES
+      skip: [LICENSES/, .reuse/, "*.license", REUSE.toml, .quality/, "LICENSE*", "LICENCE*", "COPYING*"]
