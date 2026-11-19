@@ -1,3 +1,6 @@
+import pytest
+
+from quality.adapters.astgrep import reported_rows
 from tests.integration.support import catalogue, findings_of_rule, report
 
 DEFAULTS_FIXTURES = {
@@ -215,3 +218,67 @@ def test_default_value_takes_a_nocheck_never_a_plain_comment(target, mode):
     assert result.returncode == 1, result.stderr
     assert findings_of_rule(result, DEFAULT_VALUE) == [("commented.mjs", 1)]
     assert report(result)["nocheck"] == [{"path": "waived.mjs", "line": 1, "rule": DEFAULT_VALUE}]
+
+
+EMBEDDED_SHELL = r"""sh -c 'echo ${ONE:-1}'
+dexec "$node" sh -c 'pid=$(cat /run/app.pid)
+[ "${pid:-0}" -gt 0 ] || exit 0
+echo "${EMPTY:-}" # ${NOTE:-1}
+done'
+bash -euc 'x=${TWO:-2}' _ arg
+eval 'y=${THREE:=3}'
+trap 'rm -f "${LOCK:-app.lock}"' EXIT
+echo sh -c 'echo ${PRINTED:-1}'
+printf '%s\n' '${LITERAL:-1}'
+cat > stub <<STUB
+#!/bin/sh
+printf '%s' "\${OPTS:-{\\}}" "\${SET:?SET is required}"
+echo "\${BLANK:-}"
+STUB
+cat > quoted <<'EOF'
+#!/usr/bin/env bash
+echo "${FOUR:-4}" "\${ESCAPED:-1}"
+EOF
+cat > notes.txt <<EOF
+\${TEXT:-1}
+EOF
+cat > data.txt <<'EOF'
+${DATA:-1}
+EOF
+"""
+EMBEDDED_HITS = [1, 3, 6, 7, 8, 13, 18]
+
+
+def test_default_value_reads_the_script_a_shell_runs_one_level_down(target):
+    target.write("embedded.sh", EMBEDDED_SHELL)
+    target.commit()
+    found = findings_of_rule(target.check("--all", "--json"), DEFAULT_VALUE)
+    assert found == [("embedded.sh", line) for line in EMBEDDED_HITS]
+
+
+ROWS = r"(?m)^[^#\n]*?\$\{\w+:-(?!\})"
+
+
+def astgrep_match(text: str, line: int, metadata: dict) -> dict:
+    return {
+        "ruleId": "clean.default-value/embedded",
+        "text": text,
+        "range": {"start": {"line": line, "column": 4}, "end": {"line": line + text.count("\n"), "column": 1}},
+        "metadata": metadata,
+    }
+
+
+@pytest.mark.parametrize(
+    ("text", "rows"),
+    [
+        ("'a\nb=${B:-1}\nc'", [11]),
+        ("'${A:-1}\nb\n${C:-3} ${D:-4}'", [10, 12]),
+        ("'a # ${A:-1}\n${B:-}\nc'", []),
+    ],
+)
+def test_a_rows_pattern_reports_the_lines_it_matches_inside_the_text(text, rows):
+    assert reported_rows(astgrep_match(text, 9, {"rows": ROWS})) == rows
+
+
+def test_without_a_rows_pattern_the_first_line_is_reported():
+    assert reported_rows(astgrep_match("'a\nb=${B:-1}\nc'", 9, {})) == [10]

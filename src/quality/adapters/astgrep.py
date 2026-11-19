@@ -175,12 +175,18 @@ def reported_rows(match: dict) -> list:
         match: One ast-grep match.
 
     Returns:
-        The line of a bound `$AT`, else the match's first line. An unreadable
-        region reports every line from there to the end of the region, or for
-        a missing node to the end of the top-level item `$TOP` that holds it.
+        The line of a bound `$AT`, else the match's first line. A rule whose
+        metadata names a `rows` pattern reports instead the line of every
+        match of it in the matched text, none when it does not match. An
+        unreadable region reports every line from there to the end of the
+        region, or for a missing node to the end of the top-level item `$TOP`
+        that holds it.
     """
     at = bound_node(match, "AT")
     first = first_line(at if at is not None else match)
+    rows = match.get("metadata", {}).get("rows")
+    if rows is not None:
+        return pattern_rows(match["text"], rows, first)
     if prefix(match["ruleId"]) != INCOMPLETE:
         return [first]
     top = bound_node(match, "TOP")
@@ -188,6 +194,19 @@ def reported_rows(match: dict) -> list:
     end = region["range"]["end"]
     last = end["line"] if end["column"] or end["line"] == region["range"]["start"]["line"] else end["line"] - 1
     return list(range(first, max(first, last + 1) + 1))
+
+
+def pattern_rows(text: str, pattern: str, first: int) -> list:
+    """
+    Args:
+        text: The text of one match.
+        pattern: Regular expression for the parts of it to report.
+        first: Line the text starts on.
+
+    Returns:
+        The line of every match of the pattern in the text, in order.
+    """
+    return sorted({first + text[: found.start()].count("\n") for found in re.finditer(pattern, text)})
 
 
 def broken(snapshot, path: str, above: dict, row: int) -> bool:
@@ -273,7 +292,7 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
         rows = reported_rows(match)
         if prefix(match["ruleId"]) == INCOMPLETE:
             snapshot.unparsed.add(path)
-        if owner is not None and path in owner[1] and stands(match, snapshot, path, rows[0]):
+        if owner is not None and rows and path in owner[1] and stands(match, snapshot, path, rows[0]):
             hits.extend(code_hit(owner[0], path, row, match["ruleId"], snapshot) for row in rows)
     snapshot.unparsed.update(path for path in command.files if not decodes(snapshot.data(path)))
     return hits
