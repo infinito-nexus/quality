@@ -6,7 +6,9 @@ from quality import printable
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
 EXIT_ERROR = 2
-FULL_ARCHITECTURE = 100
+FULL_SCORE = 100
+BLOCKER_SEVERITY = "critical"
+LEGAL_KEYS = ("legal", "legal_blockers", "legal_unchecked")
 
 
 @dataclass(frozen=True, order=True)
@@ -31,6 +33,20 @@ def unchecked_of(snapshot, wanted: set | None) -> list:
     ]
 
 
+@dataclass(frozen=True)
+class Legal:
+    """
+    Args:
+        score: 100 less the legal weight of every counted finding, at least 0.
+        blockers: Counted findings of a critical rule, each of which forbids the commit.
+        unchecked: Dependencies or files whose licence could not be judged.
+    """
+
+    score: int
+    blockers: int
+    unchecked: int
+
+
 @dataclass(frozen=True, repr=False)
 class Outcome:
     findings: list
@@ -41,6 +57,7 @@ class Outcome:
     incomplete: list
     unparsed: list
     architecture: int | None
+    legal: Legal | None
 
 
 def architecture_of(findings: list) -> int:
@@ -53,7 +70,26 @@ def architecture_of(findings: list) -> int:
         one, at least 0.
     """
     weight = sum(hit.rule.architecture for hit in findings if hit.rule.architecture)
-    return max(0, FULL_ARCHITECTURE - weight)
+    return max(0, FULL_SCORE - weight)
+
+
+def legal_of(findings: list, unchecked: list) -> Legal:
+    """
+    Args:
+        findings: Findings a diff mode reports, so only hits new against its base.
+        unchecked: The new findings legal.checks.split_unchecked() took out.
+
+    Returns:
+        The legal score of the findings whose rule carries a legal weight.
+    """
+    counted = [hit for hit in findings if hit.rule.legal]
+    blockers = sum(hit.rule.severity == BLOCKER_SEVERITY for hit in counted)
+    return Legal(max(0, FULL_SCORE - sum(hit.rule.legal for hit in counted)), blockers, len(unchecked))
+
+
+def legal_fields(legal: Legal | None) -> dict:
+    values = (None, None, None) if legal is None else (legal.score, legal.blockers, legal.unchecked)
+    return dict(zip(LEGAL_KEYS, values, strict=True))
 
 
 def public_finding(hit) -> dict:
@@ -104,6 +140,7 @@ def render_json(outcome: Outcome) -> str:
         "incomplete": outcome.incomplete,
         "parse_incomplete": outcome.unparsed,
         "architecture": outcome.architecture,
+        **legal_fields(outcome.legal),
     }
     return json.dumps(document, indent=2, sort_keys=True)
 

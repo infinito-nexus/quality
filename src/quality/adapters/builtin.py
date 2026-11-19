@@ -6,6 +6,7 @@ import yaml
 
 from quality import QualityError
 from quality.gate import code_hit, metric_hit
+from quality.legal.checks import BUILTINS as LEGAL_BUILTINS
 from quality.ruledata import require
 
 ROOT_FOLDER = "."
@@ -313,8 +314,22 @@ BUILTINS = {
 }
 
 
-def run_builtin(item, snapshot) -> list:
+def run_builtin(item, snapshot, resources: dict) -> list:
+    """
+    Args:
+        item: Bound rule with its files.
+        snapshot: Snapshot holding the files.
+        resources: The run's values, which only the legal builtins read.
+
+    Returns:
+        The findings of the builtin the enforcer names.
+
+    Raises:
+        QualityError: No builtin has that name.
+    """
     name = item.binding.settings["builtin"]
+    if name in LEGAL_BUILTINS:
+        return LEGAL_BUILTINS[name](item, snapshot, resources)
     if name not in BUILTINS:
         raise QualityError(f"rule {item.binding.rule.id}: unknown builtin {name!r}")
     return BUILTINS[name](item, snapshot)

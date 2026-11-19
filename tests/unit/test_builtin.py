@@ -3,7 +3,10 @@ from collections import Counter
 import pytest
 
 from quality.adapters import builtin
+from quality.legal.index import license_of
+from quality.legal.spdx import allowed
 
+PERMISSIVE = {"MIT", "ISC", "Apache-2.0"}
 JOB = "    runs-on: ubuntu-latest\n    steps:\n      - &step\n        name: s\n        run: echo 1\n"
 REFERENCES = 200
 
@@ -79,3 +82,35 @@ def test_logical_lines(script, expected):
 )
 def test_name_prefix(name, expected):
     assert builtin.name_prefix(name, ["test"]) == expected
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("MIT", True),
+        ("GPL-3.0-only", False),
+        ("MIT OR GPL-3.0-only", True),
+        ("MIT AND GPL-3.0-only", False),
+        ("GPL-3.0-only AND (MIT OR ISC)", False),
+        ("(GPL-3.0-only AND MIT) OR ISC", True),
+        ("Apache-2.0 WITH LLVM-exception", True),
+        ("mit or isc", False),
+        ("MIT OR", None),
+        ("(MIT", None),
+        ("MIT ISC", None),
+        ("", None),
+    ],
+)
+def test_allowed_evaluates_the_spdx_expression(expression, expected):
+    assert allowed(expression, PERMISSIVE) == expected
+
+
+def test_license_of_prefers_the_release_then_the_shared_licence():
+    packages = {"npm": {"a": {"1.0.0": "GPL-3.0-only", "*": "MIT"}, "b": {"2.0.0": "ISC"}, "c": {"*": 7}}}
+    assert license_of(packages, "npm", "a", "1.0.0") == "GPL-3.0-only"
+    assert license_of(packages, "npm", "a", "2.0.0") == "MIT"
+    assert license_of(packages, "npm", "a", "") == "MIT"
+    assert license_of(packages, "npm", "b", "") is None
+    assert license_of(packages, "npm", "c", "") is None
+    assert license_of(packages, "PyPI", "a", "1.0.0") is None
+    assert license_of(None, "npm", "a", "1.0.0") is None

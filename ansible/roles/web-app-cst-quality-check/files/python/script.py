@@ -40,7 +40,7 @@ FINDING = {"rule": TEXT, "path": TEXT, "line": LINE, "summary": TEXT, "commit": 
 FINDING.update({"severity": {"critical", "high", "medium", "low"}, "value": (int, float, NOTHING), "lens": (str, NOTHING)})
 IGNORED = {"rule": TEXT, "paths": "strings", "reason": TEXT}
 NOCHECK = {"path": TEXT, "line": LINE, "rule": TEXT}
-REPORT = {"findings": [FINDING], "ignored": [IGNORED], "nocheck": [NOCHECK], "architecture": (int, NOTHING)}
+REPORT = {"findings": [FINDING], "ignored": [IGNORED], "nocheck": [NOCHECK], **dict.fromkeys(("architecture", "legal", "legal_blockers", "legal_unchecked"), (int, NOTHING))}
 REPORT.update({"unchecked": "strings", "notes": "strings", "incomplete": "strings", "parse_incomplete": "strings"})
 LABEL = "quality-check.job"
 STEP_USER = "65534:65534"

@@ -7,6 +7,7 @@ import pytest
 
 from quality import QualityError, db, modes
 from quality.environment import tool_environment
+from quality.legal import index
 from quality.ruledata import load
 from tests.unit.deep.support import RULES
 
@@ -250,3 +251,40 @@ def test_scan_environment_has_no_network_and_no_semgrep_metrics(tmp_path):
     assert env["HOME"] == str(tmp_path / "home")
     assert env["OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY"] == str(tmp_path / db.OSV_DIR)
     assert "OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY" not in tool_environment("/bin", tmp_path, None)
+
+
+PACKAGES = {"PyPI": {"alpha": {"1.0": "MIT", "*": "MIT"}}}
+
+
+def licensed_bundle(root: Path, packages: dict) -> Path:
+    (root / db.TRIVY_DIR).mkdir(parents=True)
+    licenses = index.write_index(root, packages)
+    db.write_manifest(root, NOW, db.tree_digest(root), licenses)
+    return root
+
+
+def test_license_index_round_trips_and_is_covered_by_the_bundle_digest(tmp_path):
+    root = licensed_bundle(tmp_path / "bundle", PACKAGES)
+    assert index.read_index(root) == PACKAGES
+    before = db.tree_digest(root)
+    (root / db.LICENSE_DIR / db.LICENSE_INDEX).write_text('{"format": 1, "packages": {}}\n', encoding="utf-8")
+    assert db.tree_digest(root) != before
+    with pytest.raises(QualityError, match="licence index .* does not match its digest"):
+        index.read_index(root)
+
+
+def test_license_index_is_absent_without_a_bundle_or_an_index(tmp_path):
+    assert index.read_index(tmp_path / "absent") is None
+    assert index.read_index(bundle_at(tmp_path / "old", NOW)) is None
+
+
+def test_license_index_refuses_a_link_and_a_linked_index(tmp_path):
+    root = licensed_bundle(tmp_path / "bundle", PACKAGES)
+    (tmp_path / "link").symlink_to(root)
+    with pytest.raises(QualityError, match="is a link"):
+        index.read_index(tmp_path / "link")
+    target = root / db.LICENSE_DIR / db.LICENSE_INDEX
+    target.rename(tmp_path / "moved.json")
+    target.symlink_to(tmp_path / "moved.json")
+    with pytest.raises(QualityError, match="unreadable"):
+        index.read_index(root)

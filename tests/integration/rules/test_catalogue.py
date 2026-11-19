@@ -18,7 +18,14 @@ from tests.integration.support import (
     rules_without_tool,
 )
 
-PREFIXES = ("security.", "coding.", "clean.")
+PREFIXES = ("security.", "coding.", "clean.", "legal.")
+LEGAL = {
+    "legal.license-declared": ({"license-declared"}, "medium", 25),
+    "legal.vendored-license": ({"vendored-license"}, "critical", 50),
+    "legal.dependency-license": ({"dependency-license"}, "critical", 50),
+    "legal.external-request": ({"rg"}, "medium", 25),
+    "legal.reuse": ({"reuse"}, "medium", 25),
+}
 ARCHITECTURE = {
     "clean.complexity": ("SRP", 10),
     "clean.function-length": ("SRP", 10),
@@ -90,12 +97,29 @@ def test_every_counted_rule_names_a_lens():
         ({"lens": "SRP", "architecture": 0}, "positive integer"),
         ({"lens": "SRP", "architecture": True}, "positive integer"),
         ({"lens": "SRP", "architecture": "10"}, "positive integer"),
+        ({"legal": 0}, "sets legal other than a positive integer"),
+        ({"legal": False}, "sets legal other than a positive integer"),
+        ({"legal": "25"}, "sets legal other than a positive integer"),
     ],
 )
 def test_malformed_architecture_raises(extra: dict, message: str):
     raw = {"id": "coding.print-call", "severity": "low", "summary": "s", "enforcer": PRINT_CALL, **extra}
     with pytest.raises(QualityError, match=message):
         build_rule(raw, "fixture.yml", {})
+
+
+def test_legal_rules_carry_their_enforcer_severity_and_weight():
+    found = {
+        rule["id"]: (
+            {settings.get("builtin") or settings["tool"] for settings in rule["enforcer"].values()},
+            rule["severity"],
+            rule["legal"],
+        )
+        for rule in catalogue()
+        if rule["id"].startswith("legal.")
+    }
+    assert found == LEGAL
+    assert [rule["id"] for rule in catalogue() if "legal" in rule and not rule["id"].startswith("legal.")] == []
 
 
 def test_lens_without_architecture_is_valid():
@@ -186,6 +210,7 @@ def test_coverage_lists_only_rules_that_run(target):
     assert kinds["shell"]["rules"] == [
         "clean.file-lines",
         "coding.conflict-marker",
+        "legal.external-request",
         "security.uncounted-line-break",
         "security.unverified-download",
     ]
@@ -193,6 +218,7 @@ def test_coverage_lists_only_rules_that_run(target):
         "clean.default-value",
         "clean.tool-pragma",
         "coding.conflict-marker",
+        "legal.external-request",
         "security.uncounted-line-break",
     ]
 

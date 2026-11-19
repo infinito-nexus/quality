@@ -18,8 +18,8 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
 
     Returns:
         One command per rule. A rule setting `multiline` lets its pattern span
-        lines; a rule setting `pcre2` gets look-around. --threads carries the
-        run's thread cap.
+        lines; a rule setting `pcre2` gets look-around; a `pattern` list
+        matches any of its patterns. --threads carries the run's thread cap.
     """
     return [
         Command(
@@ -31,8 +31,7 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
                 "--json",
                 *(["--multiline"] if item.binding.settings.get("multiline") else []),
                 *(["--pcre2"] if item.binding.settings.get("pcre2") else []),
-                "--regexp",
-                require(item.binding.settings, "pattern", f"enforcer of {item.binding.rule.id}"),
+                *regexps(require(item.binding.settings, "pattern", f"enforcer of {item.binding.rule.id}")),
                 "--",
             ],
             item.files,
@@ -40,6 +39,17 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         )
         for item in bound
     ]
+
+
+def regexps(pattern) -> list:
+    """
+    Args:
+        pattern: One pattern, or a list of patterns.
+
+    Returns:
+        One --regexp option per pattern.
+    """
+    return [argument for item in ([pattern] if isinstance(pattern, str) else pattern) for argument in ("--regexp", item)]
 
 
 def operands(command: Command, snapshot, work) -> list:

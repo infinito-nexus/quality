@@ -20,6 +20,9 @@ REPORT = {
     "incomplete": [],
     "parse_incomplete": [],
     "architecture": None,
+    "legal": None,
+    "legal_blockers": None,
+    "legal_unchecked": None,
 }
 
 

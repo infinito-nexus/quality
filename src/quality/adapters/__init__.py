@@ -239,7 +239,7 @@ class Collector:
 
     def run_tool(self, tool: str, bound: list, snapshot) -> list:
         if tool == BUILTIN:
-            return [hit for item in bound for hit in run_builtin(item, snapshot)]
+            return [hit for item in bound for hit in run_builtin(item, snapshot, self.runtime.resources)]
         if tool not in REGISTRY:
             raise QualityError(f"tool {tool} is allow-listed without an adapter")
         binary = self.runtime.resolve(tool)
