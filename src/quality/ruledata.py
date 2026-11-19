@@ -24,6 +24,7 @@ PLACEHOLDERS = "placeholders"
 COMMENTS = "comments"
 NOCHECK_NAMES = "nocheck_names"
 PARSES = "parses"
+LENSES = ("SRP", "DRY", "KISS", "KISS/YAGNI", "fail fast")
 
 
 def require(mapping: dict, key: str, where: str):
@@ -50,6 +51,8 @@ class Rule:
     tier: str | None
     exclude: object
     changed_only: bool
+    lens: str | None
+    architecture: int | None
 
     def excludes(self, path: str) -> bool:
         return self.exclude is not None and self.exclude.match_file(path)
@@ -259,7 +262,10 @@ def build_rule(raw: dict, where: str, placeholders: dict) -> Rule:
         tier=raw.get("tier"),
         exclude=gitignore_spec(exclude) if exclude else None,
         changed_only=bool(raw.get("changed_only")),
+        lens=raw.get("lens"),
+        architecture=raw.get("architecture"),
     )
+    check_architecture(rule, entry)
     if rule.changed_only and rule.hard:
         raise QualityError(f"rule data: {entry} sets changed_only with hard")
     if rule.history and not rule.hard:
@@ -269,6 +275,26 @@ def build_rule(raw: dict, where: str, placeholders: dict) -> Rule:
     if rule.pending:
         require(raw, "tier", entry)
     return rule
+
+
+def check_architecture(rule: Rule, entry: str) -> None:
+    """
+    Args:
+        rule: Rule as read from the catalogue.
+        entry: Where the rule was read, for the error.
+
+    Raises:
+        QualityError: The rule names a lens outside LENSES, sets architecture
+            without a lens, or weighs architecture other than as a positive integer.
+    """
+    if rule.lens is not None and rule.lens not in LENSES:
+        raise QualityError(f"rule data: {entry} names a lens outside {', '.join(LENSES)}")
+    if rule.architecture is None:
+        return
+    if rule.lens is None:
+        raise QualityError(f"rule data: {entry} sets architecture without lens")
+    if type(rule.architecture) is not int or rule.architecture < 1:
+        raise QualityError(f"rule data: {entry} sets architecture other than a positive integer")
 
 
 def check_unique(rules: list) -> None:
@@ -378,8 +404,9 @@ def load(directory: Path) -> RuleData:
         The validated rule data.
 
     Raises:
-        QualityError: A key is missing, a rule id repeats, or an enforcer
-            names a tool outside the allow-list.
+        QualityError: A key is missing, a rule id repeats, a lens or an
+            architecture weight is malformed, or an enforcer names a tool
+            outside the allow-list.
     """
     entries = [
         (path.name, raw)

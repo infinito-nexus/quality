@@ -92,6 +92,8 @@
 - id: coding.structural
   severity: medium
   summary: Per-language structural rule matched
+  lens: fail fast
+  architecture: 10
   enforcer:
     python: {tool: ast-grep, language: python}
     shell: {tool: ast-grep, language: bash}

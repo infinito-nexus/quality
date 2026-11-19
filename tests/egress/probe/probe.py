@@ -35,7 +35,7 @@ CONNECT_SECONDS = 3
 SKIPPED = ("/proc", "/sys", "/dev", "/nix")
 SEEK_MAX_BYTES = 4 << 20
 CHUNK = b"\0" * (1 << 20)
-EMPTY_REPORT = {"findings": [], "ignored": [], "nocheck": [], "unchecked": [], "incomplete": [], "parse_incomplete": []}
+EMPTY_REPORT = {"findings": [], "ignored": [], "nocheck": [], "unchecked": [], "incomplete": [], "parse_incomplete": [], "architecture": None}
 
 
 def run_git(*args):

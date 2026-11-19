@@ -1,6 +1,8 @@
 - id: clean.file-lines
   severity: medium
   summary: File exceeds the line limit
+  lens: SRP
+  architecture: 25
   metric:
     limit: 500
   exclude:
@@ -14,6 +16,8 @@
 - id: clean.folder-items
   severity: medium
   summary: Folder exceeds the direct item limit
+  lens: SRP
+  architecture: 25
   metric:
     limit: 12
   enforcer: folder-items
@@ -39,6 +43,8 @@
 - id: clean.complexity
   severity: medium
   summary: Function exceeds the cyclomatic complexity limit
+  lens: SRP
+  architecture: 10
   metric:
     limit: 10
   enforcer:
@@ -48,6 +54,8 @@
 - id: clean.function-length
   severity: medium
   summary: Function exceeds the length limit
+  lens: SRP
+  architecture: 10
   metric:
     limit: 50
   enforcer:
@@ -57,6 +65,8 @@
 - id: clean.parameters
   severity: medium
   summary: Function exceeds the parameter limit
+  lens: SRP
+  architecture: 10
   metric:
     limit: 5
   enforcer:
@@ -142,6 +152,8 @@
 - id: clean.clones
   severity: medium
   summary: Duplicated code block
+  lens: DRY
+  architecture: 10
   tier: deep
   enforcer:
     code:

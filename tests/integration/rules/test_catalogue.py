@@ -1,10 +1,12 @@
 import json
 import re
 
+import pytest
 import yaml
 
+from quality import QualityError
 from quality.adapters import astgrep
-from quality.ruledata import load
+from quality.ruledata import LENSES, build_rule, load
 from tests.integration.support import (
     ROOT,
     RULES,
@@ -17,6 +19,16 @@ from tests.integration.support import (
 )
 
 PREFIXES = ("security.", "coding.", "clean.")
+ARCHITECTURE = {
+    "clean.complexity": ("SRP", 10),
+    "clean.function-length": ("SRP", 10),
+    "clean.parameters": ("SRP", 10),
+    "clean.clones": ("DRY", 10),
+    "coding.structural": ("fail fast", 10),
+    "clean.file-lines": ("SRP", 25),
+    "clean.folder-items": ("SRP", 25),
+}
+PRINT_CALL = {"python": {"tool": "ruff", "codes": ["T201"]}}
 
 LIMIT_LEAK = re.compile(r"500|MAX_")
 CORE_COUPLING = re.compile(r"utils\.cache|PROJECT_ROOT")
@@ -60,6 +72,47 @@ def test_catalogue_schema():
     for rule in rules:
         assert {"id", "severity", "summary", "enforcer"} <= set(rule), rule.get("id")
         assert rule["id"].startswith(PREFIXES), rule["id"]
+
+
+def test_every_counted_rule_names_a_lens():
+    rules = catalogue()
+    counted = [rule for rule in rules if "architecture" in rule]
+    assert [rule["id"] for rule in counted if "lens" not in rule] == []
+    assert {rule["lens"] for rule in rules if "lens" in rule} <= set(LENSES)
+    assert {rule["id"]: (rule["lens"], rule["architecture"]) for rule in counted} == ARCHITECTURE
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ({"architecture": 10}, "sets architecture without lens"),
+        ({"lens": "SOLID"}, "names a lens outside"),
+        ({"lens": "SRP", "architecture": 0}, "positive integer"),
+        ({"lens": "SRP", "architecture": True}, "positive integer"),
+        ({"lens": "SRP", "architecture": "10"}, "positive integer"),
+    ],
+)
+def test_malformed_architecture_raises(extra: dict, message: str):
+    raw = {"id": "coding.print-call", "severity": "low", "summary": "s", "enforcer": PRINT_CALL, **extra}
+    with pytest.raises(QualityError, match=message):
+        build_rule(raw, "fixture.yml", {})
+
+
+def test_lens_without_architecture_is_valid():
+    raw = {"id": "coding.print-call", "severity": "low", "summary": "s", "enforcer": PRINT_CALL, "lens": "KISS/YAGNI"}
+    rule = build_rule(raw, "fixture.yml", {})
+    assert (rule.lens, rule.architecture) == ("KISS/YAGNI", None)
+
+
+def test_architecture_without_lens_fails_closed(target, tmp_path):
+    rules = rules_copy(tmp_path / "rules")
+    weighed = {"id": "coding.print-call", "severity": "low", "summary": "s", "enforcer": PRINT_CALL, "architecture": 10}
+    add_rules(rules, [weighed])
+    target.write("a.py", "x = 1\n")
+    target.commit()
+    result = target.check("--all", "--rules", str(rules))
+    assert result.returncode == 2
+    assert "coding.print-call sets architecture without lens" in result.stderr
 
 
 def test_unknown_runner_enforcer_fails_closed(target, tmp_path):

@@ -6,6 +6,7 @@ from quality import printable
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
 EXIT_ERROR = 2
+FULL_ARCHITECTURE = 100
 
 
 @dataclass(frozen=True, order=True)
@@ -39,6 +40,20 @@ class Outcome:
     notes: list
     incomplete: list
     unparsed: list
+    architecture: int | None
+
+
+def architecture_of(findings: list) -> int:
+    """
+    Args:
+        findings: Findings a diff mode reports, so only hits new against its base.
+
+    Returns:
+        100 less the architecture weight of every finding whose rule carries
+        one, at least 0.
+    """
+    weight = sum(hit.rule.architecture for hit in findings if hit.rule.architecture)
+    return max(0, FULL_ARCHITECTURE - weight)
 
 
 def public_finding(hit) -> dict:
@@ -48,7 +63,8 @@ def public_finding(hit) -> dict:
 
     Returns:
         The only form of a finding that leaves the runner: exactly rule, path,
-        line, severity, summary, value and commit.
+        line, severity, summary, value, commit and lens, the principle the rule
+        checks or None.
     """
     return {
         "rule": hit.rule.id,
@@ -58,6 +74,7 @@ def public_finding(hit) -> dict:
         "summary": hit.rule.summary,
         "value": hit.value,
         "commit": hit.commit,
+        "lens": hit.rule.lens,
     }
 
 
@@ -86,6 +103,7 @@ def render_json(outcome: Outcome) -> str:
         "notes": outcome.notes,
         "incomplete": outcome.incomplete,
         "parse_incomplete": outcome.unparsed,
+        "architecture": outcome.architecture,
     }
     return json.dumps(document, indent=2, sort_keys=True)
 

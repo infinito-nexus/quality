@@ -26,7 +26,7 @@ from quality.history import finding_key, history_hits
 from quality.ignorefile import audit_lines, refuse_stale, stale_names
 from quality.ignorefile import parse as parse_ignore
 from quality.repo import Repo, hardened_env
-from quality.report import Outcome, unchecked_of
+from quality.report import Outcome, architecture_of, unchecked_of
 from quality.ruledata import (
     BINARY_GUARD,
     FOLDER_ITEMS,
@@ -327,7 +327,7 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
 
     Returns:
         Hard and unread-file findings absolute, all other findings through the
-        differential gate.
+        differential gate, and the architecture score of those findings.
     """
     changed = {change.path for change in plan.changes}
     notes = notes + control_notes(plan.head, plan.changes)
@@ -343,7 +343,8 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
     soft = [hit for hit in kept if not ungated(hit)]
     if soft:
         findings += new_hits(soft, plan_baseline(session, plan))
-    return Outcome(findings, ignored, nocheck, unchecked_of(plan.head, changed), notes, [], sorted(plan.head.unparsed))
+    unchecked = unchecked_of(plan.head, changed)
+    return Outcome(findings, ignored, nocheck, unchecked, notes, [], sorted(plan.head.unparsed), architecture_of(findings))
 
 
 def touched_paths(plan: Plan) -> list:
@@ -376,7 +377,7 @@ def check_all(session: Session, _options: Options) -> Outcome:
     if session.repo.is_shallow():
         notes.append(HEAD_ONLY_NOTE)
     pending = [rule.id for rule in session.data.pending_rules(ALL_TIERS)]
-    return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending, sorted(head.unparsed))
+    return Outcome(findings, ignored, nocheck, unchecked_of(head, None), notes, pending, sorted(head.unparsed), None)
 
 
 def unparsed_notes(kept: list) -> list:
@@ -389,7 +390,7 @@ def check_staged(session: Session, _options: Options) -> Outcome:
     changes = repo.staged_changes(first_parent)
     notes = session.pending_notes(FAST_TIER)
     if not changes:
-        return Outcome([], [], [], [], notes, [], [])
+        return Outcome([], [], [], [], notes, [], [], architecture_of([]))
     head = session.snapshot(repo.index_entries(), "head")
     merge_head = repo.merge_head()
     parents = [first_parent, merge_head] if merge_head else [first_parent]
