@@ -55,8 +55,8 @@ flowchart TD
 
 ### Stage C
 
-- [ ] A GPL header pasted into a fixture MIT project gives one `legal.foreign-origin` blocker.
-- [ ] The CI workflow runs ORT on the default branch only and uploads its report.
+- [x] A GPL header pasted into a fixture MIT project gives one `legal.foreign-origin` blocker.
+- [x] The CI workflow runs ORT on the default branch only and uploads its report.
 
 ### Tests
 
