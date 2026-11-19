@@ -1,3 +1,5 @@
+import pytest
+
 from tests.integration.support import (
     add_rules,
     branchy,
@@ -232,3 +234,34 @@ def test_architecture_counts_a_file_the_change_pushes_past_the_line_limit(target
     target.write("legacy.py", legacy.replace("legacy_7 = 7", "legacy_7 = 77"))
     target.advance(mode)
     assert architecture(target.judge(mode, "--json")) == (75, [("clean.file-lines", "SRP")])
+
+
+CLONED_JS = (
+    "export function totals(rows) {\n"
+    "  const first = rows[0] + rows[1] + rows[2] + rows[3];\n"
+    "  const second = rows[4] * rows[5] - rows[6] * rows[7];\n"
+    "  const third = rows[8] - rows[9] + rows[10] - rows[11];\n"
+    "  return [first, second, third];\n"
+    "}\n"
+)
+CLONE_FRAGMENTS = [("clean.clones", "DRY"), ("clean.clones", "DRY")]
+
+
+@pytest.mark.deep
+def test_architecture_counts_a_javascript_clone_the_change_adds(target):
+    target.write("web/a.js", CLONED_JS)
+    target.start_feature("base")
+    target.write("web/b.js", CLONED_JS)
+    target.advance("base")
+    assert architecture(target.judge("base", "--json")) == (90, CLONE_FRAGMENTS)
+
+
+@pytest.mark.deep
+def test_architecture_skips_a_javascript_clone_at_the_base(target):
+    target.write("web/a.js", CLONED_JS)
+    target.write("web/b.js", CLONED_JS)
+    target.start_feature("base")
+    target.write("web/b.js", CLONED_JS + "export const marker = 1;\n")
+    target.advance("base")
+    assert architecture(target.judge("base", "--json")) == (100, [])
+    assert architecture(target.check("--all", "--json")) == (None, CLONE_FRAGMENTS)

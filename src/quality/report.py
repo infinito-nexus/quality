@@ -50,10 +50,15 @@ def architecture_of(findings: list) -> int:
 
     Returns:
         100 less the architecture weight of every finding whose rule carries
-        one, at least 0.
+        one, the findings of one group, such as both fragments of a clone,
+        weighed once; at least 0.
     """
-    weight = sum(hit.rule.architecture for hit in findings if hit.rule.architecture)
-    return max(0, FULL_ARCHITECTURE - weight)
+    weights = {
+        (hit.rule.id, hit.group) if hit.group else index: hit.rule.architecture
+        for index, hit in enumerate(findings)
+        if hit.rule.architecture
+    }
+    return max(0, FULL_ARCHITECTURE - sum(weights.values()))
 
 
 def public_finding(hit) -> dict:
@@ -117,7 +122,8 @@ def text_line(hit) -> str:
     location = item["path"] if item["line"] is None else f"{item['path']}:{item['line']}"
     value = "" if item["value"] is None else f" (value {item['value']})"
     commit = "" if item["commit"] is None else f" (commit {item['commit']})"
-    return f"{location}: {item['rule']} [{item['severity']}] {item['summary']}{value}{commit}"
+    lens = "" if item["lens"] is None else f" (lens {item['lens']})"
+    return f"{location}: {item['rule']} [{item['severity']}] {item['summary']}{value}{commit}{lens}"
 
 
 def render_text(outcome: Outcome) -> str:
@@ -128,5 +134,7 @@ def render_text(outcome: Outcome) -> str:
     lines += outcome.notes
     if outcome.incomplete:
         lines.append(f"incomplete: pending rules {', '.join(outcome.incomplete)}")
+    if outcome.architecture is not None:
+        lines.append(f"architecture: {outcome.architecture}")
     lines.append(f"quality: {len(outcome.findings)} finding(s)")
     return "\n".join(printable(line) for line in lines)
