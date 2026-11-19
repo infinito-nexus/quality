@@ -1,5 +1,6 @@
 import json
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 from quality.adapters.base import (
@@ -78,14 +79,19 @@ def parse(_stdout: bytes, command: Command, snapshot) -> list:
         snapshot: Snapshot the files came from.
 
     Returns:
-        One finding at the start of each fragment of each clone, and the files
-        left out for their names.
+        One finding at the start of each fragment of each clone, both fragments
+        of a clone in one group, and the files left out for their names.
     """
     rule = command.bound[0].binding.rule
     hits = []
     for clone in read_report(command)["duplicates"]:
-        for side in (clone["firstFile"], clone["secondFile"]):
-            path = known_path(relative(side["name"], snapshot.root), snapshot)
-            hits.append(code_hit(rule, path, side["start"], clone["format"], snapshot))
+        sides = tuple(
+            (known_path(relative(side["name"], snapshot.root), snapshot), side["start"])
+            for side in (clone["firstFile"], clone["secondFile"])
+        )
+        hits += [
+            replace(code_hit(rule, path, start, clone["format"], snapshot), group=sides)
+            for path, start in sides
+        ]
     left_out = sorted(set(all_files(command.bound)) - set(command.files))
     return hits + [Skipped(path, "jscpd cannot read a name that is not UTF-8") for path in left_out]

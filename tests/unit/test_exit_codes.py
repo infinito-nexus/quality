@@ -15,6 +15,7 @@ from quality.report import (
     legal_of,
     public_finding,
     render_json,
+    render_text,
 )
 from quality.snapshot import safe_path
 
@@ -130,15 +131,22 @@ def test_public_finding_holds_only_the_allowed_fields():
     assert "CANARY" not in str(finding)
 
 
-def weighed(architecture: int | None) -> SimpleNamespace:
-    return SimpleNamespace(rule=SimpleNamespace(architecture=architecture))
+def weighed(architecture: int | None, group: tuple) -> SimpleNamespace:
+    return SimpleNamespace(rule=SimpleNamespace(id="clean.clones", architecture=architecture), group=group)
 
 
 def test_architecture_subtracts_each_weight_and_stops_at_zero():
     assert architecture_of([]) == 100
-    assert architecture_of([weighed(None)]) == 100
-    assert architecture_of([weighed(10), weighed(None), weighed(25)]) == 65
-    assert architecture_of([weighed(25)] * 5) == 0
+    assert architecture_of([weighed(None, ())]) == 100
+    assert architecture_of([weighed(10, ()), weighed(None, ()), weighed(25, ())]) == 65
+    assert architecture_of([weighed(25, ())] * 5) == 0
+
+
+def test_architecture_weighs_the_fragments_of_one_clone_once():
+    pair = (("a.js", 1), ("b.js", 1))
+    assert architecture_of([weighed(10, ()), weighed(10, ())]) == 80
+    assert architecture_of([weighed(10, pair), weighed(10, pair)]) == 90
+    assert architecture_of([weighed(10, pair), weighed(10, pair[::-1])]) == 80
 
 
 def legal_hit(weight: int | None, severity: str) -> SimpleNamespace:
@@ -159,3 +167,20 @@ def test_report_carries_the_legal_keys_and_null_without_a_score():
     assert (scored["legal"], scored["legal_blockers"], scored["legal_unchecked"]) == (75, 0, 1)
     whole = json.loads(render_json(outcome([], [])))
     assert (whole["legal"], whole["legal_blockers"], whole["legal_unchecked"]) == (None, None, None)
+
+
+def text_finding(rule_id: str, lens: str | None, line: int) -> SimpleNamespace:
+    rule = SimpleNamespace(id=rule_id, severity="medium", summary="summary", lens=lens)
+    return SimpleNamespace(rule=rule, path="a.py", line=line, value=None, commit=None)
+
+
+def scored(findings: list, architecture: int | None) -> list:
+    return render_text(Outcome(findings, [], [], [], [], [], [], architecture, None)).splitlines()
+
+
+def test_text_report_prints_the_architecture_score_and_each_lens_only_in_diff_modes():
+    hits = [text_finding("clean.complexity", "SRP", 3), text_finding("coding.unused-import", None, 1)]
+    listed = ["a.py:1: coding.unused-import [medium] summary", "a.py:3: clean.complexity [medium] summary (lens SRP)"]
+    assert scored(hits, 90) == [*listed, "architecture: 90", "quality: 2 finding(s)"]
+    assert scored(hits, None) == [*listed, "quality: 2 finding(s)"]
+    assert scored([], 100) == ["architecture: 100", "quality: 0 finding(s)"]
