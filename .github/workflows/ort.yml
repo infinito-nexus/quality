@@ -35,9 +35,10 @@ jobs:
           test -s "$RUNNER_TEMP/ort/config/allowed.txt"
           chmod -R a+rwX "$RUNNER_TEMP/ort"
 
-      - name: Copy the checkout where the analyzer may write its package manager caches
+      - name: Copy the checkout where the analyzer may write its package manager caches, excluding the exempt paths of rules/legal.yml
         run: |
           cp -a -- "$GITHUB_WORKSPACE/." "$RUNNER_TEMP/ort-project"
+          yq -o=json 'explode(.)' rules/legal.yml | python3 .github/ort/excludes.py > "$RUNNER_TEMP/ort-project/.ort.yml"
           chmod -R a+rwX "$RUNNER_TEMP/ort-project"
 
       - name: Analyze the full dependency tree

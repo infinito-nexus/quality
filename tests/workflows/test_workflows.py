@@ -11,6 +11,7 @@ ORT_IMAGE = re.compile(r"^ghcr\.io/oss-review-toolkit/ort:\d+\.\d+\.\d+@sha256:[
 ORT_COMMANDS = (" analyze ", " evaluate ", " report ")
 PIN_CHECK = 'image="$(python3 .github/ort/pin.py check .github/ort/image)"'
 PIN_UPDATE = "python3 .github/ort/pin.py update .github/ort/image"
+ORT_EXCLUDES = "yq -o=json 'explode(.)' rules/legal.yml | python3 .github/ort/excludes.py > \"$RUNNER_TEMP/ort-project/.ort.yml\""
 SUITE = "nix develop --command make test-unit test-integration test-service"
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
@@ -231,3 +232,13 @@ def test_ort_analyzes_a_writable_copy_and_mounts_the_checkout_read_only():
     assert '--volume "$RUNNER_TEMP/ort-project:/project" ' in job["steps"][analyze]["run"]
     mounts = [step["run"] for step in job["steps"] if "docker run " in step.get("run", "") and "$GITHUB_WORKSPACE" in step["run"]]
     assert mounts and all('--volume "$GITHUB_WORKSPACE:/project:ro" ' in run for run in mounts)
+
+
+def test_ort_excludes_the_exempt_paths_of_rules_legal_in_the_analyzed_copy():
+    job = load("ort.yml")["jobs"]["dependency-tree"]
+    copy = step_index(job, lambda step: ORT_EXCLUDES in step.get("run", ""))
+    analyze = step_index(job, lambda step: '"$ORT_IMAGE" analyze ' in step.get("run", ""))
+    assert copy < analyze
+    lines = job["steps"][copy]["run"].splitlines()
+    assert lines.index(ORT_EXCLUDES) == 1 and lines[0].startswith("cp -a -- ")
+    assert "--repository-configuration-file" not in job["steps"][analyze]["run"]
