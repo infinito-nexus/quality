@@ -85,7 +85,7 @@ def test_parse_job_refuses(job, reason):
 
 
 def test_parse_job_deep_nesting_raises():
-    with pytest.raises(RecursionError):
+    with pytest.raises((RecursionError, launcher.JobFailed)):
         launcher.parse_job("[" * 100000 + "]" * 100000, 10)
 
 

@@ -11,13 +11,14 @@ CORE_TASKS = ROLE / "tasks" / "00_core.yml"
 MODE_REFUSAL = "deploys in compose mode only"
 DEMO_REFUSAL = "would name core's demo data"
 CORE_MODULE = "stack_host_template"
+COLLECTIONS = "collections"
 
 
 def deploy(tmp_path, mode):
     """
     Args:
         tmp_path: Scratch directory for the playbook, stubs of core's once-flag include and stack_host_template module,
-            and Ansible's own files.
+            the only collection Ansible may read, with a stub of ansible.posix.mount, and Ansible's own files.
         mode: DEPLOYMENT_MODE of the run.
 
     Returns:
@@ -32,6 +33,9 @@ def deploy(tmp_path, mode):
     module = tmp_path / "library" / f"{CORE_MODULE}.py"
     module.parent.mkdir()
     module.write_text(f"raise SystemExit('{CORE_MODULE} stands in for core\\'s module and never runs')\n", encoding="utf-8")
+    mount = tmp_path / COLLECTIONS / "ansible_collections" / "ansible" / "posix" / "plugins" / "modules" / "mount.py"
+    mount.parent.mkdir(parents=True)
+    mount.write_text("raise SystemExit('mount stands in for ansible.posix and never runs')\n", encoding="utf-8")
     play = [{"hosts": "localhost", "gather_facts": False, "vars": {"IS_COMPOSE_MODE": "{{ DEPLOYMENT_MODE == 'compose' }}"}}]
     play[0]["tasks"] = [{"ansible.builtin.import_tasks": str(CORE_TASKS)}]
     (tmp_path / "play.yml").write_text(json.dumps(play), encoding="utf-8")
@@ -39,7 +43,7 @@ def deploy(tmp_path, mode):
     extra = {"DEPLOYMENT_MODE": mode, "ENVIRONMENT": "production", "application_id": "web-app-cst-quality-check"}
     extra["QUALITY_CHECK_CONTROLLER_DEMO_FIELDS"] = ["contact.email"]
     environment = {**os.environ, "ANSIBLE_CONFIG": str(tmp_path / "ansible.cfg"), "ANSIBLE_LOCAL_TEMP": str(tmp_path / "local")}
-    environment.update(ANSIBLE_NOCOLOR="1", ANSIBLE_RETRY_FILES_ENABLED="0")
+    environment.update(ANSIBLE_NOCOLOR="1", ANSIBLE_RETRY_FILES_ENABLED="0", ANSIBLE_COLLECTIONS_PATH=str(tmp_path / COLLECTIONS))
     argv = [playbook, "-i", "localhost,", "-c", "local", "-e", json.dumps(extra), str(tmp_path / "play.yml")]
     return subprocess.run(argv, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=300, check=False)
 
