@@ -15,7 +15,7 @@ CONFIG = ".quality/legal.yml"
 FONT = '<link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet">\n'
 LOCAL_FONT = '<link href="/static/fonts/inter.css" rel="stylesheet">\n'
 TEMPLATE = "templates/base.html.j2"
-PACKAGES = {"PyPI": {"apache-lib": {"*": "Apache-2.0"}, "gpl-lib": {"1.0": "GPL-3.0-only"}}}
+PACKAGES = {"PyPI": {"apache-lib": {"*": "Apache-2.0"}, "gpl-lib": {"1.0": "GPL-3.0-only"}, "mit0-lib": {"*": "MIT-0"}}}
 CLEAN = (100, 0, 0, [])
 DEPENDENCY = "legal.dependency-license"
 NO_DATA_NOTE = "unchecked: requirements.txt:1: legal.dependency-license has no licence data for this dependency in the bundle"
@@ -59,10 +59,11 @@ def judged(target, mode: str, before: dict, after: dict, *flags: str) -> dict:
     "case",
     [
         (MIT, "apache-lib==2.0\n", CLEAN),
+        (MIT, "mit0-lib==2.1\n", CLEAN),
         (MIT, "gpl-lib==1.0\n", (50, 1, 0, [(DEPENDENCY, "requirements.txt", 1)])),
         (GPL, "gpl-lib==1.0\n", CLEAN),
     ],
-    ids=["apache-in-mit", "gpl-in-mit", "gpl-in-gpl"],
+    ids=["apache-in-mit", "mit0-in-mit", "gpl-in-mit", "gpl-in-gpl"],
 )
 def test_dependency_license_follows_the_project_licence(target, mode, tmp_path, case):
     project, requirement, expected = case

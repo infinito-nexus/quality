@@ -26,6 +26,9 @@ updates:
   - package-ecosystem: "docker-compose"
     directories:
       - "**/*"
+    exclude-paths:
+      - "*.j2"
+      - "**/*.j2"
     schedule:
       interval: "daily"
       time: "00:00"
