@@ -35,9 +35,14 @@ jobs:
           test -s "$RUNNER_TEMP/ort/config/allowed.txt"
           chmod -R a+rwX "$RUNNER_TEMP/ort"
 
+      - name: Copy the checkout where the analyzer may write its package manager caches
+        run: |
+          cp -a -- "$GITHUB_WORKSPACE/." "$RUNNER_TEMP/ort-project"
+          chmod -R a+rwX "$RUNNER_TEMP/ort-project"
+
       - name: Analyze the full dependency tree
         id: analyze
-        run: docker run --rm --volume "$GITHUB_WORKSPACE:/project:ro" --volume "$RUNNER_TEMP/ort:/ort" "$ORT_IMAGE" analyze --input-dir /project --output-dir /ort/analyzer
+        run: docker run --rm --volume "$RUNNER_TEMP/ort-project:/project" --volume "$RUNNER_TEMP/ort:/ort" "$ORT_IMAGE" analyze --input-dir /project --output-dir /ort/analyzer
 
       - name: Evaluate every licence against the allowlist
         run: docker run --rm --volume "$GITHUB_WORKSPACE:/project:ro" --volume "$RUNNER_TEMP/ort:/ort" --env ORT_ALLOWED_LICENSES=/ort/config/allowed.txt "$ORT_IMAGE" evaluate --ort-file /ort/analyzer/analyzer-result.yml --rules-file /project/.github/ort/evaluator.rules.kts --output-dir /ort/evaluator
