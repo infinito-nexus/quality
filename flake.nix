@@ -177,7 +177,7 @@
         proxy = proxyFor pkgs;
       };
       devShell = pkgs.mkShell {
-        packages = tools ++ [ (pkgs.python3.withPackages (ps: [ ps.pathspec ps.pytest ps.pytest-xdist ps.pyyaml ])) ];
+        packages = [ (pkgs.python3.withPackages (ps: [ ps.build ps.pathspec ps.pytest ps.pytest-xdist ps.pyyaml ps.setuptools ps.wheel ])) ] ++ tools;
       };
     };
     bySystem = lib.genAttrs systems perSystem;

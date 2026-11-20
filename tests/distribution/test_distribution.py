@@ -168,6 +168,12 @@ def test_proxy_version(version, fails):
 
 
 @needs_nix
+def test_the_dev_shell_python_runs_the_tests():
+    result = nix("develop", flake_ref(ROOT), "--command", "python3", "-c", "import build, pathspec, pytest, setuptools, wheel, yaml")
+    assert result.returncode == 0, result.stderr
+
+
+@needs_nix
 def test_proxy_package_is_the_guarded_one():
     expression = (
         f'let flake = builtins.getFlake "{flake_ref(ROOT)}"; '
