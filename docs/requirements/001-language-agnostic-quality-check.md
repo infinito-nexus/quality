@@ -181,7 +181,7 @@ flowchart TD
 - [x] `test_nocheck_needs_reason`: `# nocheck: rule` without `-- reason` does not suppress.
 - [x] `test_nocheck_comment_only`: `x = "nocheck: rule -- reason"` does not suppress.
 - [x] `test_unused_nocheck_is_a_finding`: a new nocheck that waives nothing exits 1, an old one in a touched file stays in the baseline, and `--all` names every one.
-- [ ] `test_nocheck_waives_one_line_of_an_unreadable_region`: a nocheck on the first line of a 34-line unreadable region leaves every other line a finding.
+- [x] `test_nocheck_waives_one_line_of_an_unreadable_region`: a nocheck on the first line of a 34-line unreadable region leaves every other line a finding.
 
 ### Rules and languages
 
@@ -210,7 +210,7 @@ flowchart TD
 - [x] `quality check --staged --verbose` shows lizard receiving touched files only.
 - [x] `time quality --version` stays at or below 0.15 s.
 - [x] `quality check --all` on core, deep tier included, finishes within 360 s on 20 CPUs (operator, 2026-11-18: raised from 120 s, because core tracks 995 MB, 960 MB of them translated `docs.po` catalogs under `locale/`, and the secret scanner alone needs 1,660 CPU seconds for them, already on about 14 cores; measured 302 to 317 s cold, 94 s without `locale/`).
-- [ ] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
+- [x] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
 
 ### Distribution
 
@@ -222,7 +222,7 @@ flowchart TD
 - [x] `test_vuln_offline`: a fixture lockfile with a known CVE is reported from the shared test bundle through trivy and through osv-scanner, each tool alone; `test_vuln_offline_image` reports it the same way from the image under `--network none`.
 - [x] `test_db_missing_exits_2`: the deep tier without a bundle exits 2 naming `quality db update`, and `--staged` needs no bundle.
 - [x] `test_db_too_old_exits_2`: a bundle older than the limit exits 2.
-- [ ] `test_update_without_db_guards_the_default_cache`: `quality db update` without `--db` creates `$XDG_CACHE_HOME/quality` with mode 0700 and refuses it, before any fetch, when it is a link, belongs to another user or is writable by group or others.
+- [x] `test_update_without_db_guards_the_default_cache`: `quality db update` without `--db` creates `$XDG_CACHE_HOME/quality` with mode 0700 and refuses it, before any fetch, when it is a link, belongs to another user or is writable by group or others.
 - [x] `test_report_names_db`: every deep tier report prints the bundle's date and digest.
 - [x] The compressed image size is at most 1 GiB.
 - [x] The image holds a notices file listing every bundled tool with its licence.
@@ -242,7 +242,7 @@ flowchart TD
 ### Tests
 
 - **Unit**
-  - [ ] `make test-unit` passes and covers fingerprints, message normalisation, metric compare, the ignore file parser, the suppression parser and exit codes.
+  - [x] `make test-unit` passes and covers fingerprints, message normalisation, metric compare, the ignore file parser, the suppression parser and exit codes.
 - **Integration**
   - [ ] Every named test above passes in the suite that owns it: `make test-unit` runs `test_update_without_db_guards_the_default_cache`, `make test-distribution` runs `test_single_pin_source` against the flake outputs (operator, 2026-11-13), `make test-e2e` runs `test_vuln_offline_image` against the image (operator, 2026-11-18), and `make test-integration` runs every other one against real tools and temporary git repositories.
 - **E2E**
