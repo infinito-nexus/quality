@@ -12,7 +12,7 @@ services:
         PACKAGE: scan
 
   state:
-    image: docker:29.0.1-cli
+    image: docker:29.10.0-cli
     entrypoint: ["sh", "-c"]
     command:
       - >-
