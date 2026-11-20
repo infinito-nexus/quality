@@ -221,3 +221,13 @@ def test_ort_runs_a_digest_pinned_image_and_uploads_its_report():
     assert job["steps"][upload]["with"]["path"] == "${{ runner.temp }}/ort"
     assert job["steps"][upload]["with"]["if-no-files-found"] == "error"
     assert "!cancelled()" in job["steps"][upload]["if"]
+
+
+def test_ort_analyzes_a_writable_copy_and_mounts_the_checkout_read_only():
+    job = load("ort.yml")["jobs"]["dependency-tree"]
+    copy = step_index(job, lambda step: step.get("run", "").startswith('cp -a -- "$GITHUB_WORKSPACE/." "$RUNNER_TEMP/ort-project"'))
+    analyze = step_index(job, lambda step: '"$ORT_IMAGE" analyze ' in step.get("run", ""))
+    assert copy < analyze
+    assert '--volume "$RUNNER_TEMP/ort-project:/project" ' in job["steps"][analyze]["run"]
+    mounts = [step["run"] for step in job["steps"] if "docker run " in step.get("run", "") and "$GITHUB_WORKSPACE" in step["run"]]
+    assert mounts and all('--volume "$GITHUB_WORKSPACE:/project:ro" ' in run for run in mounts)
