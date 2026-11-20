@@ -3,43 +3,17 @@ import json
 
 import pytest
 
-from tests.service.support import FINDING, REPORT, load_launcher
+from tests.service.support import ACCEPTED_URLS, FINDING, REJECTED_URLS, REPORT, load_launcher
 
 launcher = load_launcher()
 
-ACCEPTED = ["https://example.org/a/b", "https://git.example.co.uk/owner/repo.git", "https://example.org:443/a"]
-REJECTED = [
-    "http://example.org/a/b",
-    "ssh://example.org/a/b",
-    "file:///etc/passwd",
-    "ext::sh -c id",
-    "/a/b",
-    "https://user@example.org/a/b",
-    "https://user:secret@example.org/a/b",
-    "https://example.org:8443/a/b",
-    "https://127.0.0.1/a/b",
-    "https://[::1]/a/b",
-    "https://2130706433/a/b",
-    "https://0x7f.1/a/b",
-    "https://localhost/a/b",
-    "https://example.org/a/b?x=1",
-    "https://example.org/a/b#x",
-    "-https://example.org/a/b",
-    "https://example.org",
-    "https://example.org/a b",
-    "https://example.org/%2e%2e/b",
-    "https://-example.org/a",
-    "https://example.123/a",
-    "https://EXAMPLE.org/a",
-]
 
-
-@pytest.mark.parametrize("url", ACCEPTED)
+@pytest.mark.parametrize("url", ACCEPTED_URLS)
 def test_url_validation_accepts(url):
     assert launcher.valid_url(url)
 
 
-@pytest.mark.parametrize("url", REJECTED)
+@pytest.mark.parametrize("url", REJECTED_URLS)
 def test_url_validation_rejects(url):
     assert not launcher.valid_url(url)
 
