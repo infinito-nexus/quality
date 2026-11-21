@@ -86,7 +86,7 @@ flowchart TD
 
 ### Inputs
 
-- [ ] `test_url_validation`: web app and launcher each accept `https://example.org/a/b` and reject `http://`, `ssh://`, `file://`, `ext::`, a plain path, user info, a port other than 443, an IPv4 literal, an IPv6 literal, `2130706433`, `0x7f.1`, a single label, a query, a fragment and a leading `-`.
+- [x] `test_url_validation`: web app and launcher each accept `https://example.org/a/b` and reject `http://`, `ssh://`, `file://`, `ext::`, a plain path, user info, a port other than 443, an IPv4 literal, an IPv6 literal, `2130706433`, `0x7f.1`, a single label, a query, a fragment and a leading `-`.
 - [x] `test_launcher_revalidates`: a job file placed directly into the spool with an invalid URL never reaches git.
 - [x] `test_prepare_step`: a file job and a text job reach the scan through a `--network=none` prepare step, and `git ls-files` lists exactly the normalised name.
 - [x] `test_upload_opaque`: an uploaded ZIP is scanned as one file, and a canary inside it appears nowhere.

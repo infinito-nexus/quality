@@ -2,6 +2,9 @@ import json
 import re
 import time
 
+import pytest
+
+from tests.service.support import ACCEPTED_URLS, REJECTED_URLS
 from tests.service.webapp import (
     build,
     headers,
@@ -30,6 +33,14 @@ def challenge_of(client):
     page = client.get("/", headers=headers()).get_data(as_text=True)
     found = re.search(r'challenge="([^"]+)"', page)
     return found.group(1).replace("&#34;", '"').replace("&quot;", '"')
+
+
+@pytest.mark.parametrize(("url", "status"), [*((url, 303) for url in ACCEPTED_URLS), *((url, 400) for url in REJECTED_URLS)])
+def test_url_validation_through_the_form(tmp_path, url, status):
+    app, state = build(tmp_path, **CAPTCHA_OFF)
+    client = app.test_client(use_cookies=False)
+    assert client.post("/submit", data={"kind": "url", "url": url}, headers=headers()).status_code == status
+    assert len(queued(state)) == (status == 303)
 
 
 def test_missing_real_ip(tmp_path):
