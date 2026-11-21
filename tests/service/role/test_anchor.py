@@ -5,6 +5,7 @@ COMPOSE = ROOT / "ansible" / "roles" / "web-app-cst-quality-check" / "templates"
 REQUIRED = (
     'command: ["sleep", "infinity"]',
     "{{ lookup('compose_restart') }}",
+    "{{ lookup('template', 'roles/sys-svc-container/templates/logging.yml.j2') | indent(4) }}",
     "network_mode: none",
     "read_only: true",
     'user: "{{ QUALITY_CHECK_STEP_UID }}:{{ QUALITY_CHECK_STEP_UID }}"',
