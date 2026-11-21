@@ -3,7 +3,13 @@ import json
 
 import pytest
 
-from tests.service.support import ACCEPTED_URLS, FINDING, REJECTED_URLS, REPORT, load_launcher
+from tests.service.support import (
+    ACCEPTED_URLS,
+    FINDING,
+    REJECTED_URLS,
+    REPORT,
+    load_launcher,
+)
 
 launcher = load_launcher()
 
