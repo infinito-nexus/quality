@@ -191,7 +191,7 @@ flowchart TD
 - [x] `test_shebang_mapping`: an extensionless script with a bash shebang gets the shell rules.
 - [x] `test_jinja_inner_type`: `deploy.sh.j2` and `compose.yml.j2` get the Jinja rules and their inner type's rules.
 - [x] `test_missing_tool_fails_closed`: a missing tool exits 2 naming it when its language is present, and is not required when absent.
-- [ ] `test_defaults_parity`: every fixture of `skills/tests/test_defaults.py` yields the same hit from the new rules, and shell, Python and JavaScript recall against `defaults.py` on core is at least 95 %.
+- [x] `test_defaults_parity`: every fixture of `skills/tests/test_defaults.py` yields the same hit from the new rules, and shell, Python and JavaScript recall against `defaults.py` on core is at least 95 %.
 - [x] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
 - [x] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
 - [x] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.

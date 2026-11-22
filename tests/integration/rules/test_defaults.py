@@ -98,6 +98,23 @@ DEFAULTS_FIXTURES = {
     ),
     "subst.ts": "export const url: string = `${process.env.URL ?? 'http://localhost'}/api`;\n",
     "subst.tsx": "export const A = () => <a href={`${base || '/'}x`}>x</a>;\n",
+    "extra.py": "def g(x=1):\n    return x\n",
+    "tern.js": (
+        "const page = {\n"
+        "  getByText: (text) =>\n"
+        '    text === "OpenID"\n'
+        "      ? control(() => true, {\n"
+        "          click: async () => {\n"
+        "            state.url = `${ISSUER}/auth`;\n"
+        "          },\n"
+        "        })\n"
+        "      : hidden,\n"
+        "  getByLabel: (pattern) => pattern,\n"
+        "};\n"
+    ),
+    "typed.ts": "class A {\n  m(a = 1): (x: number) => void { return; }\n}\n",
+    "t.sh": "# the probe needs a fixed port\necho ${A:-b}\n",
+    "t.ts": "x = y ?? 1;\n",
     "quoted.yml": (
         'msg: "see #docs {{ port | default(8080) }}"\n'
         "# {{ x | default(1) }}\n"
@@ -136,6 +153,7 @@ DEFAULTS_HITS = {
     "Svc.cs": [2, 3],
     "app.py": [4, 8, 12, 14, 16, 17, 18, 20, 21],
     "compose.yml.j2": [3, 4],
+    "extra.py": [1],
     "lib.rs": [2, 3, 5],
     "main.tf": [2, 5],
     "run.sh": [1, 2],
@@ -145,6 +163,9 @@ DEFAULTS_HITS = {
     "subst.js": [1, 2, 3],
     "subst.ts": [1],
     "subst.tsx": [1],
+    "t.sh": [2],
+    "t.ts": [1],
+    "typed.ts": [2],
     "web.ts": [1, 2, 3, 4, 9],
     "wrap.js": [4, 5],
 }
