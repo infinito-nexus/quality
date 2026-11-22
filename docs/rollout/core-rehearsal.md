@@ -4,30 +4,46 @@ Requirement 001 asks for `quality check --base main` on three core branches befo
 
 ## Method
 
-- Binary: `quality 0.1.0` built from `e7edfc2` (`nix build .#default`), deep tier with the bundle of `quality db update`, `--threads 14`.
+- Binary: `quality 0.1.0` built from `bb76399` (`nix build .#default`), deep tier with the bundle of `quality db update` dated 2026-11-17 (`sha256:edf475d3…`), `--threads 14`.
 - Command, in the branch's checkout: `quality check --base <base> --json --db <bundle> --threads 14`.
-- Checkout: a detached worktree without files (`git worktree add --no-checkout --detach`, then `git read-tree HEAD`), because quality reads the index and the commits, not the work tree.
-- Base: `main` is `origin/main` at `d6b4e1ab6a` (2026-11-14). `feature/store-i18n` was merged in `ace84681ff` and deleted, so its run uses that merge's parents: head `246a681f3c`, base `995d9d7461`.
-- Legacy check: every non-hard finding is matched against the range. A line finding must stand on a line the range adds; a folder finding on a folder that gained an entry; a size or complexity finding on a function whose value rose; a clone finding on a pair that did not exist at the merge base.
+- Checkout: a shared clone without files (`git clone --shared --no-checkout`, then `git update-ref --no-deref HEAD <head>` and `git read-tree <head>`), because quality reads the index and the commits, not the work tree.
+- Base: `main` is `origin/main` at `75bff92dfa` (2026-11-22). `feature/store-i18n` was merged in `ace84681ff` and deleted, so its run uses that merge's parents: head `246a681f3c`, base `995d9d7461`.
+- Quiet host: the run started only below 50 % CPU busy over 5 s (`/proc/stat`, the condition of the Speed criteria), and each branch records the load before and after.
+- Legacy check: every non-hard finding is matched against the range. A line finding must stand on a line the range adds or in a file the range adds; a folder finding on a folder that gained an entry; a file length finding on a file that grew; a size or complexity finding on a function whose value rose (lizard on the merge base and the head); a clone finding on a pair that did not exist at the merge base.
 
-## Results (2026-11-14)
+## Results (2026-11-22)
 
-| Branch | Head | Merge base | Changed files | Exit | New findings | Hard | Legacy reported as new | Time |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `production` | `0dc8e74f8a` | `2ae42b9ab4` | 499 | 1 | 148 | 0 | 0 | 75 s |
-| `feature/iam-profile-rbac` | `677c9c0f29` | `5182a21244` | 4540 | 2 | none | none | none | 758 s |
-| `feature/store-i18n` | `246a681f3c` | `995d9d7461` | 6118 | 2 | none | none | none | 406 s |
+| Branch | Head | Merge base | Changed files | Exit | New findings | Hard | Legacy reported as new | Time | CPU busy before, after |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `production` | `b7443aa573` | `d06eb3bcbf` | 488 | 1 | 137 | 0 | 0 | 188 s | 12 %, 11 % |
+| `feature/iam-profile-rbac` | `b7a4def00b` | `cd61bb82cd` | 6824 | 1 | 8053 | 84 | at least 32 | 1938 s | 11 %, 25 % |
+| `feature/store-i18n` | `246a681f3c` | `995d9d7461` | 6538 | 2 | none | none | none | 659 s | 21 %, 12 % |
+
+The run of 2026-11-14 (binary `e7edfc2`) reached the same verdict for `production` and failed on `gitleaks exceeded its timeout of 300 s` for the other two on a busy host; this run repeats all three on a quiet one.
 
 ### production
 
-The 148 new findings: 106 `clean.comment`, 11 `clean.default-value`, 10 `clean.folder-items`, 6 `clean.clones`, 5 `clean.complexity`, 3 `clean.parameters`, 2 `clean.function-length`, 2 `coding.implicit-namespace`, 1 `clean.prefix-groups`, 1 `clean.tool-pragma`, 1 `clean.unused-nocheck`.
+132 of the 137 findings stand on a line or a folder the range adds. The other 5 are new as well:
 
-17 of them do not stand on a line the range adds; each is new:
+- 3 function findings whose value rose: `_apps` in `tests/unit/python/plugins/lookup/test_sso.py` CCN 11 to 12 and parameters 9 to 10, `_apps` in `tests/unit/python/utils/roles/applications/services/test_sso.py` parameters 7 to 8.
+- 2 clone findings on the untouched side of a new pair: `tests/unit/python/roles/sys-ctl-cln-disc-space/files/shell/test_script.py:46`, whose partner at line 76 the range adds, and `tests/unit/python/roles/web-app-xwiki/test_blobstore_render_order.py:18`, whose partner in `test_render_stages.py:161` the range adds.
 
-- 12 folder findings, each on a folder that gained an entry in the range: `docs/requirements` (44 to 45, `098-showroom.md`), `plugins/lookup` (149 to 150, `role_version.py`, also its prefix group), `roles` (297 to 299), `tests/lint/ansible/roles` (50 to 51), `tests/lint/ansible/roles/meta` (47 to 48), `tests/unit/python/plugins/lookup` (128 to 129), `tests/unit/python/roles` (124 to 126), `tests/unit/python/roles/web-app-nextcloud` (18 to 19), `tests/unit/python/utils/roles` (14 to 15), `utils/roles` (22 to 23).
-- 3 function findings whose value rose (lizard on the merge base and the head): `test_declared_docker_service_image_and_version_are_valid` in `tests/integration/infrastructure/docker/test_services_image_version_valid.py` CCN 10 to 11, `_apps` in `tests/unit/python/plugins/lookup/test_sso.py` CCN 11 to 12 and parameters 9 to 10, `_apps` in `tests/unit/python/utils/roles/applications/services/test_sso.py` parameters 7 to 8.
-- 2 clone findings on the untouched side of a new pair: `TestPacmanCleanup` in `tests/unit/python/roles/sys-ctl-cln-disc-space/files/shell/test_script.py`, whose partner is `TestApplicationCollectors`, the class the range adds to that file, and `flatten` in `tests/unit/python/roles/web-app-xwiki/test_blobstore_render_order.py`, which the range copies twice into `test_render_stages.py`; at the merge base the helper existed once.
+### feature/iam-profile-rbac
 
-### feature/iam-profile-rbac and feature/store-i18n
+84 hard findings: 52 `security.secret`, all from the history scan of the range's commits and mostly in test fakes (`_fake_provision.py`, `test_forms.py`, `test_redact.py`), 29 `security.eval-exec`, 2 `security.shell-exec`, 1 `security.tls-disabled`.
 
-Both exited 2 with `gitleaks exceeded its timeout of 300 s and was killed`, so they report no finding. The host ran other agents' jobs at the time: the queue granted the rehearsal at 70.2 % CPU busy, with peaks of 99.9 % and three jobs running beside it. `store-i18n` adds the 575 MB of generated gettext catalogs that also dominate `check --all` on core. Both runs are repeated on a quiet host, below 50 % CPU, the condition requirement 001 sets for its time budgets.
+Of the 7969 non-hard findings, 7566 stand on a line, file or folder the range adds, and all 143 function findings off an added line belong to 99 functions whose CCN, length or parameter count rose. Open are 227 clone findings off an added line, whose pairs are not yet checked, 1 `security.partial-scan` on `roles/web-app-mini-qr/files/playwright/test-design.js`, not yet checked, and 32 line findings in three groups that stand on a line the merge base already held:
+
+- 4 `legal.foreign-copyright` findings on unchanged lines (`roles/web-app-docs/meta/services.yml:50`, `roles/web-app-joomla/files/joomla-oidc-plugin/plg_system_keycloak/keycloak.xml:6`, `roles/web-app-n8n/files/javascript/hooks.js:28`, `tests/unit/python/utils/i18n/test_catalog.py:130`): the report notes `base side failed, so every finding of that tool counts as new: scancode exceeded its timeout of 600 s and was killed`.
+- 10 `clean.comment` findings on lines whose text the file holds as often as at the merge base, for example `scripts/install/wrapper.sh:11` and `:15`, `scripts/lint/wrapper.sh:8`, `scripts/meta/resolve/diff/affected_roles.sh:33` and `:38`, `tests/unit/python/roles/sys-svc-compose/files/test_prune.py:76`. Each file gained another comment finding, and the line's text rose across the repository (one of them from 973 to 1008 occurrences). `new_fingerprint_hits` in `src/quality/gate.py` counts the fingerprint `(rule, source)` repository-wide and the rise per file by `(path, rule, message)`, so it can hand the repository-wide rise to the legacy line and leave the file's new comment unreported.
+- 18 line findings whose text the file holds more often than at the merge base, so a new instance exists, are reported on an older instance of the same text: 8 `coding.workflow-lint` (6 in `.github/workflows/cron-update.yml`, 6 to 8 occurrences), 4 `clean.comment`, 4 `security.temp-path`, 2 `clean.default-value`.
+
+### feature/store-i18n
+
+Exit 2 with `scancode exceeded its timeout of 600 s and was killed` on the head side, on a quiet host. The range adds 6538 files, among them the generated gettext catalogs under `locale/`.
+
+## Open
+
+- The gate hands a fingerprint rise to an older instance of the same text instead of the instance the range adds.
+- scancode exceeds its 600 s timeout on ranges of this size, on the head side (`store-i18n`) and on the base side (`iam-profile-rbac`).
+- `--base` exports and scans every commit of the range for secrets one by one: on `iam-profile-rbac` the per-commit exports ran from 16:07:11 to past 16:18:13, 1038 commits in 11 minutes (about 0.64 s each), so about 13 of the 32 minutes for its 1243 commits; 10 more minutes went to scancode on the base side until its timeout.
