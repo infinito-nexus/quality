@@ -37,6 +37,7 @@ DUE_HOURS = 100
 STOP_GRACE_SECONDS = 15
 SLACK_SECONDS = 60
 UNREACHABLE = {"ENETUNREACH", "EHOSTUNREACH", "timeout"}
+UNIT_SHIFTS = {"m": 20, "g": 30}
 WRITES = ("/src/probe-write", "/src/repo/probe-write", "/db/probe-write")
 STEP_ENVIRONMENT = ["HOME=/tmp", "XDG_CACHE_HOME=/tmp"]
 STEP_HOME = STEP_ENVIRONMENT[0].partition("=")[2]
@@ -110,7 +111,7 @@ def assert_sandbox(info, step, bench, image_env):
     assert config["User"] == "65534:65534" and host["CapDrop"] == ["ALL"]
     assert host["SecurityOpt"] == ["no-new-privileges"]
     assert host["PidsLimit"] == limits["pids"]
-    assert host["Memory"] == host["MemorySwap"] == 1 << 30
+    assert host["Memory"] == host["MemorySwap"] == int(limits["memory"][:-1]) << UNIT_SHIFTS[limits["memory"][-1]]
     assert host["NanoCpus"] == int(float(limits["cpus"]) * 1e9)
     assert host["Tmpfs"] == {STEP_HOME: f"size={limits['tmp_bytes']}"}
     assert host["Runtime"] == bench.config["runtime"] and host["NetworkMode"] == network

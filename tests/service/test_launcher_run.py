@@ -19,7 +19,7 @@ SANDBOX_FLAGS = {
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
     "--pids-limit=512",
-    "--memory=2g",
+    "--memory=4g",
     "--cpus=2",
     "--tmpfs=/tmp:size=268435456",
     "--runtime=runc",
@@ -356,7 +356,7 @@ def test_db_update_failure_alerts(harness):
     assert [step_of(call) for call in harness.runs()] == ["prepare", "scan", "database"]
     scan = harness.runs()[1]["argv"]
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db,readonly" in scan
-    assert scan[-6:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle"]
+    assert scan[-7:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle", "2"]
     update = harness.runs()[2]["argv"]
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db" in update
     assert update[-4:] == ["db", "update", "--db", "/db/bundle"]
@@ -368,8 +368,17 @@ def test_scan_mounts_database_with_updates_off(harness):
     assert [step_of(call) for call in harness.runs()] == ["prepare", "scan"]
     scan = harness.runs()[1]["argv"]
     assert f"--mount=type=bind,source={harness.root / 'db'},target=/db,readonly" in scan
-    assert scan[-6:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle"]
+    assert scan[-7:] == [*launcher.SCAN_COMMAND, "/src/repo", "/db/bundle", "2"]
     assert harness.report(1)["database"] is None
+
+
+@pytest.mark.parametrize(("cpus", "threads"), [("0.5", "1"), ("1", "1"), ("2.5", "2"), ("4", "4")])
+def test_scan_threads_follow_step_cpus(harness, cpus, threads):
+    harness.config["limits"]["step"]["cpus"] = cpus
+    harness.submit(1, text_job())
+    harness.run()
+    scan = harness.runs()[1]["argv"]
+    assert f"--cpus={cpus}" in scan and scan[-1] == threads
 
 
 def test_report_names_bundle_with_updates_off(harness):

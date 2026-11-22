@@ -149,3 +149,15 @@ def test_upload_opaque(tmp_path, runtime):
     assert {finding["path"] for finding in report["result"]["findings"]} <= {"bundle.zip"}
     assert "inner.py" not in json.dumps(report) and canary not in json.dumps(report)
     assert leaked == []
+
+
+def test_text_language(tmp_path, runtime):
+    with Bench(tmp_path / "scan", TRUSTING_IMAGE, STACK_PROXY, runtime) as bench:
+        unused = bench.submit(text_job("python", "import os\n"))
+        clean = bench.submit(text_job("python", "print(1)\n"))
+        bench.run()
+        reports = [bench.report(job) for job in (unused, clean)]
+    assert [report["status"] for report in reports] == ["done", "done"], reports
+    found = [{(finding["rule"], finding["path"]) for finding in report["result"]["findings"]} for report in reports]
+    assert ("coding.unused-import", "snippet.py") in found[0]
+    assert ("coding.unused-import", "snippet.py") not in found[1]

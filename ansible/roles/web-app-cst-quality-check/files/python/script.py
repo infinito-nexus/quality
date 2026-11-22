@@ -57,7 +57,7 @@ FETCH_SCRIPT = (
     f'*"No space left on device"*) exit {TOO_LARGE_EXIT};; esac; done </tmp/fetch.log; exit 1; }}'
 )
 PREPARE_SCRIPT = 'git init -q /src/repo && cat > "/src/repo/$1" && git -C /src/repo add -- "$1"'
-SCAN_COMMAND = ("sh", "-c", 'cd "$1" && exec quality check --all --json --db "$2"', "sh")
+SCAN_COMMAND = ("sh", "-c", 'cd "$1" && exec quality check --all --json --db "$2" --threads "$3"', "sh")
 BUNDLE_DIR = "/db/bundle"
 FETCH_ENVIRONMENT = ("--env=GIT_ALLOW_PROTOCOL=https", "--env=GIT_TERMINAL_PROMPT=0", "--env=LC_ALL=C")
 FETCH_ENVIRONMENT += ("--env=GIT_CONFIG_NOSYSTEM=1", "--env=GIT_CONFIG_GLOBAL=/dev/null")
@@ -383,7 +383,7 @@ class Launcher:
             raise JobFailed("too large" if storage.full() else "not checked")
 
     def scan(self, storage, job, commit):
-        code, output = self.step(storage, "scan", [*SCAN_COMMAND, "/src/repo", BUNDLE_DIR])
+        code, output = self.step(storage, "scan", [*SCAN_COMMAND, "/src/repo", BUNDLE_DIR, str(max(1, int(float(self.limits["step"]["cpus"]))))])
         if code == TIMEOUT_EXIT:
             raise JobFailed("timeout")
         if code not in (0, 1):

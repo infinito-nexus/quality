@@ -46,6 +46,6 @@
     "inodes": 200000,
     "repo_bytes": {"member": 1073741824, "registered": 536870912, "anonymous": 268435456},
     "timeouts": {"fetch": 120, "prepare": 30, "scan": 600, "database": 900},
-    "step": {"memory": "2g", "cpus": "2", "pids": 512, "tmp_bytes": 268435456}
+    "step": {"memory": "4g", "cpus": "2", "pids": 512, "tmp_bytes": 268435456}
   }
 }

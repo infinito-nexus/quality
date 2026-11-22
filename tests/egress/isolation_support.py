@@ -221,7 +221,6 @@ class Bench:
         self.config["fetch"].update(proxy=f"http://{proxy}:3128", user_agent="quality-check egress test")
         self.config["database"] = {"dir": str(self.db), "update_hours": DATABASE_HOURS, "max_age_hours": 168}
         self.config["limits"]["timeouts"].update(fetch=60, prepare=30, scan=300, database=120)
-        self.config["limits"]["step"]["memory"] = "1g"
         self.keeper, self.launchers, self.flags = None, [], []
 
     def __enter__(self):

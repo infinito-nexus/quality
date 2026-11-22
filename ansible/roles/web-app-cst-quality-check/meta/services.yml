@@ -162,7 +162,7 @@ scan:
   version: "0.1.0"
   cpus: 2
   mem_reservation: 0.256g
-  mem_limit: 2g
+  mem_limit: 4g
   pids_limit: 512
 # nocheck: dynamic-flag  the egress proxy is the only way out of the fetch network
 # nocheck: playwright-service-flag  the proxy has no UI; the specs prove it through a finished URL report
