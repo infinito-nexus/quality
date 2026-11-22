@@ -186,9 +186,9 @@ def package_finding(path: str, name: str, ids: set):
 def test_a_package_finding_is_new_with_an_id_its_lockfile_lacked(base, head, new):
     baseline = baseline_of([package_finding("go.mod", *base)], {})
     finding = package_finding("go.mod", *head)
-    assert new_hits([finding], baseline) == ([finding] if new else [])
+    assert new_hits([finding], baseline, {}) == ([finding] if new else [])
     moved = package_finding("other/go.mod", *base)
-    assert new_hits([moved], baseline) == [moved]
+    assert new_hits([moved], baseline, {}) == [moved]
 
 
 def test_jscpd_reads_its_own_report_once_and_names_unreadable_names(tmp_path):

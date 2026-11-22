@@ -122,16 +122,28 @@ def chunked(files: list, budget: int) -> list:
     Returns:
         Lists of paths in the original order.
     """
+    return chunked_groups([[path] for path in files], budget)
+
+
+def chunked_groups(groups: list, budget: int) -> list:
+    """
+    Args:
+        groups: Lists of paths that must share one command line.
+        budget: Bytes one command line may hold for paths.
+
+    Returns:
+        Lists of paths in the original order, no group split across two.
+    """
     chunks = []
     current = []
     used = 0
-    for path in files:
-        size = len(os.fsencode(path)) + 1
+    for group in groups:
+        size = sum(len(os.fsencode(path)) + 1 for path in group)
         if current and used + size > budget:
             chunks.append(current)
             current = []
             used = 0
-        current.append(path)
+        current.extend(group)
         used += size
     if current:
         chunks.append(current)

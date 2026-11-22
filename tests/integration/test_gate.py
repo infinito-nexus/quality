@@ -3,6 +3,7 @@ import pytest
 from tests.integration.support import (
     add_rules,
     branchy,
+    findings_of_rule,
     report,
     rule_for,
     rule_ids,
@@ -84,6 +85,39 @@ def test_gate_move_between_files(target, mode):
     target.write("b.py", "y = 2\nfoo(1)\n")
     target.advance(mode)
     assert_clean(target.judge(mode, "--json"))
+
+
+def test_gate_reports_the_added_comment_not_the_legacy_one(target, mode):
+    body = "".join(f"value_{index} = {index}\n" for index in range(8)) + "# shared note\n"
+    target.write("a.py", body)
+    target.start_feature(mode)
+    target.write("a.py", "# fresh note\n" + body)
+    target.write("0.py", "# shared note\nzero = 0\n")
+    target.advance(mode)
+    result = target.judge(mode, "--json")
+    assert sorted(findings_of_rule(result, "clean.comment")) == [("0.py", 1), ("a.py", 1)]
+
+
+def test_gate_reports_the_added_copy_of_a_legacy_comment(target, mode):
+    body = "".join(f"value_{index} = {index}\n" for index in range(8)) + "# shared note\n"
+    target.write("a.py", body)
+    target.start_feature(mode)
+    target.write("a.py", "# shared note\n" + body)
+    target.advance(mode)
+    result = target.judge(mode, "--json")
+    assert findings_of_rule(result, "clean.comment") == [("a.py", 1)]
+
+
+def test_gate_reports_the_added_comment_beside_an_edited_one(target, mode):
+    body = "".join(f"value_{index} = {index}\n" for index in range(8)) + "# shared note\n"
+    target.write("z.py", "zero = 0\n# old note\n")
+    target.write("a.py", body)
+    target.start_feature(mode)
+    target.write("z.py", "zero = 0\n# shared note\n")
+    target.write("a.py", "# fresh note\n" + body)
+    target.advance(mode)
+    result = target.judge(mode, "--json")
+    assert findings_of_rule(result, "clean.comment") == [("a.py", 1)]
 
 
 def test_gate_same_file_swap(target, mode):

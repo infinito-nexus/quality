@@ -180,21 +180,130 @@ def pointwise_maximum(left: list, right: list) -> list:
     ]
 
 
-def new_fingerprint_hits(hits: list, baseline: Baseline) -> list:
+def new_fingerprint_hits(hits: list, baseline: Baseline, added: dict) -> list:
+    ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)  # nocheck: clean.default-value -- a finding without a line sorts as line 0
+    preferred = sorted(ordered, key=lambda hit: hit.line not in added.get(hit.path, ()))
+    classes = Counter(gate_class(hit) for hit in preferred)
+    favoured = Counter(gate_class(hit) for hit in preferred if hit.line in added.get(hit.path, ()))
+    picked = {id(hit) for hit in chosen(preferred, matched_counts((favoured, classes), *rises(hits, baseline)))}
+    return [hit for hit in ordered if id(hit) in picked]
+
+
+def rises(hits: list, baseline: Baseline) -> tuple:
     fingerprint_rise = Counter(fingerprint(hit) for hit in hits)
     fingerprint_rise.subtract(baseline.fingerprints)
     file_rise = Counter(per_file_key(hit, hit.path) for hit in hits)
     file_rise.subtract(baseline.per_file)
-    ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)  # nocheck: clean.default-value -- a finding without a line sorts as line 0
-    new = []
-    for hit in ordered:
-        print_key = fingerprint(hit)
-        file_key = per_file_key(hit, hit.path)
-        if fingerprint_rise[print_key] > 0 and file_rise[file_key] > 0:
-            fingerprint_rise[print_key] -= 1
-            file_rise[file_key] -= 1
-            new.append(hit)
-    return new
+    return +fingerprint_rise, +file_rise
+
+
+def chosen(preferred: list, left: Counter) -> list:
+    picked = []
+    for hit in preferred:
+        if left[gate_class(hit)] > 0:
+            left[gate_class(hit)] -= 1
+            picked.append(hit)
+    return picked
+
+
+def gate_class(hit: Hit) -> tuple:
+    return fingerprint(hit), per_file_key(hit, hit.path)
+
+
+def matched_counts(sizes: tuple, spare_print: Counter, spare_file: Counter) -> Counter:
+    """
+    Args:
+        sizes: Hit count per fingerprint and per-file key on added lines,
+            then of all hits, both in the order to fill the classes.
+        spare_print: Rise of each fingerprint; used up in place.
+        spare_file: Rise of each per-file key; used up in place.
+
+    Returns:
+        Per class how many of its hits are new: as many in total as both
+        rises allow together. The classes are first filled in order with
+        their hits on added lines, then with the rest, and a class filled
+        then gives a hit up only where the total needs it.
+    """
+    favoured, classes = sizes
+    matching = Matching(classes, spare_print, spare_file)
+    matching.fill(favoured)
+    matching.fill(classes)
+    while matching.round():
+        continue
+    return matching.flow
+
+
+class Matching:
+    def __init__(self, classes: Counter, spare_print: Counter, spare_file: Counter):
+        self.classes = classes
+        self.spare_print = spare_print
+        self.spare_file = spare_file
+        self.flow = Counter()
+        self.by_print = {}
+        self.by_file = {}
+        for key in classes:
+            self.by_print.setdefault(key[0], []).append(key)
+            self.by_file.setdefault(key[1], []).append(key)
+
+    def fill(self, sizes: Counter) -> None:
+        for key in self.classes:
+            take = min(sizes[key] - self.flow[key], self.spare_print[key[0]], self.spare_file[key[1]])
+            self.flow[key] += take
+            self.spare_print[key[0]] -= take
+            self.spare_file[key[1]] -= take
+
+    def round(self) -> int:
+        """
+        Returns:
+            How many chains one pass over every fingerprint with rise left
+            found and applied; nodes the pass visits stay visited for it, so
+            a pass costs one walk over the classes and a pass finding none
+            proves the total maximal.
+        """
+        seen = set()
+        found = 0
+        for start in self.by_print:
+            if self.spare_print[start] > 0 and ("print", start) not in seen and (path := self.search(start, seen)):
+                self.augment(path)
+                found += 1
+        return found
+
+    def search(self, start, seen: set) -> list:
+        """
+        Args:
+            start: A fingerprint with rise left.
+            seen: Nodes this pass visited; extended in place.
+
+        Returns:
+            A chain of classes from it to a per-file key with rise left,
+            alternating one class that can take another hit and one that
+            gives one up, or an empty list.
+        """
+        seen.add(("print", start))
+        stack = [(start, [])]
+        while stack:
+            node, path = stack.pop()
+            for forward in self.by_print[node]:
+                if self.flow[forward] < self.classes[forward] and ("file", forward[1]) not in seen:
+                    seen.add(("file", forward[1]))
+                    if self.spare_file[forward[1]] > 0:
+                        return [*path, forward]
+                    stack.extend(self.steps(forward, path, seen))
+        return []
+
+    def steps(self, forward: tuple, path: list, seen: set) -> list:
+        steps = []
+        for backward in self.by_file[forward[1]]:
+            if self.flow[backward] > 0 and ("print", backward[0]) not in seen:
+                seen.add(("print", backward[0]))
+                steps.append((backward[0], [*path, forward, backward]))
+        return steps
+
+    def augment(self, path: list) -> None:
+        self.spare_print[path[0][0]] -= 1
+        self.spare_file[path[-1][1]] -= 1
+        for index, key in enumerate(path):
+            self.flow[key] += -1 if index % 2 else 1
 
 
 def new_metric_hits(hits: list, baseline: Baseline) -> list:
@@ -210,23 +319,26 @@ def new_metric_hits(hits: list, baseline: Baseline) -> list:
     return new
 
 
-def new_hits(hits: list, baseline: Baseline) -> list:
+def new_hits(hits: list, baseline: Baseline, added: dict) -> list:
     """
     Args:
         hits: Non-hard findings on the head side.
         baseline: Merged baseline of every parent.
+        added: Per head-side path the line numbers the change adds.
 
     Returns:
         Fingerprint findings whose fingerprint count and per-file count both
-        rose, metric findings that grew or are new, and package findings with
-        a vulnerability id the same lockfile and package lacked on the base side.
+        rose, as many as both rises allow together, findings on added lines
+        taken first wherever the total allows the choice, metric findings
+        that grew or are new, and package findings with a
+        vulnerability id the same lockfile and package lacked on the base side.
     """
     packages = [hit for hit in hits if hit.ids]
     plain = [hit for hit in hits if not hit.ids and hit.rule.metric is None]
     metric = [hit for hit in hits if not hit.ids and hit.rule.metric is not None]
     return (
         new_package_hits(packages, baseline)
-        + new_fingerprint_hits(plain, baseline)
+        + new_fingerprint_hits(plain, baseline, added)
         + new_metric_hits(metric, baseline)
     )
 

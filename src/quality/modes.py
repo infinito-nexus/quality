@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quality import QualityError, db
-from quality.adapters import Collector, Runtime, reads_by_name
+from quality.adapters import Collector, Runtime, chunked_groups, reads_by_name
 from quality.adapters.base import thread_environment
 from quality.adapters.builtin import (
     changed_folders,
@@ -185,6 +185,7 @@ class Plan:
     diff: Callable
     soft_entries: list
     hard_entries: list
+    added: Callable
 
 
 def every_rule(_rule) -> bool:
@@ -344,11 +345,31 @@ def judged(session: Session, plan: Plan, notes: list) -> Outcome:
     findings = [hit for hit in kept if ungated(hit)]
     soft = [hit for hit in kept if not ungated(hit)]
     if soft:
-        findings += new_hits(soft, plan_baseline(session, plan))
+        findings += new_hits(soft, plan_baseline(session, plan), added_lines(session, plan, soft))
     findings, undecided = split_unchecked(findings)
     unchecked = unchecked_of(plan.head, changed)
     scores = (architecture_of(findings), legal_of(findings, undecided))
     return Outcome(findings, ignored, nocheck, unchecked, notes + unchecked_notes(undecided), [], sorted(plan.head.unparsed), *scores)
+
+
+def added_lines(session: Session, plan: Plan, hits: list) -> dict:
+    """
+    Args:
+        session: The running check.
+        plan: The plan whose `added` diffs one list of paths.
+        hits: Soft findings the gate orders.
+
+    Returns:
+        Per changed file holding one of those findings the line numbers the
+        change adds. The old side of a rename shares its command line, so
+        git pairs the two.
+    """
+    olds = {change.path: change.old_path for change in plan.changes if change.status != "deleted"}
+    groups = [[path, olds[path]] if olds[path] and olds[path] != path else [path] for path in sorted({hit.path for hit in hits} & olds.keys())]
+    added = {}
+    for chunk in chunked_groups(groups, session.data.limit("argv_max_bytes")):
+        added |= plan.added(chunk)
+    return added
 
 
 def touched_paths(plan: Plan) -> list:
@@ -399,7 +420,7 @@ def check_staged(session: Session, _options: Options) -> Outcome:
     merge_head = repo.merge_head()
     parents = [first_parent, merge_head] if merge_head else [first_parent]
     entries = parse_ignore(head.ignore_data(), session.data)
-    plan = Plan(head, changes, parents, repo.staged_changes, entries, entries)
+    plan = Plan(head, changes, parents, repo.staged_changes, entries, entries, lambda paths: repo.added_lines(first_parent, None, paths))
     return judged(session, plan, notes)
 
 
@@ -429,7 +450,7 @@ def check_base(session: Session, options: Options) -> Outcome:
     def diff(parent: str) -> list:
         return repo.range_changes(parent, "HEAD")
 
-    plan = Plan(head, changes, [base], diff, head_entries, base_entries)
+    plan = Plan(head, changes, [base], diff, head_entries, base_entries, lambda paths: repo.added_lines(base, "HEAD", paths))
     outcome = judged(session, plan, notes)
     head_blobs = {(entry.path, entry.oid) for entry in head_tree}
     history = history_hits(session, base, base_entries, head_blobs)

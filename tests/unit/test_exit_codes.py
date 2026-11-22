@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from quality import QualityError, printable
-from quality.adapters import chunked
+from quality.adapters import chunked, chunked_groups
 from quality.cli import main
 from quality.report import (
     Legal,
@@ -106,6 +106,7 @@ def test_chunked_respects_the_budget_and_keeps_every_file():
     assert chunked(files, 6) == [["aa", "bb"], ["cc", "dd"]]
     assert chunked(files, 1) == [["aa"], ["bb"], ["cc"], ["dd"]]
     assert chunked([], 6) == []
+    assert chunked_groups([["aa"], ["bb", "cc"], ["dd"]], 6) == [["aa"], ["bb", "cc"], ["dd"]]
 
 
 def test_public_finding_holds_only_the_allowed_fields():

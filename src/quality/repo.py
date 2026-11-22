@@ -150,6 +150,41 @@ def parse_index_listing(raw: bytes) -> list:
     return entries
 
 
+def parse_added_lines(raw: bytes) -> dict:
+    """
+    Args:
+        raw: `git diff-* -p -U0` output.
+
+    Returns:
+        Per new-side path the line numbers the patch adds. The lines a hunk
+        header counts are content, never a header, and a `+++ ` line counts
+        as a file header only right after a `--- ` line; the tab git appends
+        to a name holding a space is dropped. A path git quotes in that
+        header is left out, and so is a deleted file.
+    """
+    added = {}
+    lines = None
+    previous = b""
+    content = 0
+    for line in raw.split(b"\n"):
+        if content:
+            content -= not line.startswith(b"\\")
+        elif line.startswith(b"+++ ") and previous.startswith(b"--- "):
+            lines = added.setdefault(os.fsdecode(line[6:].removesuffix(b"\t")), set()) if line.startswith(b"+++ b/") else None
+        elif line.startswith(b"@@ "):
+            (_, removed), (start, count) = (hunk_range(field) for field in line.split(b" ")[1:3])
+            content = removed + count
+            if lines is not None:
+                lines.update(range(start, start + count))
+        previous = line
+    return added
+
+
+def hunk_range(field: bytes) -> tuple:
+    start, _, count = field[1:].partition(b",")
+    return int(start), int(count or b"1")  # nocheck: clean.default-value -- git omits the count of a one-line hunk
+
+
 def parse_tree_listing(raw: bytes) -> list:
     entries = []
     for token in raw.split(b"\0"):
@@ -244,6 +279,24 @@ class Repo:
             "--",
         )
         return parse_raw_diff(raw)
+
+    def added_lines(self, old: str, new: str | None, paths: list) -> dict:
+        """
+        Args:
+            old: Commit or tree the change starts from.
+            new: Commit the change ends at, or None for the index.
+            paths: Paths to diff, taken literally; both sides of a rename
+                belong in it.
+
+        Returns:
+            parse_added_lines of the patch between both sides.
+        """
+        command = ("diff-index", "--cached", old) if new is None else ("diff-tree", "-r", old, new)
+        flags = ("-p", "-U0", "-M", "--no-color", "--no-ext-diff", "--no-textconv")
+        result = self._capture("--literal-pathspecs", command[0], *flags, *command[1:], "--", *paths)
+        if result.code != 0:
+            raise QualityError(f"git {command[0]} failed with exit {result.code}")
+        return parse_added_lines(result.stdout)
 
     def merge_base(self, ref: str) -> str:
         if self.is_shallow():
