@@ -204,6 +204,24 @@ def bind_files(data: RuleData, bindings: list, kinds: dict, predicate) -> list:
     return bound
 
 
+def whole_scope(snapshot, active: list) -> dict:
+    """
+    Args:
+        snapshot: Snapshot a whole_snapshot tool reads.
+        active: Its bindings the run selects.
+
+    Returns:
+        Path to kinds for the files those bindings can bind: none without an
+        active binding, only the files their `files` patterns name when every
+        one of them names patterns, else every file of the snapshot.
+    """
+    paths = snapshot.paths() if active else []
+    if active and all(binding.settings.get("files") is not None for binding in active):
+        tests = [selector(binding) for binding in active]
+        paths = [path for path in paths if any(test(path, frozenset()) for test in tests)]
+    return {path: snapshot.kinds_of(path) for path in paths}
+
+
 class Collector:
     def __init__(self, data: RuleData, runtime: Runtime):
         self.data = data
@@ -240,15 +258,11 @@ class Collector:
 
     def bound_tools(self, snapshot, paths: list, predicate) -> list:
         kinds = {path: snapshot.kinds_of(path) for path in paths}
-        everything = None
         result = []
         for tool, bindings in self.data.bindings().items():
             scope = kinds
             if self.data.tools.get(tool, {}).get("whole_snapshot"):
-                everything = everything or {
-                    path: snapshot.kinds_of(path) for path in snapshot.paths()
-                }
-                scope = everything
+                scope = whole_scope(snapshot, [binding for binding in bindings if predicate(binding.rule)])
             bound = bind_files(self.data, bindings, scope, predicate)
             if bound:
                 result.append((tool, bound))

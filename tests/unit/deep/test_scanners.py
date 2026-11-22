@@ -1,16 +1,26 @@
 import json
 import os
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from quality import QualityError
-from quality.adapters import bind_files, jscpd, once_per_gap, osvscanner, semgrep, trivy
+from quality.adapters import (
+    Collector,
+    bind_files,
+    jscpd,
+    once_per_gap,
+    osvscanner,
+    semgrep,
+    trivy,
+    whole_scope,
+)
 from quality.adapters.base import Command, Skipped
 from quality.db import Bundle
 from quality.gate import baseline_of, code_hit, new_hits, package_hit
-from quality.modes import ALL_TIERS, Session
+from quality.modes import ALL_TIERS, FAST, Session, tier_of
 from tests.unit.deep.support import (
     DATA,
     RULES,
@@ -51,6 +61,48 @@ def test_the_secret_scanner_binds_every_file_by_kind_alone():
     kinds = {"a.py": frozenset({"python"}), "notes.txt": frozenset()}
     bound = bind_files(DATA, DATA.bindings()["gitleaks"], kinds, lambda _rule: True)
     assert [item.files for item in bound] == [["a.py", "notes.txt"]]
+
+
+class CountingSnapshot:
+    def __init__(self, paths: list):
+        self.listed = paths
+        self.classified = []
+
+    def paths(self) -> list:
+        return self.listed
+
+    def kinds_of(self, path: str) -> frozenset:
+        self.classified.append(path)
+        return frozenset()
+
+
+def classified(predicate) -> tuple:
+    snapshot = CountingSnapshot([".quality/architecture.yml", "a.py", "web/b.js"])
+    tools = Collector(DATA, None).bound_tools(snapshot, ["a.py"], predicate)
+    every = {path: frozenset() for path in snapshot.listed}
+    for tool, bound in tools:
+        if DATA.tools.get(tool, {}).get("whole_snapshot"):
+            assert fields_of(bound) == fields_of(bind_files(DATA, DATA.bindings()[tool], every, predicate))
+    return {tool for tool, _bound in tools}, set(snapshot.classified)
+
+
+def fields_of(bound: list) -> list:
+    return [(item.binding.rule.id, item.binding.tool, item.files, item.kinds) for item in bound]
+
+
+def test_a_whole_snapshot_tool_classifies_only_the_files_it_binds_by_name():
+    tools, paths = classified(lambda rule: tier_of(rule) == FAST)
+    assert "lint-imports" in tools
+    assert paths == {".quality/architecture.yml", "a.py"}
+    assert classified(lambda _rule: True)[1] == {".quality/architecture.yml", "a.py", "web/b.js"}
+    assert classified(lambda _rule: False) == (set(), {"a.py"})
+
+
+def test_a_null_files_list_binds_by_kind_like_no_list():
+    kind_bound = DATA.bindings()["jscpd"][0]
+    nulled = replace(kind_bound, settings={**kind_bound.settings, "files": None})
+    snapshot = CountingSnapshot([".quality/architecture.yml", "a.py", "web/b.js"])
+    assert list(whole_scope(snapshot, [nulled])) == snapshot.listed
 
 
 def test_only_files_patterns_mark_a_file_as_read_by_name():
