@@ -122,7 +122,7 @@ depcruise:
   loads:
     - .dependency-cruiser.json
 scancode:
-  timeout: 600
+  timeout: 1800
   exit_codes: [0]
   license_score: 80
   loads: []

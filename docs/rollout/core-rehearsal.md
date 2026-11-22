@@ -42,8 +42,21 @@ Of the 7969 non-hard findings, 7566 stand on a line, file or folder the range ad
 
 Exit 2 with `scancode exceeded its timeout of 600 s and was killed` on the head side, on a quiet host. The range adds 6538 files, among them the generated gettext catalogs under `locale/`.
 
+## scancode at 1800 s (2026-11-22, evening)
+
+The same two branches again, with `rules/tools.yml` raising the scancode timeout from 600 s to 1800 s and the run held as the only heavy job of the host (`quality-high` in the agent queue):
+
+| Branch | Exit | Findings | Time | CPU busy before, after |
+| --- | --- | --- | --- | --- |
+| `feature/store-i18n` | 2 | none | 1861 s | 54 %, 51 % |
+| `feature/iam-profile-rbac` | 1 | 8049 | 3020 s | 71 %, 14 % |
+
+- `iam-profile-rbac`: the base side no longer fails, and the 4 `legal.foreign-copyright` findings on unchanged lines are gone (5 to 1, 8053 to 8049 findings).
+- `store-i18n`: `scancode exceeded its timeout of 1800 s and was killed` on the head side, with `--processes 14`.
+- An earlier attempt the same evening on a busy host (59 to 80 % busy, other test jobs beside it) failed on `gitleaks exceeded its timeout of 300 s` for both branches; it counts for neither timeout.
+
 ## Open
 
 - The gate hands a fingerprint rise to an older instance of the same text instead of the instance the range adds.
-- scancode exceeds its 600 s timeout on ranges of this size, on the head side (`store-i18n`) and on the base side (`iam-profile-rbac`).
+- scancode exceeds 1800 s on the head side of `store-i18n`; its real need on that range is not measured yet.
 - `--base` exports and scans every commit of the range for secrets one by one: on `iam-profile-rbac` the per-commit exports ran from 16:07:11 to past 16:18:13, 1038 commits in 11 minutes (about 0.64 s each), so about 13 of the 32 minutes for its 1243 commits; 10 more minutes went to scancode on the base side until its timeout.
