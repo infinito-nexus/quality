@@ -117,7 +117,7 @@ def linked_snapshot(root: Path, files: dict, links: dict) -> Snapshot:
         The snapshot holding both.
     """
     snapshot_of(root, {**files, **links})
-    return Snapshot(root, dict.fromkeys([*files, *links]), [], set(), DATA.kinds, set(links), {})
+    return Snapshot(root, dict.fromkeys([*files, *links]), [], set(), DATA.kinds, set(links), {}, None, {})
 
 
 def requirements_command(snapshot: Snapshot) -> Command:

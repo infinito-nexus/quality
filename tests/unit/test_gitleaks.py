@@ -42,7 +42,7 @@ def snapshot_of(root, files: dict) -> Snapshot:
         destination = root / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
-    return Snapshot(root, dict.fromkeys(files), [], set(), None, set(), {})
+    return Snapshot(root, dict.fromkeys(files), [], set(), None, set(), {}, None, {})
 
 
 def trace(*events: str) -> bytes:

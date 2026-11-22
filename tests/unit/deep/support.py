@@ -32,4 +32,4 @@ def snapshot_of(root: Path, files: dict) -> Snapshot:
     for name, text in files.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text, encoding="utf-8")
-    return Snapshot(root, dict.fromkeys(files), [], set(), DATA.kinds, set(), {})
+    return Snapshot(root, dict.fromkeys(files), [], set(), DATA.kinds, set(), {}, None, {})

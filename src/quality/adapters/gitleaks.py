@@ -157,7 +157,7 @@ def operands(command: Command, snapshot, work) -> list:
             own = folder / PATH / path
             own.parent.mkdir(parents=True)
             if piece.data is None:
-                os.link(snapshot.root / path, own)
+                os.link(snapshot.file(path), own)
             else:
                 own.write_bytes(piece.data)
             if command.rescan:

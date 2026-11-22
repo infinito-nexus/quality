@@ -314,3 +314,52 @@ def test_staged_on_unborn_head(target):
     target.write("a.py", "x = 1\n")
     target.stage()
     assert target.check("--staged").returncode == 0
+
+
+RUFF_CONTROL = ("ruff", "check", "--isolated", "--select", "I001,INP001", "--output-format", "concise")
+PLAIN_MODULE = "VALUE = 1\n"
+THREE_SECTIONS = "import os\n\nimport yaml\n\nimport helpers\n\nprint(os, yaml, helpers)\n"
+
+
+def ruff_codes(target, path: str) -> set:
+    output = raw_tool(target.path, *RUFF_CONTROL, path).stdout
+    return {code for code in ("I001", "INP001") if code in output}
+
+
+@pytest.mark.parametrize("marker", ["__init__.py", "__init__.pyi"])
+def test_staged_sees_the_package_marker_of_an_unchanged_package(target, marker):
+    target.write(f"pkg/{marker}", "")
+    target.commit()
+    target.write("pkg/new.py", PLAIN_MODULE)
+    target.stage()
+    found = rule_ids(target.check("--staged", "--json"))
+    assert ("coding.implicit-namespace" in found) == ("INP001" in ruff_codes(target, "pkg/new.py"))
+
+
+@pytest.mark.parametrize("module", ["helpers.py", "src/helpers.py"])
+def test_staged_sees_an_unchanged_module_under_a_source_root_as_first_party(target, module):
+    target.write(module, PLAIN_MODULE)
+    target.commit()
+    target.write("app.py", THREE_SECTIONS)
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 0, result.stderr
+    assert rule_ids(result) == []
+    assert ruff_codes(target, "app.py") == set()
+
+
+def test_negative_control_a_module_missing_on_disk_moves_its_import_to_third_party(target):
+    target.write("app.py", THREE_SECTIONS)
+    target.stage()
+    assert "coding.import-order" in rule_ids(target.check("--staged", "--json"))
+
+
+def test_staged_base_side_sees_the_package_marker_of_a_renamed_file(target):
+    target.write("pkg/__init__.py", "")
+    target.write("pkg/mod.py", PLAIN_MODULE)
+    target.commit()
+    (target.path / "loose").mkdir()
+    target.git("mv", "pkg/mod.py", "loose/mod.py")
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1, result.stderr
+    assert "coding.implicit-namespace" in rule_ids(result)

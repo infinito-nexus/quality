@@ -100,7 +100,7 @@ def manifest_license(snapshot, path: str, keys: list) -> str | None:
 
 def header_hits(rule, snapshot, path: str, settings: dict, ids: list) -> list:
     where = f"enforcer of {rule.id}"
-    with (snapshot.root / path).open("rb") as stream:
+    with snapshot.file(path).open("rb") as stream:
         data = textual(stream.read(require(settings, "header_bytes", where)))
     text = "" if data is None else data.decode("utf-8", "replace")
     found = re.search(require(settings, "header", where), text)

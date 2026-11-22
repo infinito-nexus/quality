@@ -74,7 +74,7 @@ def operands(command: Command, snapshot, work) -> list:
             levels, window = require(view, "levels", where), require(view, "window", where)
             staged.write_bytes(code_view(snapshot.data(path), levels, window))
         else:
-            os.link(snapshot.root / path, staged)
+            os.link(snapshot.file(path), staged)
     return list(command.files)
 
 

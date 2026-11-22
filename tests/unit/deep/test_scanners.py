@@ -13,6 +13,7 @@ from quality.adapters import (
     jscpd,
     once_per_gap,
     osvscanner,
+    ruff,
     semgrep,
     trivy,
     whole_scope,
@@ -21,6 +22,9 @@ from quality.adapters.base import Command, Skipped
 from quality.db import Bundle
 from quality.gate import baseline_of, code_hit, new_hits, package_hit
 from quality.modes import ALL_TIERS, FAST, Session, tier_of
+from quality.repo import Entry
+from quality.ruledata import BUILTIN
+from quality.snapshot import catalogue, materialize
 from tests.unit.deep.support import (
     DATA,
     RULES,
@@ -67,9 +71,13 @@ class CountingSnapshot:
     def __init__(self, paths: list):
         self.listed = paths
         self.classified = []
+        self.exported = set()
 
     def paths(self) -> list:
         return self.listed
+
+    def export(self, paths) -> None:
+        self.exported.update(paths)
 
     def kinds_of(self, path: str) -> frozenset:
         self.classified.append(path)
@@ -106,10 +114,138 @@ def test_a_null_files_list_binds_by_kind_like_no_list():
 
 
 def test_only_files_patterns_mark_a_file_as_read_by_name():
-    session = Session(DATA, None, None, None, ALL_TIERS, None, [])
+    session = Session(DATA, None, None, None, ALL_TIERS, None, [], False)
     assert session.read_by_name("poetry.lock")
     assert not session.read_by_name("notes.txt")
     assert not session.read_by_name("bin/tool")
+
+
+class ExportingRepo:
+    def __init__(self, blobs: dict):
+        self.blobs = blobs
+        self.requests = []
+
+    def sizes(self, oids: set) -> dict:
+        return {oid: len(self.blobs[oid]) for oid in oids}
+
+    def export_blobs(self, targets: dict, _request_file: Path) -> None:
+        self.requests.append(sorted(targets))
+        for oid, destinations in targets.items():
+            for destination in destinations:
+                destination.write_bytes(self.blobs[oid])
+
+
+def tree_of(files: dict) -> tuple:
+    oids = {path: f"{index:040x}" for index, path in enumerate(files)}
+    entries = [Entry("100644", oid, path) for path, oid in oids.items()]
+    return ExportingRepo({oids[path]: data for path, data in files.items()}), entries, oids
+
+
+TREE = {"src/a.py": b"x = 1\n", "docs/b.md": b"# b\n", ".qualityignore.yml": b"[]\n", "big.bin": b"0" * 64}
+
+
+def test_a_lazy_snapshot_writes_only_the_blobs_its_readers_open(tmp_path):
+    repo, entries, oids = tree_of(TREE)
+    snapshot = catalogue(repo, entries, tmp_path / "head", 32, DATA.kinds)
+    assert snapshot.paths() == [".qualityignore.yml", "docs/b.md", "src/a.py"]
+    assert snapshot.unchecked == ["big.bin"]
+    assert (snapshot.root / "docs").is_dir()
+    assert snapshot.data("src/a.py") == TREE["src/a.py"]
+    assert snapshot.ignore_data() == TREE[".qualityignore.yml"]
+    snapshot.export(["src/a.py", "big.bin", "missing.txt"])
+    assert repo.requests == [[oids["src/a.py"]], [oids[".qualityignore.yml"]]]
+    assert not (snapshot.root / "docs" / "b.md").exists()
+    assert not (snapshot.root / "big.bin").exists()
+
+
+def test_materialize_writes_every_kept_blob_in_one_request(tmp_path):
+    repo, entries, oids = tree_of(TREE)
+    snapshot = materialize(repo, entries, tmp_path / "head", 32, DATA.kinds)
+    assert repo.requests == [sorted(oids[path] for path in snapshot.paths())]
+    assert all((snapshot.root / path).read_bytes() == TREE[path] for path in snapshot.paths())
+    assert not snapshot.pending
+
+
+def test_negative_control_a_read_past_the_boundary_finds_no_blob(tmp_path):
+    repo, entries, _oids = tree_of(TREE)
+    snapshot = catalogue(repo, entries, tmp_path / "head", 32, DATA.kinds)
+    with pytest.raises(FileNotFoundError):
+        (snapshot.root / "src" / "a.py").read_bytes()
+    assert snapshot.file("src/a.py").read_bytes() == TREE["src/a.py"]
+
+
+class FailingRepo(ExportingRepo):
+    def export_blobs(self, targets: dict, _request_file: Path) -> None:
+        for destinations in targets.values():
+            for destination in destinations:
+                destination.write_bytes(b"partial")
+        raise QualityError("git cat-file ended inside a blob")
+
+
+def test_a_failed_export_removes_its_partial_files_and_keeps_them_pending(tmp_path):
+    repo, entries, _oids = tree_of(TREE)
+    snapshot = catalogue(FailingRepo(repo.blobs), entries, tmp_path / "head", 32, DATA.kinds)
+    with pytest.raises(QualityError):
+        snapshot.data("src/a.py")
+    assert not (snapshot.root / "src" / "a.py").exists()
+    assert "src/a.py" in snapshot.pending
+    snapshot.repo = repo
+    assert snapshot.data("src/a.py") == TREE["src/a.py"]
+
+
+RUFF_TREE = {
+    "pkg/__init__.py": b"",
+    "pkg/sub/__init__.pyi": b"",
+    "pkg/sub/new.py": b"import os\n\nimport helpers\nfrom lib.util import thing\nfrom . import sibling\n",
+    "helpers.py": b"",
+    "src/helpers.py": b"",
+    "lib/__init__.py": b"",
+    "lib/util.py": b"",
+    "other/x.py": b"",
+    "notes.md": b"",
+}
+
+
+def ruff_snapshot(tmp_path: Path, changed: bytes) -> tuple:
+    repo, entries, _oids = tree_of({**RUFF_TREE, "pkg/sub/new.py": changed})
+    snapshot = catalogue(repo, entries, tmp_path / "head", 1000, DATA.kinds)
+    return snapshot, [bound_of("coding.implicit-namespace", "ruff", {"pkg/sub/new.py": "python"})]
+
+
+def test_ruff_opens_the_package_markers_above_its_files_and_the_modules_their_imports_name(tmp_path):
+    snapshot, bound = ruff_snapshot(tmp_path, RUFF_TREE["pkg/sub/new.py"])
+    opened = ruff.opens(bound, snapshot) & set(snapshot.paths())
+    assert opened == {"pkg/__init__.py", "pkg/sub/__init__.pyi", "helpers.py", "src/helpers.py", "lib/__init__.py", "lib/util.py"}
+    assert opened <= Collector(DATA, None).opened([("ruff", bound)], snapshot)
+
+
+def test_ruff_opens_every_python_file_when_one_of_its_files_does_not_parse(tmp_path):
+    snapshot, bound = ruff_snapshot(tmp_path, b"def (:\n")
+    assert ruff.opens(bound, snapshot) == {path for path in snapshot.paths() if path != "notes.md"}
+
+
+def test_negative_control_a_tool_without_disk_discovery_opens_no_package_marker(tmp_path):
+    snapshot, _bound = ruff_snapshot(tmp_path, RUFF_TREE["pkg/sub/new.py"])
+    secrets = bind_files(DATA, DATA.bindings()["gitleaks"], {"pkg/sub/new.py": frozenset()}, lambda _rule: True)
+    assert "pkg/__init__.py" not in Collector(DATA, None).opened([("gitleaks", secrets)], snapshot)
+
+
+def test_a_fast_run_exports_its_judged_files_and_a_whole_snapshot_classification_every_file():
+    snapshot = CountingSnapshot(["a.py", "web/b.js", "docs/c.md"])
+    Collector(DATA, None).bound_tools(snapshot, ["a.py"], lambda rule: tier_of(rule) == FAST)
+    assert snapshot.exported == {"a.py"}
+    Collector(DATA, None).bound_tools(snapshot, ["a.py"], lambda _rule: True)
+    assert snapshot.exported == set(snapshot.listed)
+
+
+def test_a_bound_whole_snapshot_tool_opens_every_file_and_others_their_own_and_their_config():
+    snapshot = CountingSnapshot([".quality/architecture.yml", "a.py", "web/b.js"])
+    collector = Collector(DATA, None)
+    tools = dict(collector.bound_tools(snapshot, ["a.py"], lambda rule: tier_of(rule) == FAST))
+    assert collector.opened([("lint-imports", tools["lint-imports"])], snapshot) == set(snapshot.listed)
+    secrets = bind_files(DATA, DATA.bindings()["gitleaks"], {"a.py": frozenset()}, lambda _rule: True)
+    assert collector.opened([("gitleaks", secrets)], snapshot) == {"a.py", *DATA.tool("gitleaks")["loads"]}
+    assert collector.opened([(BUILTIN, secrets)], snapshot) == {"a.py"}
 
 
 def gap(path: str, *rows: int) -> dict:

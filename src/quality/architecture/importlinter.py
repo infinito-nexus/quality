@@ -77,7 +77,7 @@ def stage(snapshot, section: contract.Section, work: Path) -> None:
         if package in section.packages and "/" in inner:
             staged = work / inner
             staged.parent.mkdir(parents=True, exist_ok=True)
-            os.link(snapshot.root / path, staged)
+            os.link(snapshot.file(path), staged)
             found.add(package)
     for package in section.packages:
         if package not in found:

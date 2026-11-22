@@ -1,4 +1,5 @@
 import codecs
+import posixpath
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -6,7 +7,7 @@ from pathlib import Path, PurePosixPath
 
 from quality import QualityError
 from quality.kinds import KindMap
-from quality.repo import IGNORE_FILE
+from quality.repo import IGNORE_FILE, Repo
 from quality.suppress import marker_comments, python_comments
 
 REGULAR_MODES = ("100644", "100755", "100664")
@@ -85,6 +86,8 @@ class Snapshot:
     kind_map: KindMap
     links: set
     unread: dict
+    repo: Repo
+    pending: dict
     line_cache: dict = field(default_factory=dict)
     comment_cache: dict = field(default_factory=dict)
     unparsed: set = field(default_factory=set)
@@ -93,8 +96,45 @@ class Snapshot:
     def paths(self) -> list:
         return sorted(self.files)
 
+    def export(self, paths) -> None:
+        """
+        Args:
+            paths: Files a reader needs on disk. One already written, and a
+                path no pending blob backs, is skipped.
+
+        Raises:
+            QualityError: See Repo.export_blobs. The files of the failed
+                request are removed and stay pending.
+        """
+        wanted = sorted(set(paths) & self.pending.keys())
+        targets = {}
+        for path in wanted:
+            targets.setdefault(self.pending[path].oid, []).append(self.root / path)
+        if not targets:
+            return
+        try:
+            self.repo.export_blobs(targets, self.root.with_name(f"{self.root.name}.request"))
+        except QualityError:
+            for path in wanted:
+                (self.root / path).unlink(missing_ok=True)
+            raise
+        for path in wanted:
+            del self.pending[path]
+
+    def file(self, path: str) -> Path:
+        """
+        Args:
+            path: A file of this snapshot.
+
+        Returns:
+            Where it lies on disk, its blob written first when no reader
+            needed it before.
+        """
+        self.export([path])
+        return self.root / path
+
     def data(self, path: str) -> bytes:
-        return (self.root / path).read_bytes()
+        return self.file(path).read_bytes()
 
     def text(self, path: str) -> bytes | None:
         return textual(self.data(path))
@@ -129,7 +169,7 @@ class Snapshot:
             return frozenset()
         first_line = b""
         if self.kind_map.needs_first_line(path):
-            with (self.root / path).open("rb") as stream:
+            with self.file(path).open("rb") as stream:
                 first_line = stream.readline(FIRST_LINE_BYTES)
         return self.kind_map.kinds_of(path, first_line)
 
@@ -179,6 +219,16 @@ class Snapshot:
 
 def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: KindMap) -> Snapshot:
     """
+    Returns:
+        The catalogue() of the entries with every kept blob written.
+    """
+    snapshot = catalogue(repo, entries, root, blob_limit, kind_map)
+    snapshot.export(snapshot.paths())
+    return snapshot
+
+
+def catalogue(repo, entries: list, root: Path, blob_limit: int, kind_map: KindMap) -> Snapshot:
+    """
     Args:
         repo: Repository the objects come from.
         entries: Tree or index entries.
@@ -187,21 +237,25 @@ def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: Kind
         kind_map: File kind classification.
 
     Returns:
-        The snapshot. Symlinks and gitlinks are recorded as irregular and never
+        The snapshot, every path checked and every folder created, but no
+        blob written: Snapshot.export writes one when a reader first needs
+        it. Symlinks and gitlinks are recorded as irregular and never
         followed. A symlink's target text is written as a kindless file; a
         gitlink is named unread, and so is a name holding a control character,
         which no tool is given.
+
+    Raises:
+        QualityError: A path is unsafe, see safe_path.
     """
     root.mkdir(mode=0o700)
     readable = [entry for entry in entries if entry.mode in READABLE_MODES and not CONTROL.search(entry.path)]
     sizes = repo.sizes({entry.oid for entry in readable})
     kept, unchecked = split_by_size(readable, sizes, blob_limit)
-    targets = blob_targets(kept, root)
-    if targets:
-        repo.export_blobs(targets, root.with_name(f"{root.name}.request"))
+    make_folders(kept, root)
     links = {entry.path for entry in kept.values() if entry.mode == LINK_MODE}
     irregular = irregular_paths(entries)
-    return Snapshot(root, kept, unchecked, irregular, kind_map, links, unread_reasons(entries, unchecked))
+    unread = unread_reasons(entries, unchecked)
+    return Snapshot(root, kept, unchecked, irregular, kind_map, links, unread, repo, dict(kept))
 
 
 def unread_reasons(entries: list, unchecked: list) -> dict:
@@ -256,10 +310,6 @@ def split_by_size(regular: list, sizes: dict, blob_limit: int) -> tuple:
     return kept, sorted(unchecked)
 
 
-def blob_targets(kept: dict, root: Path) -> dict:
-    targets = {}
-    for entry in kept.values():
-        destination = root / safe_path(entry.path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        targets.setdefault(entry.oid, []).append(destination)
-    return targets
+def make_folders(kept: dict, root: Path) -> None:
+    for folder in sorted({posixpath.dirname(safe_path(path)) for path in kept}):
+        (root / folder).mkdir(parents=True, exist_ok=True)

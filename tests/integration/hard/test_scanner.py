@@ -188,7 +188,7 @@ def adapter_findings(target, tmp_path, names) -> list:
     path_value = os.environ["PATH"]
     environment = {**tool_environment(path_value, home, None), **thread_environment(TOOL_THREADS)}
     runtime = Runtime(path_value, environment, empty, target.path, False, {"work_dir": tmp_path})
-    snapshot = Snapshot(target.path, dict.fromkeys(names), [], set(), data.kinds, set(), {})
+    snapshot = Snapshot(target.path, dict.fromkeys(names), [], set(), data.kinds, set(), {}, None, {})
     kinds = {name: snapshot.kinds_of(name) for name in names}
     bound = [Bound(binding, names, kinds) for binding in data.bindings()["gitleaks"]]
     hits = Collector(data, runtime).run_tool("gitleaks", bound, snapshot)

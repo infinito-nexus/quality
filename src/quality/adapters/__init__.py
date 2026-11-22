@@ -22,7 +22,7 @@ from quality.adapters import (
     shellcheck,
     trivy,
 )
-from quality.adapters.base import Bound, Skipped, gap_rule
+from quality.adapters.base import Bound, Skipped, all_files, gap_rule
 from quality.adapters.builtin import run_builtin
 from quality.architecture import depcruise, importlinter
 from quality.gate import code_hit
@@ -219,6 +219,7 @@ def whole_scope(snapshot, active: list) -> dict:
     if active and all(binding.settings.get("files") is not None for binding in active):
         tests = [selector(binding) for binding in active]
         paths = [path for path in paths if any(test(path, frozenset()) for test in tests)]
+    snapshot.export(paths)
     return {path: snapshot.kinds_of(path) for path in paths}
 
 
@@ -243,7 +244,9 @@ class Collector:
         """
         found = []
         failures = []
-        for tool, bound in self.bound_tools(snapshot, paths, predicate):
+        tools = self.bound_tools(snapshot, paths, predicate)
+        snapshot.export(self.opened(tools, snapshot))
+        for tool, bound in tools:
             try:
                 hits = self.run_tool(tool, bound, snapshot)
             except QualityError as error:
@@ -256,7 +259,30 @@ class Collector:
         hits = once_per_gap([item for item in found if not isinstance(item, Skipped)])
         return hits, [item for item in found if isinstance(item, Skipped)], failures
 
+    def opened(self, tools: list, snapshot) -> set:
+        """
+        Args:
+            tools: Each tool bound for this run with its rules and their files.
+            snapshot: Snapshot they run on.
+
+        Returns:
+            The files of the snapshot those tools may open on disk: each
+            one's bound files and those its adapter's `opens` names, plus
+            every file for a tool marked whole_snapshot and the config files
+            it `loads` for any other tool of tools.yml.
+        """
+        files = set()
+        for tool, bound in tools:
+            files.update(all_files(bound))
+            if tool in REGISTRY and hasattr(REGISTRY[tool], "opens"):
+                files.update(REGISTRY[tool].opens(bound, snapshot))
+            if tool in self.data.tools:
+                settings = self.data.tools[tool]
+                files.update(snapshot.paths() if settings.get("whole_snapshot") else require(settings, "loads", f"tools.yml {tool}"))
+        return files
+
     def bound_tools(self, snapshot, paths: list, predicate) -> list:
+        snapshot.export(paths)
         kinds = {path: snapshot.kinds_of(path) for path in paths}
         result = []
         for tool, bindings in self.data.bindings().items():

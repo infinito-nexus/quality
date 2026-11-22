@@ -59,7 +59,7 @@ def stage(snapshot, section: contract.Section, work: Path) -> None:
         if inside and path not in snapshot.links and JAVASCRIPT_KIND in snapshot.kinds_of(path):
             staged = work / path
             staged.parent.mkdir(parents=True, exist_ok=True)
-            os.link(snapshot.root / path, staged)
+            os.link(snapshot.file(path), staged)
 
 
 def prepared(section: contract.Section, snapshot, work: Path) -> list:

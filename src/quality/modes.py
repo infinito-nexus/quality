@@ -36,6 +36,7 @@ from quality.ruledata import (
 from quality.snapshot import (
     BINARY,
     Snapshot,
+    catalogue,
     control_notes,
     materialize,
     refuse_control_names,
@@ -47,6 +48,7 @@ FAST_TIER = (FAST,)
 ALL_TIERS = (FAST, "deep")
 COVERAGE = "coverage"
 MODE_TIERS = {"staged": FAST_TIER, "base": ALL_TIERS, "all": ALL_TIERS, COVERAGE: ()}
+LAZY_MODES = ("staged",)
 HEAD_ONLY_NOTE = "HEAD only: history not scanned"
 
 
@@ -74,6 +76,7 @@ class Session:
     tiers: tuple
     bundle: db.Bundle | None
     notes: list
+    lazy: bool
 
     def collect(self, snapshot: Snapshot, paths: list, predicate, base_side: bool) -> list:
         """
@@ -108,7 +111,8 @@ class Session:
         return {rule.id for rule in self.data.rules if rule.file_gap() and tier_of(rule) in self.tiers}
 
     def snapshot(self, entries: list, label: str) -> Snapshot:
-        return materialize(
+        build = catalogue if self.lazy else materialize
+        return build(
             self.repo,
             entries,
             self.scratch / label,
@@ -239,7 +243,7 @@ def open_session(options: Options, scratch: Path) -> Session:
         options.verbose,
         resources,
     )
-    return Session(data, repo, Collector(data, runtime), scratch, tiers, bundle, [])
+    return Session(data, repo, Collector(data, runtime), scratch, tiers, bundle, [], options.mode in LAZY_MODES)
 
 
 def update_database(option: str | None, rules: str | None, repositories: list | None = None) -> tuple:
