@@ -15,6 +15,7 @@ from tests.integration.support import (
     LAUNCHER,
     RULES,
     TEST_DB,
+    TOOL_THREADS,
     VULNERABLE_PIN,
     path_with,
     quality,
@@ -125,7 +126,7 @@ def test_hosted_scan_command_reads_the_bundle_it_names(target, tmp_path):
         "PYTHON": sys.executable,
         "LAUNCHER": LAUNCHER,
     }
-    argv = [*load_launcher().SCAN_COMMAND, str(target.path), str(TEST_DB)]
+    argv = [*load_launcher().SCAN_COMMAND, str(target.path), str(TEST_DB), str(TOOL_THREADS)]
     result = subprocess.run(argv, env=env, capture_output=True, text=True, check=False)
     document = report(result)
     assert note in document["notes"]
