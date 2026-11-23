@@ -37,6 +37,7 @@
       target: proxy
       args:
         PACKAGE: proxy
+        INFINITO_CACHE_PACKAGE_URL: "{{ QUALITY_CHECK_PACKAGE_CACHE }}"
     {% endif %}
     {{ lookup('compose_only', 'container_name', QUALITY_CHECK_PROXY.name) }}
     {% if QUALITY_CHECK_PULL_POLICY %}

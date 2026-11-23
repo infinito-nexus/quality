@@ -16,6 +16,7 @@ The role deploys the web app, an egress proxy, and an idle anchor of the scan im
 - **Anonymous access with limits:** a proof-of-work captcha and per-IP, per-host and global hourly limits; `services.quality-check.access.anonymous` turns anonymous submissions off.
 - **Optional SSO:** with Keycloak the app signs users in through its own OIDC code flow with S256 PKCE ([templates/keycloak/clients.json.j2](./templates/keycloak/clients.json.j2)); members of the role's RBAC group get larger limits.
 - **Private reports:** a report is reachable only through its random link, sent with `no-referrer` and `noindex`.
+- **Cached Nix builds:** a source build fetches the Nix closure through the package cache's `raw-nixos-cache` repository when `dev-nix` names one in `services.nix.package_cache`, and from `cache.nixos.org` otherwise.
 
 ## Further Resources
 

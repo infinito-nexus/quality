@@ -10,6 +10,7 @@ services:
       target: scan
       args:
         PACKAGE: scan
+        INFINITO_CACHE_PACKAGE_URL: ${INFINITO_CACHE_PACKAGE_URL:-}
 
   state:
     image: docker:29.0.1-cli
@@ -32,6 +33,7 @@ services:
       target: proxy
       args:
         PACKAGE: proxy
+        INFINITO_CACHE_PACKAGE_URL: ${INFINITO_CACHE_PACKAGE_URL:-}
     runtime: runc
     read_only: true
     user: "65534:65534"
