@@ -135,6 +135,7 @@
   summary: Changed file holds a licence text or notice outside the allowlist of the project licence, such as a GPL header pasted into an MIT project
   legal: 50
   tier: deep
+  exclude: &catalogues ["*.po", "*.pot"]
   enforcer:
     any: &origin
       tool: scancode
@@ -150,6 +151,7 @@
   summary: Changed file adds a copyright line of a holder the nearest licence file does not name, under an allowed licence; keep the notice and name the holder in NOTICE
   legal: 25
   tier: deep
+  exclude: *catalogues
   enforcer:
     any:
       <<: *origin

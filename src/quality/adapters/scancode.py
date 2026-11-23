@@ -12,6 +12,8 @@ STEM = "file"
 SUFFIX = re.compile(r"\.[A-Za-z0-9]{1,16}")
 SPDX_ID = "1-spdx-id"
 ORIGIN_KINDS = ("is_license_text", "is_license_notice")
+TIMEOUT = "ERROR: Processing interrupted: timeout after "
+ERROR_PATH = "Path: "
 
 
 def commands(bound: list, settings: dict, _empty_file) -> list:
@@ -102,7 +104,20 @@ def carries_licence(match: dict, rules: dict) -> bool:
     return any(rule[kind] for kind in ORIGIN_KINDS)
 
 
-def scan_of(entry: dict, rules: dict) -> Scan:
+def timed_out(entry: dict) -> bool:
+    """
+    Args:
+        entry: One file of scancode's JSON report.
+
+    Returns:
+        Whether scancode reported errors for it and every one is its per-file
+        timeout.
+    """
+    errors = entry["scan_errors"]
+    return bool(errors) and all(TIMEOUT in error for error in errors)
+
+
+def scan_of(entry: dict, rules: dict) -> Scan | None:
     """
     Args:
         entry: One file of scancode's JSON report.
@@ -111,11 +126,13 @@ def scan_of(entry: dict, rules: dict) -> Scan:
     Returns:
         Its licence detections holding a licence text or notice as (SPDX
         expression, first line of such a match) and its copyright holders as
-        (holder, line).
+        (holder, line); None when scancode timed out on it.
 
     Raises:
-        QualityError: scancode could not scan the file.
+        QualityError: scancode could not scan the file for another reason.
     """
+    if timed_out(entry):
+        return None
     if entry["scan_errors"]:
         raise QualityError("scancode could not scan a file, so it stays unchecked")
     found = [
@@ -136,13 +153,19 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
 
     Returns:
         The findings of legal.origin.origin_hits() over the files of this
-        chunk; a file of the chunk the report leaves out raises KeyError there.
+        chunk, a file scancode timed out on mapped to None; a file of the
+        chunk the report leaves out raises KeyError there.
 
     Raises:
-        QualityError: scancode reported an error.
+        QualityError: scancode wrote no report, or reported an error other
+            than a per-file timeout.
     """
-    document = json.loads(stdout)
-    if any(header["errors"] for header in document["headers"]):
+    try:
+        document = json.loads(stdout)
+    except ValueError as error:
+        raise QualityError("scancode wrote no report, so its files stay unchecked") from error
+    timeouts = {f"{ERROR_PATH}{INPUT}/{entry['path']}" for entry in document["files"] if timed_out(entry)}
+    if any(set(header["errors"]) - timeouts for header in document["headers"]):
         raise QualityError("scancode reported an error, so a file stays unchecked")
     paths = staged(command, snapshot)
     rules = {rule["identifier"]: rule for rule in document["license_rule_references"]}

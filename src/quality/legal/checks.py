@@ -24,12 +24,14 @@ NO_DATA = f"{UNCHECKED}data"
 NO_EXPRESSION = f"{UNCHECKED}expression"
 NO_READER = f"{UNCHECKED}format"
 NO_ORIGIN = f"{UNCHECKED}origin"
+NO_SCAN = f"{UNCHECKED}scan"
 REASONS = {
     NO_PROJECT: "legal.dependency-license knows no allowlist for the project licence, so the dependency is not checked",
     NO_DATA: "legal.dependency-license has no licence data for this dependency in the bundle",
     NO_EXPRESSION: "legal.dependency-license cannot parse the licence of this dependency",
     NO_READER: "legal.dependency-license reads no dependencies from this file",
     NO_ORIGIN: "legal.foreign-origin knows no allowlist for the project licence or cannot parse the licence it found",
+    NO_SCAN: "scancode timed out on this file or its nearest licence file, so legal.foreign-origin or legal.foreign-copyright did not judge it",
 }
 FIELD = re.compile(r'^\s*"?license"?\s*[:=]')
 TOML_SUFFIX = ".toml"

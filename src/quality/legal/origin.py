@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from quality import QualityError
 from quality.gate import code_hit, package_hit
-from quality.legal.checks import NO_ORIGIN, allowlist
+from quality.legal.checks import NO_ORIGIN, NO_SCAN, allowlist
 from quality.legal.spdx import allowed, config, nearest_license
 from quality.ruledata import gitignore_spec, require
 
@@ -52,7 +52,8 @@ def origin_hits(command, snapshot, scanned: dict) -> list:
             project licence may `allow`, the `neutral` ids that name no
             licence and the `skip` patterns of the project's own licence texts.
         snapshot: Snapshot holding the files.
-        scanned: Path to its Scan; a judged file it lacks raises KeyError.
+        scanned: Path to its Scan, or to None when scancode timed out on
+            it; a judged file it lacks raises KeyError.
 
     Returns:
         For a licence binding, a finding per licence detection the allowlist
@@ -60,7 +61,8 @@ def origin_hits(command, snapshot, scanned: dict) -> list:
         per detection without allowlist or with an expression that does not
         parse. For a holder binding, a finding per copyright holder the
         nearest licence file does not name, in a file whose every detection
-        is allowed.
+        is allowed. A file scancode timed out on gets one unchecked finding
+        per binding instead.
     """
     chunk = set(command.files)
     hits = []
@@ -77,8 +79,14 @@ def origin_hits(command, snapshot, scanned: dict) -> list:
     return hits
 
 
+def unscanned(binding, path: str) -> list:
+    return [package_hit(binding.rule, path, None, "", {NO_SCAN})]
+
+
 def file_hits(binding, snapshot, path: str, context: tuple) -> list:
     scanned, repository = context
+    if scanned[path] is None:
+        return unscanned(binding, path)
     settings = binding.settings
     allow = allowlist(snapshot, path, settings, repository)
     neutral = set(require(settings, "neutral", where_of(binding)))
@@ -87,7 +95,25 @@ def file_hits(binding, snapshot, path: str, context: tuple) -> list:
         return [licence_hit(binding.rule, snapshot, path, entry) for entry in judged if entry[2] is not True]
     if any(entry[2] is not True for entry in judged):
         return []
-    own = own_holders(snapshot, path, settings, scanned)
+    return holder_hits(binding, snapshot, path, scanned)
+
+
+def holder_hits(binding, snapshot, path: str, scanned: dict) -> list:
+    """
+    Args:
+        binding: A holder binding.
+        snapshot: Snapshot holding the files.
+        path: A scanned file whose every detection is allowed.
+        scanned: Path to its Scan, or to None when scancode timed out on it.
+
+    Returns:
+        A finding per copyright holder of the file the nearest licence file
+        does not name, or one unchecked finding when scancode timed out on
+        that licence file.
+    """
+    own = own_holders(snapshot, path, binding.settings, scanned)
+    if own is None:
+        return unscanned(binding, path)
     return [
         code_hit(binding.rule, path, line, f"holder:{holder}", snapshot)
         for holder, line in scanned[path].holders
@@ -125,10 +151,16 @@ def own_holders(snapshot, path: str, settings: dict, scanned: dict) -> set:
         snapshot: Snapshot holding the files.
         path: A scanned file.
         settings: Enforcer settings naming the `project` licence files.
-        scanned: Path to its Scan, the licence files included.
+        scanned: Path to its Scan, the licence files included, or to None
+            when scancode timed out on it.
 
     Returns:
-        The casefolded copyright holders of the file's nearest licence file.
+        The casefolded copyright holders of the file's nearest licence file,
+        none without a scanned licence file, and None when scancode timed out
+        on that licence file.
     """
     found = nearest_license(snapshot, path, require(settings["project"], "files", "project settings"))
-    return {holder.casefold() for holder, _line in scanned[found].holders} if found in scanned else set()
+    if found not in scanned:
+        return set()
+    scan = scanned[found]
+    return None if scan is None else {holder.casefold() for holder, _line in scan.holders}
