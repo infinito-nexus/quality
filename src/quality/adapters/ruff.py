@@ -55,17 +55,35 @@ def opens(bound: list, snapshot) -> set:
         The files ruff looks up on disk besides its own: the package marker
         of each folder above one of them, for INP001 and same-package
         imports, and each module file or package marker an absolute import
-        of theirs names by any leading part under either source root, for
-        the first-party section of I001. Every Python file of the snapshot
-        when one of them is a notebook, does not parse, or holds an import
-        spelled in other than ASCII.
+        of theirs names by any leading part under either source root, plus
+        one file inside each folder such a part names, whose export creates
+        the folder, for the first-party section of I001. Every Python file
+        of the snapshot when one of them is a notebook, does not parse, or
+        holds an import spelled in other than ASCII.
     """
     files = all_files(bound)
     names = imported_names(files, snapshot)
     if names is None:
         return {path for path in snapshot.paths() if path.endswith(PYTHON_SUFFIXES)}
     markers = {posixpath.join(folder, marker) for path in files for folder in folders_above(path) for marker in PACKAGE_MARKERS}
-    return markers | {candidate for name in names for candidate in module_files(name)}
+    return markers | module_candidates(names, snapshot)
+
+
+def module_candidates(names: set, snapshot) -> set:
+    """
+    Args:
+        names: Dotted module names of absolute imports.
+        snapshot: Snapshot ruff runs in.
+
+    Returns:
+        Under each source root, every leading part of each name as a module
+        file and as a package marker in each Python suffix, plus the first
+        file inside each folder such a part names.
+    """
+    stems = {stem for name in names for stem in module_stems(name)}
+    found = {f"{stem}{suffix}" for stem in stems for suffix in PYTHON_SUFFIXES}
+    found |= {f"{stem}/__init__{suffix}" for stem in stems for suffix in PYTHON_SUFFIXES}
+    return found | ({snapshot.file_under(stem) for stem in stems} - {None})
 
 
 def folders_above(path: str) -> list:
@@ -73,23 +91,17 @@ def folders_above(path: str) -> list:
     return ["/".join(parts[:count]) for count in range(len(parts) + 1)]
 
 
-def module_files(name: str) -> set:
+def module_stems(name: str) -> set:
     """
     Args:
         name: Dotted module name of an absolute import.
 
     Returns:
-        Under each source root, every leading part of the name as a module
-        file and as a package marker, in each Python suffix.
+        Under each source root, the path of every leading part of the name,
+        without a suffix.
     """
     parts = name.split(".")
-    found = set()
-    for count in range(1, len(parts) + 1):
-        stem = "/".join(parts[:count])
-        for root in SOURCE_ROOTS:
-            found.update(f"{root}{stem}{suffix}" for suffix in PYTHON_SUFFIXES)
-            found.update(f"{root}{stem}/__init__{suffix}" for suffix in PYTHON_SUFFIXES)
-    return found
+    return {f"{root}{'/'.join(parts[:count])}" for count in range(1, len(parts) + 1) for root in SOURCE_ROOTS}
 
 
 def imported_names(files: list, snapshot) -> set | None:

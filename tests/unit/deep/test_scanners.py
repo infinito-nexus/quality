@@ -150,7 +150,7 @@ def test_a_lazy_snapshot_writes_only_the_blobs_its_readers_open(tmp_path):
     snapshot = catalogue(repo, entries, tmp_path / "head", 32, DATA.kinds)
     assert snapshot.paths() == [".qualityignore.yml", "docs/b.md", "src/a.py"]
     assert snapshot.unchecked == ["big.bin"]
-    assert (snapshot.root / "docs").is_dir()
+    assert list(snapshot.root.iterdir()) == []
     assert snapshot.data("src/a.py") == TREE["src/a.py"]
     assert snapshot.ignore_data() == TREE[".qualityignore.yml"]
     snapshot.export(["src/a.py", "big.bin", "missing.txt"])
@@ -197,9 +197,11 @@ def test_a_failed_export_removes_its_partial_files_and_keeps_them_pending(tmp_pa
 RUFF_TREE = {
     "pkg/__init__.py": b"",
     "pkg/sub/__init__.pyi": b"",
-    "pkg/sub/new.py": b"import os\n\nimport helpers\nfrom lib.util import thing\nfrom . import sibling\n",
+    "pkg/sub/new.py": b"import os\n\nimport helpers\nimport spaced\nfrom lib.util import thing\nfrom . import sibling\n",
     "helpers.py": b"",
     "src/helpers.py": b"",
+    "spaced/b.py": b"",
+    "spaced/a.txt": b"",
     "lib/__init__.py": b"",
     "lib/util.py": b"",
     "other/x.py": b"",
@@ -216,13 +218,15 @@ def ruff_snapshot(tmp_path: Path, changed: bytes) -> tuple:
 def test_ruff_opens_the_package_markers_above_its_files_and_the_modules_their_imports_name(tmp_path):
     snapshot, bound = ruff_snapshot(tmp_path, RUFF_TREE["pkg/sub/new.py"])
     opened = ruff.opens(bound, snapshot) & set(snapshot.paths())
-    assert opened == {"pkg/__init__.py", "pkg/sub/__init__.pyi", "helpers.py", "src/helpers.py", "lib/__init__.py", "lib/util.py"}
+    assert opened == {"pkg/__init__.py", "pkg/sub/__init__.pyi", "helpers.py", "src/helpers.py", "lib/__init__.py", "lib/util.py", "spaced/a.txt"}
     assert opened <= Collector(DATA, None).opened([("ruff", bound)], snapshot)
+    snapshot.export(opened)
+    assert (snapshot.root / "spaced").is_dir()
 
 
 def test_ruff_opens_every_python_file_when_one_of_its_files_does_not_parse(tmp_path):
     snapshot, bound = ruff_snapshot(tmp_path, b"def (:\n")
-    assert ruff.opens(bound, snapshot) == {path for path in snapshot.paths() if path != "notes.md"}
+    assert ruff.opens(bound, snapshot) == {path for path in snapshot.paths() if path.endswith((".py", ".pyi"))}
 
 
 def test_negative_control_a_tool_without_disk_discovery_opens_no_package_marker(tmp_path):

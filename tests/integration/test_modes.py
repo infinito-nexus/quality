@@ -336,7 +336,7 @@ def test_staged_sees_the_package_marker_of_an_unchanged_package(target, marker):
     assert ("coding.implicit-namespace" in found) == ("INP001" in ruff_codes(target, "pkg/new.py"))
 
 
-@pytest.mark.parametrize("module", ["helpers.py", "src/helpers.py"])
+@pytest.mark.parametrize("module", ["helpers.py", "src/helpers.py", "helpers/util.py", "src/helpers/util.py"])
 def test_staged_sees_an_unchanged_module_under_a_source_root_as_first_party(target, module):
     target.write(module, PLAIN_MODULE)
     target.commit()

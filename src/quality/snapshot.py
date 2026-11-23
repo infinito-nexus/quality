@@ -1,8 +1,10 @@
+import bisect
 import codecs
 import posixpath
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path, PurePosixPath
 
 from quality import QualityError
@@ -96,11 +98,30 @@ class Snapshot:
     def paths(self) -> list:
         return sorted(self.files)
 
+    @cached_property
+    def ordered(self) -> list:
+        return sorted(self.files)
+
+    def file_under(self, folder: str) -> str | None:
+        """
+        Args:
+            folder: A folder relative to the root.
+
+        Returns:
+            The first file of the snapshot below that folder in path order,
+            or None when the folder holds no file.
+        """
+        index = bisect.bisect_left(self.ordered, f"{folder}/")
+        if index < len(self.ordered) and self.ordered[index].startswith(f"{folder}/"):
+            return self.ordered[index]
+        return None
+
     def export(self, paths) -> None:
         """
         Args:
-            paths: Files a reader needs on disk. One already written, and a
-                path no pending blob backs, is skipped.
+            paths: Files a reader needs on disk, each written with the folders
+                above it. One already written, and a path no pending blob
+                backs, is skipped.
 
         Raises:
             QualityError: See Repo.export_blobs. The files of the failed
@@ -112,6 +133,8 @@ class Snapshot:
             targets.setdefault(self.pending[path].oid, []).append(self.root / path)
         if not targets:
             return
+        for folder in sorted({posixpath.dirname(path) for path in wanted} - {""}):
+            (self.root / folder).mkdir(parents=True, exist_ok=True)
         try:
             self.repo.export_blobs(targets, self.root.with_name(f"{self.root.name}.request"))
         except QualityError:
@@ -237,10 +260,11 @@ def catalogue(repo, entries: list, root: Path, blob_limit: int, kind_map: KindMa
         kind_map: File kind classification.
 
     Returns:
-        The snapshot, every path checked and every folder created, but no
-        blob written: Snapshot.export writes one when a reader first needs
-        it. Symlinks and gitlinks are recorded as irregular and never
-        followed. A symlink's target text is written as a kindless file; a
+        The snapshot, every path checked, but no folder or blob written below
+        the root: Snapshot.export writes a blob and the folders above it when
+        a reader first needs it. Symlinks and gitlinks are recorded as
+        irregular and never followed. A symlink's target text is written as
+        a kindless file; a
         gitlink is named unread, and so is a name holding a control character,
         which no tool is given.
 
@@ -251,7 +275,8 @@ def catalogue(repo, entries: list, root: Path, blob_limit: int, kind_map: KindMa
     readable = [entry for entry in entries if entry.mode in READABLE_MODES and not CONTROL.search(entry.path)]
     sizes = repo.sizes({entry.oid for entry in readable})
     kept, unchecked = split_by_size(readable, sizes, blob_limit)
-    make_folders(kept, root)
+    for path in kept:
+        safe_path(path)
     links = {entry.path for entry in kept.values() if entry.mode == LINK_MODE}
     irregular = irregular_paths(entries)
     unread = unread_reasons(entries, unchecked)
@@ -308,8 +333,3 @@ def split_by_size(regular: list, sizes: dict, blob_limit: int) -> tuple:
         else:
             kept[entry.path] = entry
     return kept, sorted(unchecked)
-
-
-def make_folders(kept: dict, root: Path) -> None:
-    for folder in sorted({posixpath.dirname(safe_path(path)) for path in kept}):
-        (root / folder).mkdir(parents=True, exist_ok=True)
