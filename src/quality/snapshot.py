@@ -2,6 +2,7 @@ import bisect
 import codecs
 import posixpath
 import re
+import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -94,6 +95,7 @@ class Snapshot:
     comment_cache: dict = field(default_factory=dict)
     unparsed: set = field(default_factory=set)
     ran: dict = field(default_factory=dict)
+    lock: threading.Lock = field(default_factory=threading.Lock)
 
     def paths(self) -> list:
         return sorted(self.files)
@@ -127,22 +129,23 @@ class Snapshot:
             QualityError: See Repo.export_blobs. The files of the failed
                 request are removed and stay pending.
         """
-        wanted = sorted(set(paths) & self.pending.keys())
-        targets = {}
-        for path in wanted:
-            targets.setdefault(self.pending[path].oid, []).append(self.root / path)
-        if not targets:
-            return
-        for folder in sorted({posixpath.dirname(path) for path in wanted} - {""}):
-            (self.root / folder).mkdir(parents=True, exist_ok=True)
-        try:
-            self.repo.export_blobs(targets, self.root.with_name(f"{self.root.name}.request"))
-        except QualityError:
+        with self.lock:
+            wanted = sorted(set(paths) & self.pending.keys())
+            targets = {}
             for path in wanted:
-                (self.root / path).unlink(missing_ok=True)
-            raise
-        for path in wanted:
-            del self.pending[path]
+                targets.setdefault(self.pending[path].oid, []).append(self.root / path)
+            if not targets:
+                return
+            for folder in sorted({posixpath.dirname(path) for path in wanted} - {""}):
+                (self.root / folder).mkdir(parents=True, exist_ok=True)
+            try:
+                self.repo.export_blobs(targets, self.root.with_name(f"{self.root.name}.request"))
+            except QualityError:
+                for path in wanted:
+                    (self.root / path).unlink(missing_ok=True)
+                raise
+            for path in wanted:
+                del self.pending[path]
 
     def file(self, path: str) -> Path:
         """

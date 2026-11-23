@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -110,7 +111,7 @@ class Runtime:
 
     def log(self, text: str) -> None:
         if self.verbose:
-            print(f"quality: {printable(text)}", file=sys.stderr)
+            sys.stderr.write(f"quality: {printable(text)}\n")
 
 
 def chunked(files: list, budget: int) -> list:
@@ -246,18 +247,41 @@ class Collector:
         failures = []
         tools = self.bound_tools(snapshot, paths, predicate)
         snapshot.export(self.opened(tools, snapshot))
-        for tool, bound in tools:
-            try:
-                hits = self.run_tool(tool, bound, snapshot)
-            except QualityError as error:
+        for (_tool, bound), (hits, error) in zip(tools, self.run_all(tools, snapshot), strict=True):
+            if error is not None:
                 if not tolerant:
-                    raise
+                    raise error
                 failures.append(str(error))
             else:
                 found += hits
                 record_ran(snapshot, bound, {item.path for item in hits if isinstance(item, Skipped)})
         hits = once_per_gap([item for item in found if not isinstance(item, Skipped)])
         return hits, [item for item in found if isinstance(item, Skipped)], failures
+
+    def run_all(self, tools: list, snapshot) -> list:
+        """
+        Args:
+            tools: Each tool bound for this run with its rules and their files.
+            snapshot: Snapshot they run on, every file they open exported.
+
+        Returns:
+            Per tool, in their order, its findings and None, or no findings
+            and its QualityError. The external tools run side by side, one at
+            a time under --threads; the builtin rules run after them in the
+            calling thread, being Python code a thread does not speed up.
+        """
+        external = [(tool, bound) for tool, bound in tools if tool != BUILTIN]
+        workers = 1 if self.runtime.resources["threads"] is not None else max(len(external), 1)
+        with ThreadPoolExecutor(workers) as pool:
+            futures = {tool: pool.submit(self.attempt, tool, bound, snapshot) for tool, bound in external}
+            results = {tool: future.result() for tool, future in futures.items()}
+        return [results[tool] if tool in results else self.attempt(tool, bound, snapshot) for tool, bound in tools]
+
+    def attempt(self, tool: str, bound: list, snapshot) -> tuple:
+        try:
+            return self.run_tool(tool, bound, snapshot), None
+        except QualityError as error:
+            return [], error
 
     def opened(self, tools: list, snapshot) -> set:
         """
