@@ -11,6 +11,7 @@ QUALITY_CHECK_VOLUMES_DIR: "{{ lookup('container', application_id, 'directories.
 QUALITY_CHECK_CONFIG_DIR: "{{ [QUALITY_CHECK_VOLUMES_DIR, 'config'] | path_join }}"
 QUALITY_CHECK_SECRETS_DIR: "{{ [QUALITY_CHECK_VOLUMES_DIR, 'secrets'] | path_join }}"
 QUALITY_CHECK_BUILD_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'build'] | path_join }}"
+QUALITY_CHECK_PACKAGE_CACHE: "{{ lookup('config', 'dev-nix', 'services.nix.package_cache') }}"
 QUALITY_CHECK_LAUNCHER_CONFIG: "{{ [QUALITY_CHECK_CONFIG_DIR, 'launcher.json'] | path_join }}"
 QUALITY_CHECK_STATE_DIR: "/var/lib/{{ application_id }}/state"
 QUALITY_CHECK_JOBS_DIR: "/run/{{ application_id }}/jobs"

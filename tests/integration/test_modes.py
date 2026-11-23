@@ -91,6 +91,22 @@ def test_staged_name_status(target):
     assert [finding["path"] for finding in report(result)["findings"]] == ["ü.py"]
 
 
+def test_sizes_asks_git_once_per_object(target):
+    target.write("a.py", "x = 1\n")
+    target.write("b.py", "y = 22\n")
+    target.commit()
+    oids = {target.git("rev-parse", f"HEAD:{name}").stdout.strip(): size for name, size in (("a.py", 6), ("b.py", 7))}
+    repo = Repo.open(
+        str(target.path),
+        hardened_env(os.environ["PATH"], os.environ, None),
+        60,
+        shutil.which("git"),
+    )
+    assert repo.sizes(set(oids)) == oids
+    repo.git = str(target.path / "no-git")
+    assert repo.sizes(set(oids)) == oids
+
+
 def test_staged_full_index_context(target):
     target.write("helpers/__init__.py", "")
     target.write("helpers/util.py", "VALUE = 1\n")

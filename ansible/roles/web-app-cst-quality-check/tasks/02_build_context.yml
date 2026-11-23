@@ -53,6 +53,7 @@
       - "--file={{ QUALITY_CHECK_BUILD_DIR }}/service/nix/Dockerfile"
       - "--target=scan"
       - "--build-arg=PACKAGE=scan"
+      - "--build-arg=INFINITO_CACHE_PACKAGE_URL={{ QUALITY_CHECK_PACKAGE_CACHE }}"
       - "--tag={{ lookup('image', application_id, 'scan', tag_only=True) }}"
       - "{{ QUALITY_CHECK_BUILD_DIR }}"
   changed_when: true

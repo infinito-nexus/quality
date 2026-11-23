@@ -1,9 +1,12 @@
 FROM nixos/nix:2.35.2 AS closure
 ARG PACKAGE
+ARG INFINITO_CACHE_PACKAGE_URL
 WORKDIR /build
 COPY flake.nix flake.lock ./
 RUN test -n "${PACKAGE}" \
- && nix --extra-experimental-features "nix-command flakes" build "path:/build#${PACKAGE}" --out-link /package \
+ && nix --extra-experimental-features "nix-command flakes" \
+    ${INFINITO_CACHE_PACKAGE_URL:+--option extra-substituters "${INFINITO_CACHE_PACKAGE_URL}/repository/raw-nixos-cache" --option trusted-public-keys "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="} \
+    build "path:/build#${PACKAGE}" --out-link /package \
  && mkdir -p /image/nix/store /image/bin /image/etc/ssl/certs /image/src /image/tmp \
  && nix-store --query --requisites /package > /tmp/closure \
  && while read -r path; do cp -a "$path" /image/nix/store/ || exit 1; done < /tmp/closure \
