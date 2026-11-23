@@ -201,6 +201,7 @@ class Repo:
         self.env = env
         self.timeout = timeout
         self.git = git
+        self.known_sizes = {}
 
     @classmethod
     def open(cls, cwd: str, env: dict, timeout: float, git: str):
@@ -382,14 +383,20 @@ class Repo:
             oids: Object IDs to look up.
 
         Returns:
-            A map of object ID to size in bytes, read without inflating any blob.
+            A map of object ID to size in bytes, read without inflating any
+            blob; git is asked only for the IDs no earlier call of this
+            repository looked up.
 
         Raises:
             QualityError: An object is missing.
         """
-        if not oids:
-            return {}
-        request = "".join(f"{oid}\n" for oid in sorted(oids)).encode("ascii")
+        missing = sorted(set(oids) - self.known_sizes.keys())
+        if missing:
+            self.known_sizes |= self.looked_up(missing)
+        return {oid: self.known_sizes[oid] for oid in oids}
+
+    def looked_up(self, oids: list) -> dict:
+        request = "".join(f"{oid}\n" for oid in oids).encode("ascii")
         result = run(
             [self.git, "cat-file", "--batch-check"],
             self.root,
