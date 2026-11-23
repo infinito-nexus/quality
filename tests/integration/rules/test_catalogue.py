@@ -6,7 +6,7 @@ import yaml
 
 from quality import QualityError
 from quality.adapters import astgrep
-from quality.ruledata import LENSES, build_rule, load
+from quality.ruledata import LENSES, build_rule, load, read_yaml
 from tests.integration.support import (
     ROOT,
     RULES,
@@ -263,3 +263,12 @@ def test_ast_grep_rule_files_match_the_catalogue():
         composed = astgrep.composed(AST_GREP, language, settings)
         assert bound <= prefixes(composed), language
         assert '"@' not in json.dumps(composed), language
+
+
+@pytest.mark.parametrize(
+    "path",
+    [*sorted(RULES.glob("*.yml")), AST_GREP / astgrep.SHARED_FILE],
+    ids=lambda path: str(path.relative_to(RULES)),
+)
+def test_rule_data_reads_alike_with_its_loader_and_the_pure_python_one(path):
+    assert read_yaml(path) == yaml.safe_load(path.read_bytes())

@@ -7,12 +7,11 @@ import yaml
 from quality import QualityError
 from quality.gate import code_hit, metric_hit
 from quality.legal.checks import BUILTINS as LEGAL_BUILTINS
-from quality.ruledata import require
+from quality.ruledata import YAML_LOADER, require
 
 ROOT_FOLDER = "."
 SEPARATOR = re.compile(r"[_-]")
 CONTINUATION = "\\"
-YAML_LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
 
 
 def file_lines(item, snapshot) -> list:

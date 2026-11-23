@@ -25,6 +25,7 @@ COMMENTS = "comments"
 NOCHECK_NAMES = "nocheck_names"
 PARSES = "parses"
 LENSES = ("SRP", "DRY", "KISS", "KISS/YAGNI", "fail fast")
+YAML_LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
 
 
 def require(mapping: dict, key: str, where: str):
@@ -333,7 +334,7 @@ def check_allow_list(rules: list, tools: dict) -> None:
 
 def read_yaml(path: Path):
     try:
-        return yaml.safe_load(path.read_bytes())
+        return yaml.load(path.read_bytes(), Loader=YAML_LOADER)
     except OSError:
         raise QualityError(f"rule data: cannot read {path.name}") from None
     except yaml.YAMLError:
