@@ -48,7 +48,7 @@ def test_normalise_message_replaces_digits_and_paths():
     assert normalise_message("Undefined name `foo`") == "Undefined name `foo`"
 
 
-def test_gate_requires_both_counts_to_rise():
+def test_gate_requires_every_count_to_rise():
     moved = plain_hit("b.py", "foo(1)", "m")
     assert judge(Case([moved], [plain_hit("a.py", "foo(1)", "m")], {})) == []
     reflowed = plain_hit("a.py", "foo(", "m")
@@ -85,7 +85,7 @@ def gate_of(base: list, head: list, added: dict) -> list:
     return new_hits(head, merge_baselines([baseline_of(base, {})]), added)
 
 
-def test_gate_reports_as_many_findings_as_both_rises_allow():
+def test_gate_reports_as_many_findings_as_the_rises_allow():
     legacy = line_hit("a.py", 9, "# shared")
     fresh = line_hit("a.py", 1, "# fresh")
     copy = line_hit("0.py", 1, "# shared")
@@ -108,7 +108,25 @@ def test_gate_prefers_the_added_line_across_classes():
     base = [line_hit("z.py", 5, "# old"), line_hit("a.py", 9, "# shared")]
     edited, legacy, fresh = line_hit("z.py", 5, "# shared"), line_hit("a.py", 9, "# shared"), line_hit("a.py", 1, "# fresh")
     assert gate_of(base, [edited, legacy, fresh], {"z.py": {5}, "a.py": {1}}) == [fresh]
-    assert gate_of(base, [edited, legacy, fresh], {}) == [legacy]
+    assert gate_of(base, [edited, legacy, fresh], {}) == [fresh]
+    first, second = line_hit("b.py", 1, "# one"), line_hit("b.py", 9, "# two")
+    assert gate_of([line_hit("b.py", 3, "# old")], [first, second], {"b.py": {1}}) == [first]
+    assert gate_of([line_hit("b.py", 3, "# old")], [first, second], {"b.py": {9}}) == [second]
+
+
+def test_gate_never_reports_a_line_its_file_holds_as_often_as_the_base():
+    base = [line_hit("f.py", 5, "# foo"), line_hit("g.py", 1, "# bar"), line_hit("g.py", 2, "# gone")]
+    legacy, moved = line_hit("f.py", 6, "# foo"), line_hit("f.py", 1, "# bar")
+    head = [legacy, moved, line_hit("g.py", 1, "# foo"), line_hit("g.py", 2, "# gone")]
+    for added in ({}, {"f.py": {1}, "g.py": {1}}):
+        assert gate_of(base, head, added) == []
+
+
+def test_gate_reports_a_new_message_on_an_unchanged_line():
+    swapped = plain_hit("f.py", "foo(a,b)", "Undefined name b")
+    base = [plain_hit("f.py", "foo(a,b)", "Undefined name a"), plain_hit("g.py", "bar(a)", "Undefined name a")]
+    head = [swapped, plain_hit("g.py", "foo(a,b)", "Undefined name a")]
+    assert judge(Case(head, base, {})) == [swapped]
 
 
 def test_gate_fills_added_lines_before_the_rest_of_a_class():

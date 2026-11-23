@@ -117,6 +117,7 @@ def package_key(hit: Hit, path: str) -> tuple:
 @dataclass(frozen=True, repr=False)
 class Baseline:
     fingerprints: Counter
+    per_class: Counter
     per_file: Counter
     metrics: dict
     packages: dict
@@ -133,6 +134,7 @@ def baseline_of(hits: list, renames: dict) -> Baseline:
         head side is compared with.
     """
     fingerprints = Counter()
+    per_class = Counter()
     per_file = Counter()
     metrics = {}
     packages = {}
@@ -144,10 +146,11 @@ def baseline_of(hits: list, renames: dict) -> Baseline:
             metrics.setdefault(metric_key(hit, path), []).append(hit.value)
         else:
             fingerprints[fingerprint(hit)] += 1
+            per_class[class_key(hit, path)] += 1
             per_file[per_file_key(hit, path)] += 1
     for values in metrics.values():
         values.sort(reverse=True)
-    return Baseline(fingerprints, per_file, metrics, packages)
+    return Baseline(fingerprints, per_class, per_file, metrics, packages)
 
 
 def merge_baselines(baselines: list) -> Baseline:
@@ -159,17 +162,19 @@ def merge_baselines(baselines: list) -> Baseline:
         The per-key maximum.
     """
     fingerprints = Counter()
+    per_class = Counter()
     per_file = Counter()
     metrics = {}
     packages = {}
     for baseline in baselines:
         fingerprints |= baseline.fingerprints
+        per_class |= baseline.per_class
         per_file |= baseline.per_file
         for key, values in baseline.metrics.items():
             metrics[key] = pointwise_maximum(metrics.get(key, []), values)
         for key, ids in baseline.packages.items():
             packages.setdefault(key, set()).update(ids)
-    return Baseline(fingerprints, per_file, metrics, packages)
+    return Baseline(fingerprints, per_class, per_file, metrics, packages)
 
 
 def pointwise_maximum(left: list, right: list) -> list:
@@ -183,8 +188,8 @@ def pointwise_maximum(left: list, right: list) -> list:
 def new_fingerprint_hits(hits: list, baseline: Baseline, added: dict) -> list:
     ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)  # nocheck: clean.default-value -- a finding without a line sorts as line 0
     preferred = sorted(ordered, key=lambda hit: hit.line not in added.get(hit.path, ()))
-    classes = Counter(gate_class(hit) for hit in preferred)
-    favoured = Counter(gate_class(hit) for hit in preferred if hit.line in added.get(hit.path, ()))
+    classes = Counter(gate_class(hit) for hit in preferred) - baseline.per_class
+    favoured = Counter(gate_class(hit) for hit in preferred if hit.line in added.get(hit.path, ())) & classes
     picked = {id(hit) for hit in chosen(preferred, matched_counts((favoured, classes), *rises(hits, baseline)))}
     return [hit for hit in ordered if id(hit) in picked]
 
@@ -207,20 +212,26 @@ def chosen(preferred: list, left: Counter) -> list:
 
 
 def gate_class(hit: Hit) -> tuple:
-    return fingerprint(hit), per_file_key(hit, hit.path)
+    return class_key(hit, hit.path)
+
+
+def class_key(hit: Hit, path: str) -> tuple:
+    return fingerprint(hit), per_file_key(hit, path)
 
 
 def matched_counts(sizes: tuple, spare_print: Counter, spare_file: Counter) -> Counter:
     """
     Args:
-        sizes: Hit count per fingerprint and per-file key on added lines,
-            then of all hits, both in the order to fill the classes.
+        sizes: Per class, the rise of its count in its file, limited to its
+            hits on added lines, then unlimited, both in the order to fill
+            the classes.
         spare_print: Rise of each fingerprint; used up in place.
         spare_file: Rise of each per-file key; used up in place.
 
     Returns:
-        Per class how many of its hits are new: as many in total as both
-        rises allow together. The classes are first filled in order with
+        Per class how many of its hits are new: at most its rise, and as
+        many in total as the fingerprint and per-file rises allow
+        together. The classes are first filled in order with
         their hits on added lines, then with the rest, and a class filled
         then gives a hit up only where the total needs it.
     """
@@ -327,8 +338,9 @@ def new_hits(hits: list, baseline: Baseline, added: dict) -> list:
         added: Per head-side path the line numbers the change adds.
 
     Returns:
-        Fingerprint findings whose fingerprint count and per-file count both
-        rose, as many as both rises allow together, findings on added lines
+        Fingerprint findings whose fingerprint count, per-file count and
+        count of the same fingerprint and message in their file all rose,
+        as many as the rises allow together, findings on added lines
         taken first wherever the total allows the choice, metric findings
         that grew or are new, and package findings with a
         vulnerability id the same lockfile and package lacked on the base side.
