@@ -21,6 +21,7 @@ from quality.adapters import (
 from quality.adapters.base import Command, Skipped
 from quality.db import Bundle
 from quality.gate import baseline_of, code_hit, new_hits, package_hit
+from quality.legal.checks import NO_DATA, REASONS, unchecked_notes
 from quality.modes import ALL_TIERS, FAST, Session, tier_of
 from quality.repo import Entry
 from quality.ruledata import BUILTIN
@@ -404,3 +405,16 @@ def test_jscpd_reads_its_own_report_once_and_names_unreadable_names(tmp_path):
     assert found[2:] == [Skipped(hostile, "jscpd cannot read a name that is not UTF-8")]
     with pytest.raises(ValueError, match="no report"):
         jscpd.parse(b"", command, snapshot)
+
+
+def test_unchecked_notes_follow_file_and_line_whatever_order_the_hits_arrive_in():
+    rule = next(rule for rule in DATA.rules if rule.id == "legal.dependency-license")
+    hits = [
+        package_hit(rule, "b.txt", 2, "x", {NO_DATA}),
+        package_hit(rule, "a.txt", 7, "y", {NO_DATA}),
+        package_hit(rule, "a.txt", None, "z", {NO_DATA}),
+        package_hit(rule, "a.txt", 4, "w", {NO_DATA}),
+    ]
+    expected = [f"unchecked: {where}: {REASONS[NO_DATA]}" for where in ("a.txt", "a.txt:4", "a.txt:7", "b.txt:2")]
+    assert unchecked_notes(hits) == expected
+    assert unchecked_notes(hits[::-1]) == expected

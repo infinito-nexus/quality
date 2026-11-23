@@ -279,10 +279,11 @@ def unchecked_notes(hits: list) -> list:
         hits: The unchecked findings of split_unchecked().
 
     Returns:
-        One note per finding, naming its file and line, never the package.
+        One note per finding, naming its file and line, never the package,
+        ordered by file and line.
     """
     notes = []
-    for hit in hits:
+    for hit in sorted(hits, key=lambda hit: (hit.path, -1 if hit.line is None else hit.line)):
         where = hit.path if hit.line is None else f"{hit.path}:{hit.line}"
         notes += [f"unchecked: {where}: {REASONS[marker]}" for marker in sorted(hit.ids)]
     return list(dict.fromkeys(notes))
