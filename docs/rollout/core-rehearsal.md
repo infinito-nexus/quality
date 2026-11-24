@@ -55,8 +55,24 @@ The same two branches again, with `rules/tools.yml` raising the scancode timeout
 - `store-i18n`: `scancode exceeded its timeout of 1800 s and was killed` on the head side, with `--processes 14`.
 - An earlier attempt the same evening on a busy host (59 to 80 % busy, other test jobs beside it) failed on `gitleaks exceeded its timeout of 300 s` for both branches; it counts for neither timeout.
 
+## Results on `1d01307` (2026-11-24)
+
+The same heads, bases, bundle and `--threads 14`, with the binary built from `1d01307`: its gate also requires the count of a finding's fingerprint and message in its own file to rise (decision 5), and scancode runs under the 1800 s timeout. Each run started only below 50 % CPU busy.
+
+| Branch | Exit | New findings | Hard | Legacy line findings reported as new | Clone findings off an added line | Time | CPU busy before, after |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `production` | 1 | 137 | 0 | 0 | 0 | 87 s | 9 %, 5 % |
+| `feature/iam-profile-rbac` | 1 | 8075 | 84 | 0 | 207 | 988 s | 4 %, 4 % |
+| `feature/store-i18n` | 1 | 6082 | 101 | 0 | 166 | 1959 s | 5 %, 5 % |
+
+- `production`: the same 137 findings as on 2026-11-22, explained the same way.
+- `iam-profile-rbac`: of the 7991 non-hard findings, 7640 stand on a line, file or folder the range adds, and all 143 function findings off an added line belong to 99 functions whose CCN, length or parameter count rose. The 32 line findings of 2026-11-22 on lines the merge base already held are gone. Open: 207 clone findings and 1 `security.partial-scan` on `roles/web-app-mini-qr/files/playwright/test-design.js`.
+- `store-i18n`: the head side completes for the first time. 95 of its 101 hard findings are `security.secret` from the history scan, most of them in the generated catalogs under `locale/`, plus 3 `security.eval-exec`, 2 `security.shell-exec` and 1 `security.tls-disabled`. Of the 5981 non-hard findings, 5686 stand on a line, file or folder the range adds, and all 122 function findings off an added line belong to 87 functions whose values rose. The 7 line and folder findings off an added line are caused by the range too: 5 `clean.comment` on `TODO` lines in `scripts/lint/action.sh` and `scripts/tests/deploy/act/workflow.sh`, whose `# Exception:` lines above them the range deleted; 1 `coding.import-order` on the import block of `cli/build/docs/readme/generate.py`, which the range rewrote; 1 `clean.prefix-groups` on `.github/workflows`, which gained `entry-pr-translate.yml` and renamed `call-test-install-make.yml` to `call-test-install.yml`.
+- Clone pairs: a jscpd run over the head's code files with the adapter's thresholds names each open clone finding's partners; a pair counts as old when the stripped lines of both fragments stand contiguously in the merge base. `iam-profile-rbac`: 192 of 207 findings have a new pair, 11 only pairs the base already held, 4 match no pair of the head run. `store-i18n`: 149 of 166 new, 15 only old pairs, 2 unmatched. The likely cause of the 26 old pairs: jscpd pairs a fragment with the first copy it meets, so a copy the range adds elsewhere re-pairs two old copies.
+
 ## Open
 
-- The gate hands a fingerprint rise to an older instance of the same text instead of the instance the range adds.
-- scancode exceeds 1800 s on the head side of `store-i18n`; its real need on that range is not measured yet.
+- 26 clone findings whose pairs both stood at the merge base (11 on `iam-profile-rbac`, 15 on `store-i18n`) are legacy reported as new. The operator picked a pair-aware clone gate (2026-11-24): a clone finding is new only when a line of either half is one the range adds. 238 stays open until the rehearsal runs again with it.
+- 6 clone findings (4 on `iam-profile-rbac`, 2 on `store-i18n`) match no pair of the head run and are not yet explained.
+- The `security.partial-scan` finding on `iam-profile-rbac` does not come from the file: the `1d01307` binary checks `test-design.js` of the head alone in a one-file repository with Semgrep exit 0 and 0 findings, and Semgrep with the repository's JavaScript rules parses it without an error. It depends on the full run, most likely Semgrep's per-file timeout; the rehearsal rerun for 238 shows whether it repeats.
 - `--base` exports and scans every commit of the range for secrets one by one: on `iam-profile-rbac` the per-commit exports ran from 16:07:11 to past 16:18:13, 1038 commits in 11 minutes (about 0.64 s each), so about 13 of the 32 minutes for its 1243 commits; 10 more minutes went to scancode on the base side until its timeout.

@@ -205,11 +205,11 @@ flowchart TD
 
 ### Speed
 
-- [ ] `scripts/bench.sh` runs the full fast tier, secret scanner and hadolint included, over 43 sampled core commits on 20 CPUs: at least 90 % finish under 1 s.
+- [x] `scripts/bench.sh` runs the full fast tier, secret scanner and hadolint included, over 43 sampled core commits on 20 CPUs: at least 90 % finish under 1 s (measured on `1d01307`, 2026-11-24: p90 0.723 s).
 - [x] `quality check --staged --verbose` lists neither jscpd, Semgrep, trivy nor osv-scanner.
 - [x] `quality check --staged --verbose` shows lizard receiving touched files only.
 - [x] `time quality --version` stays at or below 0.15 s.
-- [x] `quality check --all` on core, deep tier included, finishes within 360 s on 20 CPUs (operator, 2026-11-18: raised from 120 s, because core tracks 995 MB, 960 MB of them translated `docs.po` catalogs under `locale/`, and the secret scanner alone needs 1,660 CPU seconds for them, already on about 14 cores; measured 302 to 317 s cold, 94 s without `locale/`).
+- [x] `quality check --all` on core, deep tier included, finishes within 600 s on 20 CPUs (operator, 2026-11-18: raised from 120 s, because core tracks 995 MB, 960 MB of them translated `docs.po` catalogs under `locale/`, and the secret scanner alone needs 1,660 CPU seconds for them, already on about 14 cores; measured 302 to 317 s cold, 94 s without `locale/`. Operator, 2026-11-24: raised from 360 s, because scancode, added for `legal.foreign-*` on 2026-11-19, runs in the deep tier, whose tools run one at a time under `--threads`; measured 534 and 537 s cold on `1d01307`: fast tier 52 s, scancode 264 s, gitleaks 197 s, the rest 23 s).
 - [x] Both budgets above are judged only on a quiet host: their tests sample `/proc/stat` for 5 s before and after the timed run and are skipped with the measured load as the reason when 50 % or more of the CPUs were busy in either sample (operator, 2026-11-13).
 
 ### Distribution
