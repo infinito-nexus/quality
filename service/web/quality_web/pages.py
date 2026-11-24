@@ -1,4 +1,5 @@
 import base64
+from importlib.metadata import version
 from urllib.parse import urlsplit
 
 import launcher
@@ -185,7 +186,7 @@ def legal(page):
 
 @pages.get("/notices")
 def notices():
-    return render_template("notices.html.j2")
+    return render_template("notices.html.j2", version=version)
 
 
 @pages.get("/account/login")
