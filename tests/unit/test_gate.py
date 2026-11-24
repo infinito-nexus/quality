@@ -135,6 +135,29 @@ def test_gate_fills_added_lines_before_the_rest_of_a_class():
     assert gate_of(base, [copy, legacy, other], {"c.py": {2}, "a.py": {5}}) == [copy, other]
 
 
+CLONES = make_rule("clean.clones", None)
+
+
+def pair_hits(first: tuple, second: tuple) -> list:
+    group = (first, second)
+    return [Hit(CLONES, path, start, "python", f"{path}:{start}", None, "", None, False, frozenset(), group) for path, start, _end in group]
+
+
+def test_gate_reports_a_pair_only_when_the_range_adds_a_line_of_either_half():
+    old = pair_hits(("a.py", 10, 20), ("b.py", 30, 40))
+    assert gate_of([], old, {}) == []
+    assert gate_of([], old, {"a.py": {5, 21}, "c.py": {10}}) == []
+    assert gate_of([], old, {"b.py": {40}}) == old[::-1]
+
+
+def test_gate_gives_a_rise_to_the_new_pair_of_a_reused_half():
+    legacy = pair_hits(("a.py", 10, 20), ("b.py", 30, 40))
+    fresh = pair_hits(("c.py", 1, 11), ("a.py", 10, 20))
+    found = gate_of(legacy, [*legacy, *fresh], {"c.py": set(range(1, 12))})
+    assert found == [fresh[0], fresh[1]]
+    assert all(hit.group == fresh[0].group for hit in found)
+
+
 def test_metric_compare_growth_new_and_legacy():
     legacy = metric_hit(METRIC, "a.py", 1, 31, "f")
     grown = metric_hit(METRIC, "a.py", 1, 201, "f")

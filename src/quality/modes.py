@@ -364,12 +364,13 @@ def added_lines(session: Session, plan: Plan, hits: list) -> dict:
         hits: Soft findings the gate orders.
 
     Returns:
-        Per changed file holding one of those findings the line numbers the
-        change adds. The old side of a rename shares its command line, so
-        git pairs the two.
+        Per changed file holding one of those findings or one half of their
+        pairs the line numbers the change adds. The old side of a rename
+        shares its command line, so git pairs the two.
     """
     olds = {change.path: change.old_path for change in plan.changes if change.status != "deleted"}
-    groups = [[path, olds[path]] if olds[path] and olds[path] != path else [path] for path in sorted({hit.path for hit in hits} & olds.keys())]
+    held = {hit.path for hit in hits} | {side[0] for hit in hits for side in hit.group}
+    groups = [[path, olds[path]] if olds[path] and olds[path] != path else [path] for path in sorted(held & olds.keys())]
     added = {}
     for chunk in chunked_groups(groups, session.data.limit("argv_max_bytes")):
         added |= plan.added(chunk)

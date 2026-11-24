@@ -399,13 +399,13 @@ def test_jscpd_reads_its_own_report_once_and_names_unreadable_names(tmp_path):
     assert "--absolute" in prefix
     clone = {
         "format": "python",
-        "firstFile": {"name": str(snapshot.root / "a.py"), "start": 1},
-        "secondFile": {"name": str(snapshot.root / "b.py"), "start": 2},
+        "firstFile": {"name": str(snapshot.root / "a.py"), "start": 1, "end": 1},
+        "secondFile": {"name": str(snapshot.root / "b.py"), "start": 2, "end": 2},
     }
     (output / jscpd.REPORT).write_text(json.dumps({"duplicates": [clone]}), encoding="utf-8")
     found = jscpd.parse(b"", command, snapshot)
     assert [(hit.path, hit.line) for hit in found[:2]] == [("a.py", 1), ("b.py", 2)]
-    assert [hit.group for hit in found[:2]] == [(("a.py", 1), ("b.py", 2))] * 2
+    assert [hit.group for hit in found[:2]] == [(("a.py", 1, 1), ("b.py", 2, 2))] * 2
     assert found[2:] == [Skipped(hostile, "jscpd cannot read a name that is not UTF-8")]
     with pytest.raises(ValueError, match="no report"):
         jscpd.parse(b"", command, snapshot)

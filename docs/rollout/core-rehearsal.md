@@ -70,9 +70,22 @@ The same heads, bases, bundle and `--threads 14`, with the binary built from `1d
 - `store-i18n`: the head side completes for the first time. 95 of its 101 hard findings are `security.secret` from the history scan, most of them in the generated catalogs under `locale/`, plus 3 `security.eval-exec`, 2 `security.shell-exec` and 1 `security.tls-disabled`. Of the 5981 non-hard findings, 5686 stand on a line, file or folder the range adds, and all 122 function findings off an added line belong to 87 functions whose values rose. The 7 line and folder findings off an added line are caused by the range too: 5 `clean.comment` on `TODO` lines in `scripts/lint/action.sh` and `scripts/tests/deploy/act/workflow.sh`, whose `# Exception:` lines above them the range deleted; 1 `coding.import-order` on the import block of `cli/build/docs/readme/generate.py`, which the range rewrote; 1 `clean.prefix-groups` on `.github/workflows`, which gained `entry-pr-translate.yml` and renamed `call-test-install-make.yml` to `call-test-install.yml`.
 - Clone pairs: a jscpd run over the head's code files with the adapter's thresholds names each open clone finding's partners; a pair counts as old when the stripped lines of both fragments stand contiguously in the merge base. `iam-profile-rbac`: 192 of 207 findings have a new pair, 11 only pairs the base already held, 4 match no pair of the head run. `store-i18n`: 149 of 166 new, 15 only old pairs, 2 unmatched. The likely cause of the 26 old pairs: jscpd pairs a fragment with the first copy it meets, so a copy the range adds elsewhere re-pairs two old copies.
 
+## Results with the pair-aware clone gate (2026-11-24)
+
+The same heads, bases, bundle and `--threads 14`, with the binary of this branch: a clone finding is new only when a line of either half is one the range adds (decision 5). The host was busy with work outside the queue, so these times are no budget measurement; `store-i18n` ran a second time after gitleaks hit its 300 s timeout at 69 % busy.
+
+| Branch | Exit | New findings | Hard | Legacy line findings reported as new | Clone findings whose pairs both stood at the merge base | Time | CPU busy before, after |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `production` | 1 | 137 | 0 | 0 | 0 | 94 s | 18 %, 19 % |
+| `feature/iam-profile-rbac` | 1 | 8065 | 84 | 0 | 1 of 212 | 1457 s | 22 %, 69 % |
+| `feature/store-i18n` | 1 | 6069 | 101 | 0 | 3 of 195 | 3266 s | 74 %, 71 % |
+
+- The 26 old pairs of `1d01307` drop to 4; where a file holds a new copy, the finding moves to the copy the range adds (`RealignAdminPasswordTest.php` 153 to 150, `test_trigger.py` 370 to 187).
+- The 4 left are pairings, not legacy: the gate pairs each of them with a fragment the range adds, while the separate check over all code files pairs it with an older twin. On `store-i18n`, `test_services_disabler.py:590` is the `setUp` of an old class, and the range adds the same `setUp` lines at 760 to 769 in `TestReconcileServicesDisabledFromEnv`; `iam-profile-rbac`'s `test_realm_import_json.py:484` sits between the lines 480 to 483 and 494 to 532 the range adds.
+- The `security.partial-scan` finding on `iam-profile-rbac` repeats in the full run.
+
 ## Open
 
-- 26 clone findings whose pairs both stood at the merge base (11 on `iam-profile-rbac`, 15 on `store-i18n`) are legacy reported as new. The operator picked a pair-aware clone gate (2026-11-24): a clone finding is new only when a line of either half is one the range adds. 238 stays open until the rehearsal runs again with it.
-- 6 clone findings (4 on `iam-profile-rbac`, 2 on `store-i18n`) match no pair of the head run and are not yet explained.
-- The `security.partial-scan` finding on `iam-profile-rbac` does not come from the file: the `1d01307` binary checks `test-design.js` of the head alone in a one-file repository with Semgrep exit 0 and 0 findings, and Semgrep with the repository's JavaScript rules parses it without an error. It depends on the full run, most likely Semgrep's per-file timeout; the rehearsal rerun for 238 shows whether it repeats.
+- 6 clone findings (4 on `iam-profile-rbac`, 2 on `store-i18n`) match no pair of the separate check's head run.
+- The `security.partial-scan` finding on `iam-profile-rbac` does not come from the file: the `1d01307` binary checks `test-design.js` of the head alone in a one-file repository with Semgrep exit 0 and 0 findings, and Semgrep with the repository's JavaScript rules parses it without an error. It repeats in the full run, most likely Semgrep's per-file timeout.
 - `--base` exports and scans every commit of the range for secrets one by one: on `iam-profile-rbac` the per-commit exports ran from 16:07:11 to past 16:18:13, 1038 commits in 11 minutes (about 0.64 s each), so about 13 of the 32 minutes for its 1243 commits; 10 more minutes went to scancode on the base side until its timeout.

@@ -185,13 +185,28 @@ def pointwise_maximum(left: list, right: list) -> list:
     ]
 
 
+def touches_added(hit: Hit, added: dict) -> bool:
+    """
+    Args:
+        hit: A head-side finding.
+        added: Per head-side path the line numbers the change adds.
+
+    Returns:
+        For a finding of a pair, whether a line of either half is one the
+        change adds; for any other finding, whether its own line is.
+    """
+    if hit.group:
+        return any(line in added.get(path, ()) for path, start, end in hit.group for line in range(start, end + 1))
+    return hit.line in added.get(hit.path, ())
+
+
 def new_fingerprint_hits(hits: list, baseline: Baseline, added: dict) -> list:
     ordered = sorted(hits, key=lambda hit: (hit.path, hit.line or 0), reverse=True)  # nocheck: clean.default-value -- a finding without a line sorts as line 0
-    preferred = sorted(ordered, key=lambda hit: hit.line not in added.get(hit.path, ()))
+    preferred = sorted(ordered, key=lambda hit: not touches_added(hit, added))
     classes = Counter(gate_class(hit) for hit in preferred) - baseline.per_class
-    favoured = Counter(gate_class(hit) for hit in preferred if hit.line in added.get(hit.path, ())) & classes
+    favoured = Counter(gate_class(hit) for hit in preferred if touches_added(hit, added)) & classes
     picked = {id(hit) for hit in chosen(preferred, matched_counts((favoured, classes), *rises(hits, baseline)))}
-    return [hit for hit in ordered if id(hit) in picked]
+    return [hit for hit in ordered if id(hit) in picked and (not hit.group or touches_added(hit, added))]
 
 
 def rises(hits: list, baseline: Baseline) -> tuple:
@@ -341,7 +356,8 @@ def new_hits(hits: list, baseline: Baseline, added: dict) -> list:
         Fingerprint findings whose fingerprint count, per-file count and
         count of the same fingerprint and message in their file all rose,
         as many as the rises allow together, findings on added lines
-        taken first wherever the total allows the choice, metric findings
+        taken first wherever the total allows the choice, a finding of a
+        pair only when a line of either half is added, metric findings
         that grew or are new, and package findings with a
         vulnerability id the same lockfile and package lacked on the base side.
     """

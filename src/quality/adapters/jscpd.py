@@ -80,18 +80,19 @@ def parse(_stdout: bytes, command: Command, snapshot) -> list:
 
     Returns:
         One finding at the start of each fragment of each clone, both fragments
-        of a clone in one group, and the files left out for their names.
+        of a clone in one group as path, first and last line, and the files
+        left out for their names.
     """
     rule = command.bound[0].binding.rule
     hits = []
     for clone in read_report(command)["duplicates"]:
         sides = tuple(
-            (known_path(relative(side["name"], snapshot.root), snapshot), side["start"])
+            (known_path(relative(side["name"], snapshot.root), snapshot), side["start"], side["end"])
             for side in (clone["firstFile"], clone["secondFile"])
         )
         hits += [
             replace(code_hit(rule, path, start, clone["format"], snapshot), group=sides)
-            for path, start in sides
+            for path, start, _end in sides
         ]
     left_out = sorted(set(all_files(command.bound)) - set(command.files))
     return hits + [Skipped(path, "jscpd cannot read a name that is not UTF-8") for path in left_out]
