@@ -57,10 +57,10 @@ flowchart TD
 
 - [x] A GPL header pasted into a fixture MIT project gives one `legal.foreign-origin` blocker.
 - [x] The CI workflow runs ORT on the default branch only and uploads its report.
-- [ ] `test_scancode_never_receives_a_gettext_catalogue`: neither scancode rule binds a `*.po` or `*.pot` file.
-- [ ] `test_a_scancode_timeout_leaves_the_file_unchecked`: a file scancode timed out on gives one `unchecked` note and no finding.
-- [ ] `test_a_timed_out_licence_file_leaves_the_holders_of_its_files_unchecked`: a file whose nearest licence file timed out gives an unchecked `legal.foreign-copyright` finding, never a holder finding.
-- [ ] `test_any_scancode_error_but_a_timeout_aborts_the_run` and `test_a_scancode_run_without_a_report_aborts_the_run`: any other scan error, a header error beyond the timed-out files, and a missing report abort the run.
+- [x] `test_scancode_never_receives_a_gettext_catalogue`: neither scancode rule binds a `*.po` or `*.pot` file.
+- [x] `test_a_scancode_timeout_leaves_the_file_unchecked`: a file scancode timed out on gives one `unchecked` note and no finding.
+- [x] `test_a_timed_out_licence_file_leaves_the_holders_of_its_files_unchecked`: a file whose nearest licence file timed out gives an unchecked `legal.foreign-copyright` finding, never a holder finding.
+- [x] `test_any_scancode_error_but_a_timeout_aborts_the_run` and `test_a_scancode_run_without_a_report_aborts_the_run`: any other scan error, a header error beyond the timed-out files, and a missing report abort the run.
 
 ### Tests
 

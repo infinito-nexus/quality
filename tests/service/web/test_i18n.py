@@ -7,7 +7,7 @@ from quality_web import ERRORS, i18n
 from tests.service.webapp import build, headers
 
 TEMPLATES = i18n.LOCALE.parent / "templates"
-ARABIC = "فحص"
+ARABIC = "فحص جودة الشيفرة"
 
 
 class Catalog(gettext.NullTranslations):
@@ -40,7 +40,7 @@ def page(app, path, **extra):
 def test_every_source_key_is_used_and_every_used_key_exists():
     used = set()
     for template in TEMPLATES.glob("*.html.j2"):
-        used |= set(re.findall(r"""\bt\(["']([\w.]+)["']""", template.read_text(encoding="utf-8")))
+        used |= set(re.findall(r"""\bt\(["']([\w.]+)["']\s*[,)]""", template.read_text(encoding="utf-8")))
     used |= {"pending.queued", "pending.running"} | {f"error.{code}" for code in ERRORS}
     assert used == set(i18n.SOURCE)
 

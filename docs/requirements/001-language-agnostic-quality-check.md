@@ -244,7 +244,7 @@ flowchart TD
 - **Unit**
   - [x] `make test-unit` passes and covers fingerprints, message normalisation, metric compare, the ignore file parser, the suppression parser and exit codes.
 - **Integration**
-  - [ ] Every named test above passes in the suite that owns it: `make test-unit` runs `test_update_without_db_guards_the_default_cache`, `make test-distribution` runs `test_single_pin_source` against the flake outputs (operator, 2026-11-13), `make test-e2e` runs `test_vuln_offline_image` against the image (operator, 2026-11-18), and `make test-integration` runs every other one against real tools and temporary git repositories.
+  - [x] Every named test above passes in the suite that owns it: `make test-unit` runs `test_update_without_db_guards_the_default_cache`, `make test-distribution` runs `test_single_pin_source` against the flake outputs (operator, 2026-11-13), `make test-e2e` runs `test_vuln_offline_image` against the image (operator, 2026-11-18), and `make test-integration` runs every other one against real tools and temporary git repositories (all four green on 2026-11-24, with the flake's tools on `PATH` and a test bundle under six days old).
 - **E2E**
   - [x] `make test-e2e` runs host binary and image against clones of skills and package-manager, for `--staged`, `--base` and `--all`, on one database digest, with identical findings.
   - [ ] A test pull request on skills goes red through the reusable workflow on a new finding and green after its fix.

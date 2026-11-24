@@ -23,14 +23,20 @@
     - tests/integration/test_modes.py
   reason: the secret-scanner tests spell out each staged, base and history scenario in full, as main wrote them before the deep tier ran jscpd; folding them is a refactor of its own
 - rule: clean.clones
-  paths: ["tests/service/test_web.py"]
+  paths: ["tests/service/web/test_web.py"]
   reason: each rate-limit test spells out its own request sequence, so the repeated client setup and first two submissions keep every test readable on its own
 - rule: legal.external-request
   paths: ["tests/integration/rules/test_legal.py"]
   reason: the fixtures of legal.external-request write the third-party web font link the rule must find into a template of the fixture repository; the test file itself requests nothing
 - rule: legal.foreign-origin
   paths: ["tests/integration/rules/test_legal.py"]
-  reason: the legal fixtures write the GPL texts and headers the legal rules must find into files of the fixture repository; the test file itself holds no foreign code
+  reason: the legal fixtures put the GPL licences and headers the legal rules must find into files of the fixture repository; the test file itself holds no foreign code
+- rule: legal.foreign-copyright
+  paths: ["tests/unit/deep/test_scancode.py"]
+  reason: the scancode adapter tests put the MIT licence and copyright line the adapter must read into fixture files; the test file itself holds no foreign code
+- rule: clean.folder-items
+  paths: ["service/web/quality_web/locale"]
+  reason: gettext reads every language from its own <code>/LC_MESSAGES directory under one locale root, so the 182 catalogs core extracts cannot be split across folders
 - rule: legal.foreign-origin
   paths: ["service/web/quality_web/templates/notices.html.j2"]
   reason: the notices page names the licence of every bundled package as its attribution; it carries no code under those licences

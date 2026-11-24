@@ -157,15 +157,16 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
         chunk the report leaves out raises KeyError there.
 
     Raises:
-        QualityError: scancode wrote no report, or reported an error other
-            than a per-file timeout.
+        QualityError: scancode wrote no report, reported an error no file
+            carries, or could not scan a file for another reason than its
+            timeout.
     """
     try:
         document = json.loads(stdout)
     except ValueError as error:
         raise QualityError("scancode wrote no report, so its files stay unchecked") from error
-    timeouts = {f"{ERROR_PATH}{INPUT}/{entry['path']}" for entry in document["files"] if timed_out(entry)}
-    if any(set(header["errors"]) - timeouts for header in document["headers"]):
+    owned = {f"{ERROR_PATH}{INPUT}/{entry['path']}" for entry in document["files"] if entry["scan_errors"]}
+    if any(set(header["errors"]) - owned for header in document["headers"]):
         raise QualityError("scancode reported an error, so a file stays unchecked")
     paths = staged(command, snapshot)
     rules = {rule["identifier"]: rule for rule in document["license_rule_references"]}

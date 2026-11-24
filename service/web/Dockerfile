@@ -8,10 +8,7 @@ RUN mkdir /widget \
  && cp /tmp/package/LICENSE.txt /widget/LICENSE.txt
 
 FROM python:3.14-slim-trixie AS catalogs
-# hadolint ignore=DL3008
-RUN apt-get update \
- && apt-get install --no-install-recommends -y gettext \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install --no-install-recommends -y gettext && rm -rf /var/lib/apt/lists/*  # nocheck: coding.dockerfile -- DL3008: the tag python:3.14-slim-trixie fixes the Debian release, whose repository keeps only the current gettext build, so a pinned version breaks the build at its next point release; this stage only compiles the catalogs and ships no gettext
 COPY service/web/quality_web/locale /locale
 RUN find /locale -name quality.po -execdir msgfmt --output-file=quality.mo quality.po \;
 

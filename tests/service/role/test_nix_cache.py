@@ -21,7 +21,7 @@ def nix_words(url: str) -> list:
         The words the closure stage's conditional Nix options expand to under sh.
     """
     expression = re.search(r"\$\{" + ARG + r":\+.*\}", DOCKERFILE.read_text(encoding="utf-8")).group(0)
-    script = f'{ARG}="$1"; set -- {expression}; printf "%s\\n" "$@"'
+    script = f'{ARG}="$1"; set -- {expression}; for word do printf "%s\\n" "$word"; done'
     return subprocess.run(["sh", "-c", script, "sh", url], capture_output=True, text=True, check=True).stdout.splitlines()
 
 

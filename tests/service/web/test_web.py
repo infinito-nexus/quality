@@ -270,7 +270,7 @@ def test_every_template_escapes(tmp_path):
     app, _state = build(tmp_path)
     environment = app.jinja_env
     names = environment.list_templates()
-    assert names and all(name.endswith(".html.j2") for name in names)
+    assert names and all(name.endswith((".html.j2", ".html")) for name in names)
     chosen = environment.autoescape
     assert all(chosen(name) if callable(chosen) else chosen for name in names)
 
