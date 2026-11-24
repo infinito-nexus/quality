@@ -7,6 +7,14 @@ RUN mkdir /widget \
  && cp /tmp/package/dist/external/altcha.min.js /tmp/package/dist/external/altcha.css /tmp/package/dist/workers/pbkdf2.js /widget/ \
  && cp /tmp/package/LICENSE.txt /widget/LICENSE.txt
 
+FROM python:3.14-slim-trixie AS catalogs
+# hadolint ignore=DL3008
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y gettext \
+ && rm -rf /var/lib/apt/lists/*
+COPY service/web/quality_web/locale /locale
+RUN find /locale -name quality.po -execdir msgfmt --output-file=quality.mo quality.po \;
+
 FROM python:3.14-slim-trixie
 WORKDIR /app
 COPY service/web/requirements.txt ./
@@ -14,6 +22,7 @@ RUN pip install --no-cache-dir --no-compile --root-user-action=ignore -r require
 COPY service/web/quality_web ./quality_web
 COPY ansible/roles/web-app-cst-quality-check/files/python/script.py ./launcher.py
 COPY --from=widget /widget ./quality_web/static/altcha
+COPY --from=catalogs /locale ./quality_web/locale
 ENV PYTHONDONTWRITEBYTECODE=1
 USER 65532:65532
 EXPOSE 8080

@@ -1,5 +1,7 @@
 from flask import Flask, abort, render_template, request
+from jinja2 import ChoiceLoader, FileSystemLoader, PrefixLoader
 
+from quality_web import i18n
 from quality_web.access import Limiter, client_address
 from quality_web.captcha import Captcha
 from quality_web.login import Login
@@ -8,13 +10,7 @@ from quality_web.settings import load
 from quality_web.spool import Spool
 
 FORM_OVERHEAD_BYTES = 65536
-MESSAGES = {
-    400: "The submission is not valid.",
-    403: "The submission was refused.",
-    404: "There is no such page or report.",
-    413: "The submission is larger than the upload limit.",
-    429: "Too many submissions right now. Please try again later.",
-}
+ERRORS = (400, 403, 404, 413, 429)
 SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex, nofollow",
@@ -45,10 +41,16 @@ def create_app(config_path):
         "captcha": Captcha(settings),
         "login": Login(settings),
         "spool": Spool(settings),
+        "languages": i18n.load(i18n.LOCALE),
     }
+    legal = PrefixLoader({"legal": FileSystemLoader(settings["legal_dir"])})
+    app.jinja_env.loader = ChoiceLoader([app.jinja_env.loader, legal])
+    app.before_request(i18n.choose_language)
     app.before_request(require_address)
     app.after_request(secure)
-    for code in MESSAGES:
+    app.after_request(i18n.vary)
+    app.context_processor(i18n.language_context)
+    for code in ERRORS:
         app.register_error_handler(code, message)
     app.register_blueprint(pages)
     return app
@@ -67,4 +69,4 @@ def secure(response):
 
 
 def message(error):
-    return render_template("message.html.j2", text=MESSAGES[error.code]), error.code
+    return render_template("message.html.j2", key=f"error.{error.code}"), error.code

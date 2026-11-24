@@ -1,0 +1,219 @@
+# Hebrew translations for infinito-nexus.
+# Copyright (C) 2026 Kevin Veen-Birkenbach
+# This file is distributed under the licence of the repository that holds it.
+# Kevin Veen-Birkenbach <kevinveenbirkenbach@infinito.nexus>, 2026.
+# https://infinito.nexus
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: infinito-nexus VERSION\n"
+"Report-Msgid-Bugs-To: contact@infinito.nexus\n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: Kevin Veen-Birkenbach <kevinveenbirkenbach@infinito.nexus>\n"
+"Language: he\n"
+"Language-Team: Kevin Veen-Birkenbach <kevinveenbirkenbach@infinito.nexus>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgctxt "quality:report.exclusions"
+msgid "Applied exclusions"
+msgstr ""
+
+msgctxt "quality:message.back"
+msgid "Back"
+msgstr ""
+
+msgctxt "quality:index.submit"
+msgid "Check"
+msgstr ""
+
+msgctxt "quality:report.commit"
+msgid "Commit"
+msgstr ""
+
+msgctxt "quality:report.database"
+msgid "Database"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.findings"
+msgid "Findings in the rules that ran: {count}. The submission controls its own exclusions, so this report is a claim, not proof."
+msgstr ""
+
+msgctxt "quality:report.history"
+msgid "History"
+msgstr ""
+
+msgctxt "quality:footer.language"
+msgid "Language"
+msgstr ""
+
+msgctxt "quality:report.location"
+msgid "Location"
+msgstr ""
+
+msgctxt "quality:nav.login"
+msgid "Log in"
+msgstr ""
+
+msgctxt "quality:nav.logout"
+msgid "Log out"
+msgstr ""
+
+msgctxt "quality:report.none"
+msgid "None."
+msgstr ""
+
+msgctxt "quality:report.unchecked"
+msgid "Not checked"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.failed"
+msgid "Not checked: {reason}."
+msgstr ""
+
+msgctxt "quality:footer.notices"
+msgid "Notices"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:index.file"
+msgid "One file, at most {kib} KiB"
+msgstr ""
+
+msgctxt "quality:index.text"
+msgid "Pasted code"
+msgstr ""
+
+msgctxt "quality:footer.privacy"
+msgid "Privacy"
+msgstr ""
+
+msgctxt "quality:index.url"
+msgid "Public repository URL"
+msgstr ""
+
+msgctxt "quality:brand"
+msgid "Quality check"
+msgstr ""
+
+msgctxt "quality:report.title"
+msgid "Quality report"
+msgstr ""
+
+msgctxt "quality:pending.title"
+msgid "Quality report pending"
+msgstr ""
+
+msgctxt "quality:report.rule"
+msgid "Rule"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.rule_skipped"
+msgid "Rule {rule} did not run."
+msgstr ""
+
+msgctxt "quality:index.login_required"
+msgid "Scans are available after logging in."
+msgstr ""
+
+msgctxt "quality:report.severity"
+msgid "Severity"
+msgstr ""
+
+msgctxt "quality:index.title"
+msgid "Static quality scan"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:index.intro"
+msgid "Submit a public repository, one file or pasted code. The service runs the checks of {tool} on it and never runs the code itself. Reports stay reachable through their link for a limited time."
+msgstr ""
+
+msgctxt "quality:report.summary"
+msgid "Summary"
+msgstr ""
+
+msgctxt "quality:footer.terms"
+msgid "Terms"
+msgstr ""
+
+msgctxt "quality:pending.queued"
+msgid "The scan is queued. This page reloads every five seconds. Keep its link: it is the only way back to the report."
+msgstr ""
+
+msgctxt "quality:pending.running"
+msgid "The scan is running. This page reloads every five seconds. Keep its link: it is the only way back to the report."
+msgstr ""
+
+msgctxt "quality:error.413"
+msgid "The submission is larger than the upload limit."
+msgstr ""
+
+msgctxt "quality:error.400"
+msgid "The submission is not valid."
+msgstr ""
+
+msgctxt "quality:error.403"
+msgid "The submission was refused."
+msgstr ""
+
+msgctxt "quality:error.404"
+msgid "There is no such page or report."
+msgstr ""
+
+msgctxt "quality:legal.english_only"
+msgid "This page exists in English and German only. The English text below applies as written."
+msgstr ""
+
+msgctxt "quality:report.not_scanned"
+msgid "This submission was not scanned, so nothing can be said about its quality."
+msgstr ""
+
+msgctxt "quality:error.429"
+msgid "Too many submissions right now. Please try again later."
+msgstr ""
+
+msgctxt "quality:index.legend"
+msgid "What to check"
+msgstr ""
+
+msgctxt "quality:report.database_unused"
+msgid "not used"
+msgstr ""
+
+msgctxt "quality:report.whole_project"
+msgid "the whole project"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.database_updated"
+msgid "updated {date}"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.database_digest"
+msgid "updated {date}, digest {digest}"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.oversized"
+msgid "{path} is over the size limit."
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.ignored"
+msgid "{rule} off for {paths}: {reason}"
+msgstr ""
+
+#, python-brace-format
+msgctxt "quality:report.suppressed"
+msgid "{rule} suppressed at {location}"
+msgstr ""
+

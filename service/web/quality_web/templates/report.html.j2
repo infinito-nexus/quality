@@ -1,21 +1,22 @@
 {% extends "base.html.j2" %}
-{% block title %}Quality report{% endblock %}
+{% macro code(text) %}<code>{{ text }}</code>{% endmacro %}
+{% block title %}{{ t("report.title") }}{% endblock %}
 {% block main %}
-<h1>Quality report</h1>
+<h1>{{ t("report.title") }}</h1>
 {% if report.status != "done" %}
-<p class="failed">Not checked: {{ report.reason }}.</p>
-<p>This submission was not scanned, so nothing can be said about its quality.</p>
+<p class="failed">{{ t("report.failed", reason=report.reason) }}</p>
+<p>{{ t("report.not_scanned") }}</p>
 {% else %}
 <dl class="header">
-  {% if report.commit %}<dt>Commit</dt><dd><code>{{ report.commit }}</code></dd>{% endif %}
+  {% if report.commit %}<dt>{{ t("report.commit") }}</dt><dd>{{ code(report.commit) }}</dd>{% endif %}
   <dt>quality</dt><dd>{{ report.quality }}</dd>
-  <dt>Database</dt><dd>{% if report.database %}updated {{ report.database.updated }}{% if report.database.digest %}, digest <code>{{ report.database.digest }}</code>{% endif %}{% else %}not used{% endif %}</dd>
-  {% if report.history %}<dt>History</dt><dd>{{ report.history }}</dd>{% endif %}
+  <dt>{{ t("report.database") }}</dt><dd>{% if report.database %}{% if report.database.digest %}{{ t("report.database_digest", date=report.database.updated, digest=code(report.database.digest)) }}{% else %}{{ t("report.database_updated", date=report.database.updated) }}{% endif %}{% else %}{{ t("report.database_unused") }}{% endif %}</dd>
+  {% if report.history %}<dt>{{ t("report.history") }}</dt><dd>{{ report.history }}</dd>{% endif %}
 </dl>
-<p>{{ report.result.findings | length }} finding(s) in the rules that ran. The submission controls its own exclusions, so this report is a claim, not proof.</p>
+<p>{{ t("report.findings", count=report.result.findings | length) }}</p>
 {% if report.result.findings %}
 <table>
-  <thead><tr><th>Severity</th><th>Rule</th><th>Location</th><th>Summary</th></tr></thead>
+  <thead><tr><th>{{ t("report.severity") }}</th><th>{{ t("report.rule") }}</th><th>{{ t("report.location") }}</th><th>{{ t("report.summary") }}</th></tr></thead>
   <tbody>
   {% for finding in report.result.findings %}
   <tr>
@@ -28,20 +29,20 @@
   </tbody>
 </table>
 {% endif %}
-<h2>Applied exclusions</h2>
+<h2>{{ t("report.exclusions") }}</h2>
 {% if report.result.ignored or report.result.nocheck %}
 <ul>
-  {% for entry in report.result.ignored %}<li><code>{{ entry.rule }}</code> off for {{ entry.paths | join(", ") or "the whole project" }}: {{ entry.reason }}</li>{% endfor %}
-  {% for entry in report.result.nocheck %}<li><code>{{ entry.rule }}</code> suppressed at <code>{{ entry.path }}:{{ entry.line }}</code></li>{% endfor %}
+  {% for entry in report.result.ignored %}<li>{{ t("report.ignored", rule=code(entry.rule), paths=entry.paths | join(", ") or t("report.whole_project"), reason=entry.reason) }}</li>{% endfor %}
+  {% for entry in report.result.nocheck %}<li>{{ t("report.suppressed", rule=code(entry.rule), location=code(entry.path ~ ":" ~ entry.line)) }}</li>{% endfor %}
 </ul>
 {% else %}
-<p>None.</p>
+<p>{{ t("report.none") }}</p>
 {% endif %}
 {% if report.result.incomplete or report.result.unchecked %}
-<h2>Not checked</h2>
+<h2>{{ t("report.unchecked") }}</h2>
 <ul>
-  {% for rule in report.result.incomplete %}<li>Rule <code>{{ rule }}</code> did not run.</li>{% endfor %}
-  {% for path in report.result.unchecked %}<li><code>{{ path }}</code> is over the size limit.</li>{% endfor %}
+  {% for rule in report.result.incomplete %}<li>{{ t("report.rule_skipped", rule=code(rule)) }}</li>{% endfor %}
+  {% for path in report.result.unchecked %}<li>{{ t("report.oversized", path=code(path)) }}</li>{% endfor %}
 </ul>
 {% endif %}
 {% endif %}

@@ -1,5 +1,8 @@
 {% extends "base.html.j2" %}
 {% block main %}
-<p><a href="?lang=en">English</a> <a href="?lang=de">Deutsch</a></p>
-{{ body }}
+<p><a href="?lang=en" hreflang="en" lang="en">English</a> <a href="?lang=de" hreflang="de" lang="de">Deutsch</a></p>
+{% if english_only %}<p>{{ t("legal.english_only") }}</p>{% endif %}
+<div lang="{{ body_language }}" dir="ltr">
+{% include body %}
+</div>
 {% endblock %}

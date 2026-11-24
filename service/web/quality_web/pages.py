@@ -1,5 +1,4 @@
 import base64
-import os
 from urllib.parse import urlsplit
 
 import launcher
@@ -7,14 +6,14 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    g,
     redirect,
     render_template,
-    render_template_string,
     request,
     url_for,
 )
-from markupsafe import Markup
 
+from quality_web import i18n
 from quality_web.spool import SpoolFull
 
 SESSION_COOKIE = "__Host-quality-session"
@@ -24,6 +23,7 @@ LEGAL_LANGUAGES = ("en", "de")
 LEGAL_CONTEXT = ("controller", "limits", "resolvers", "host_log_days")
 
 pages = Blueprint("pages", __name__)
+pages.url_defaults(i18n.keep_language)
 
 
 def quality():
@@ -171,14 +171,16 @@ def report(job_id):
 
 @pages.get("/<any(privacy, terms):page>")
 def legal(page):
-    language = request.args.get("lang", "en")  # nocheck: clean.default-value -- a footer link carries no ?lang= and opens the English text
-    if language not in LEGAL_LANGUAGES:
-        abort(404)
+    interface = g.language
+    language = next(code for code in (request.args.get("lang"), interface, i18n.DEFAULT) if code in LEGAL_LANGUAGES)
     settings = quality()["settings"]
-    path = os.path.join(settings["legal_dir"], language, f"{page}.html")
-    with open(path, encoding="utf-8") as handle:
-        body = render_template_string(handle.read(), **{key: settings[key] for key in LEGAL_CONTEXT})
-    return render_template("legal.html.j2", body=Markup(body))
+    return render_template(
+        "legal.html.j2",
+        body=f"legal/{language}/{page}.html",
+        body_language=language,
+        english_only=language == i18n.DEFAULT and interface != i18n.DEFAULT,
+        **{key: settings[key] for key in LEGAL_CONTEXT},
+    )
 
 
 @pages.get("/notices")

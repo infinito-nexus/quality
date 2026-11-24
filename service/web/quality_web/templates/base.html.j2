@@ -1,22 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ language }}" dir="{{ direction }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>{% block title %}Quality check{% endblock %}</title>
+<title>{% block title %}{{ t("brand") }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 {% block head %}{% endblock %}
 </head>
 <body>
 <header>
-  <a class="brand" href="{{ url_for('pages.index') }}">Quality check</a>
+  <a class="brand" href="{{ url_for('pages.index') }}">{{ t("brand") }}</a>
   <nav>
     {% if user %}
     <a href="{{ url_for('pages.account') }}">{{ user.name }}</a>
-    <a href="{{ url_for('pages.logout') }}">Log out</a>
+    <a href="{{ url_for('pages.logout') }}">{{ t("nav.logout") }}</a>
     {% elif login_available %}
-    <a href="{{ url_for('pages.login') }}">Log in</a>
+    <a href="{{ url_for('pages.login') }}">{{ t("nav.login") }}</a>
     {% endif %}
   </nav>
 </header>
@@ -24,9 +24,17 @@
 {% block main %}{% endblock %}
 </main>
 <footer>
-  <a href="{{ url_for('pages.legal', page='privacy') }}">Privacy</a>
-  <a href="{{ url_for('pages.legal', page='terms') }}">Terms</a>
-  <a href="{{ url_for('pages.notices') }}">Notices</a>
+  <a href="{{ url_for('pages.legal', page='privacy') }}">{{ t("footer.privacy") }}</a>
+  <a href="{{ url_for('pages.legal', page='terms') }}">{{ t("footer.terms") }}</a>
+  <a href="{{ url_for('pages.notices') }}">{{ t("footer.notices") }}</a>
+  {% if languages | length > 1 %}
+  <form method="get" action="{{ request.path if request.method == 'GET' else url_for('pages.index') }}">
+    <select name="lang" aria-label="{{ t('footer.language') }}">
+      {% for code in languages %}<option value="{{ code }}" lang="{{ code }}"{% if code == language %} selected{% endif %}>{{ code }}</option>{% endfor %}
+    </select>
+    <button type="submit">{{ t("footer.language") }}</button>
+  </form>
+  {% endif %}
 </footer>
 </body>
 </html>

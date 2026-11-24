@@ -6,17 +6,17 @@
 {% endif %}
 {% endblock %}
 {% block main %}
-<h1>Static quality scan</h1>
-<p>Submit a public repository, one file or pasted code. The service runs the checks of <code>quality</code> on it and never runs the code itself. Reports stay reachable through their link for a limited time.</p>
+<h1>{{ t("index.title") }}</h1>
+<p>{{ t("index.intro", tool="<code>quality</code>" | safe) }}</p>
 {% if form %}
 <form method="post" action="{{ form.action }}" enctype="multipart/form-data">
   <fieldset>
-    <legend>What to check</legend>
-    <label><input type="radio" name="kind" value="url" checked> Public repository URL</label>
+    <legend>{{ t("index.legend") }}</legend>
+    <label><input type="radio" name="kind" value="url" checked> {{ t("index.url") }}</label>
     <input type="url" name="url" placeholder="https://github.com/owner/repository" pattern="https://.*">
-    <label><input type="radio" name="kind" value="file"> One file, at most {{ form.upload_bytes // 1024 }} KiB</label>
+    <label><input type="radio" name="kind" value="file"> {{ t("index.file", kib=form.upload_bytes // 1024) }}</label>
     <input type="file" name="file">
-    <label><input type="radio" name="kind" value="text"> Pasted code</label>
+    <label><input type="radio" name="kind" value="text"> {{ t("index.text") }}</label>
     <select name="language">
       {% for language in form.languages %}<option value="{{ language }}">{{ language }}</option>{% endfor %}
     </select>
@@ -25,9 +25,9 @@
   {% if form.challenge %}
   <altcha-widget challenge="{{ form.challenge }}" name="altcha"></altcha-widget>
   {% endif %}
-  <button type="submit">Check</button>
+  <button type="submit">{{ t("index.submit") }}</button>
 </form>
 {% else %}
-<p>Scans are available after logging in.</p>
+<p>{{ t("index.login_required") }}</p>
 {% endif %}
 {% endblock %}

@@ -215,7 +215,7 @@ def test_privacy_pages_hold_every_required_section(tmp_path):
         for field, value in CONTROLLER.items():
             assert value.replace("&", "&amp;") in controller_section, (language, field)
         assert "{{" not in page and "{%" not in page
-    assert app.test_client(use_cookies=False).get("/privacy?lang=fr", headers=headers()).status_code == 404
+    assert sections(page_of(app, "/privacy?lang=fr")) == sections(page_of(app, "/privacy"))
 
 
 def test_privacy_pages_name_the_legal_basis_of_each_processing(tmp_path):
