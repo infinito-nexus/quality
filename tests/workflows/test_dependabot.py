@@ -22,17 +22,30 @@ def present(patterns: list, paths: list) -> bool:
     return any(fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(Path(path).name, pattern) for path in paths for pattern in patterns)
 
 
+def updates() -> list:
+    return yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))["updates"]
+
+
+def ecosystem(name: str) -> dict:
+    return next(update for update in updates() if update["package-ecosystem"] == name)
+
+
 def test_every_manifest_kind_gets_automatic_updates():
-    updates = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))["updates"]
-    configured = {update["package-ecosystem"] for update in updates}
+    configured = {update["package-ecosystem"] for update in updates()}
     paths = tracked()
-    assert {ecosystem for ecosystem, patterns in MANIFESTS.items() if present(patterns, paths)} <= configured
-    assert all(update["schedule"]["interval"] for update in updates)
+    assert {name for name, patterns in MANIFESTS.items() if present(patterns, paths)} <= configured
+    assert all(update["schedule"]["interval"] for update in updates())
+
+
+def test_pip_updates_list_each_manifest_directory_exactly_once():
+    manifests = {"/" + path.rpartition("/")[0] for path in tracked() if present(MANIFESTS["pip"], [path])}
+    directories = ecosystem("pip")["directories"]
+    assert len(directories) == len(set(directories))
+    assert set(directories) == manifests
 
 
 def test_docker_compose_updates_skip_the_jinja_templates_it_cannot_parse():
-    updates = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))["updates"]
-    compose = next(update for update in updates if update["package-ecosystem"] == "docker-compose")
+    compose = ecosystem("docker-compose")
     templates = [path for path in tracked() if fnmatch.fnmatch(Path(path).name, "compose*.y*ml*.j2")]
     assert templates
     assert [path for path in templates if not present(compose["exclude-paths"], [path])] == []

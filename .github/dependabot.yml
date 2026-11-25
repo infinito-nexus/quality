@@ -3,7 +3,9 @@ version: 2
 updates:
   - package-ecosystem: "pip"
     directories:
-      - "**/*"
+      - "/"
+      - "/service/web"
+      - "/tests/service"
     schedule:
       interval: "daily"
       time: "00:00"
