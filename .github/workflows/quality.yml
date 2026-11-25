@@ -4,9 +4,10 @@ on:
   workflow_call:
     inputs:
       quality-ref:
-        description: Full commit SHA of infinito-nexus/quality whose flake builds the tool; pass the SHA this workflow is pinned to
-        required: true
+        description: Full commit SHA of infinito-nexus/quality whose flake builds the tool; empty means the commit this workflow is called at
+        required: false
         type: string
+        default: ""
       base-ref:
         description: Ref the differential gate compares against; empty means the pull request base, else the commit before the push
         required: false
@@ -40,11 +41,13 @@ jobs:
         uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9 # v32.0.0
 
       - name: Build quality from its flake
+        id: quality
         env:
-          QUALITY_REF: ${{ inputs.quality-ref }}
+          QUALITY_REF: ${{ inputs.quality-ref || job.workflow_sha }}  # nocheck: coding.workflow-lint -- actionlint 1.7.12 predates job.workflow_sha, which GitHub documents as the commit of the reusable workflow
         run: |
           if [[ ! "$QUALITY_REF" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::inputs.quality-ref must be a full commit SHA" >&2; exit 2; fi
           nix build "github:infinito-nexus/quality/${QUALITY_REF}#default" --out-link "$RUNNER_TEMP/quality"
+          echo "ref=${QUALITY_REF}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve the base and require full history
         id: base
@@ -69,8 +72,8 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/quality-db
-          key: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-${{ steps.day.outputs.day }}
-          restore-keys: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-
+          key: ${{ inputs.db-cache-key }}-${{ steps.quality.outputs.ref }}-${{ steps.day.outputs.day }}
+          restore-keys: ${{ inputs.db-cache-key }}-${{ steps.quality.outputs.ref }}-
 
       - name: Update the vulnerability database, the only step with network
         id: update
@@ -83,7 +86,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/quality-db
-          key: ${{ inputs.db-cache-key }}-${{ inputs.quality-ref }}-${{ steps.day.outputs.day }}
+          key: ${{ inputs.db-cache-key }}-${{ steps.quality.outputs.ref }}-${{ steps.day.outputs.day }}
 
       - name: Gate base..HEAD and scan every commit of the range, without network
         env:

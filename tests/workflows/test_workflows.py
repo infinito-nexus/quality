@@ -5,7 +5,7 @@ import pytest
 import yaml
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-FILES = ["ort.yml", "quality.yml", "release.yml", "tests.yml", "update.yml"]
+FILES = ["ort.yml", "quality.yml", "release.yml", "tests.yml", "tool.yml", "update.yml"]
 ORT_PIN = WORKFLOWS.parent / "ort" / "image"
 ORT_IMAGE = re.compile(r"^ghcr\.io/oss-review-toolkit/ort:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}\n$")
 ORT_COMMANDS = (" analyze ", " evaluate ", " report ")
@@ -18,6 +18,8 @@ USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
 VERSION_COMMENT = re.compile(r"^ # v\d+(?:\.\d+)*$")
 PIP = re.compile(r"\bpip3?\s+install\b|-m\s+pip\b")
 FLAKE_BUILD = 'nix build "github:infinito-nexus/quality/${QUALITY_REF}#default"'
+FLAKE_RUN = 'nix shell "github:infinito-nexus/quality/${QUALITY_REF}#${TOOL}" --command "$TOOL" "${args[@]}"'
+OWN_COMMIT = "${{ job.workflow_sha }}"
 
 
 def load(name: str) -> dict:
@@ -61,7 +63,8 @@ def step_index(job: dict, predicate) -> int:
 def test_quality_is_reusable_with_typed_inputs():
     inputs = triggers(load("quality.yml"))["workflow_call"]["inputs"]
     assert {"quality-ref", "base-ref", "db-cache-key"} <= inputs.keys()
-    assert inputs["quality-ref"]["required"] is True
+    assert inputs["quality-ref"]["required"] is False
+    assert inputs["quality-ref"]["default"] == ""
     assert all(spec.get("type") in {"string", "boolean", "number"} for spec in inputs.values())
 
 
@@ -75,10 +78,32 @@ def test_quality_checks_out_full_history():
 def test_quality_builds_the_tool_from_its_own_flake():
     job = load("quality.yml")["jobs"]["check"]
     install = job["steps"][step_index(job, lambda step: FLAKE_BUILD in step.get("run", ""))]
-    assert install["env"]["QUALITY_REF"] == "${{ inputs.quality-ref }}"
+    assert install["env"]["QUALITY_REF"] == "${{ inputs.quality-ref || job.workflow_sha }}"
     assert "^[0-9a-f]{40}$" in install["run"]
+    assert install["run"].rstrip().endswith('echo "ref=${QUALITY_REF}" >> "$GITHUB_OUTPUT"')
     every_job = [each for name in FILES for each in load(name)["jobs"].values()]
     assert not any(PIP.search(script_of(each)) for each in every_job)
+
+
+def test_quality_keys_the_database_cache_by_the_resolved_ref():
+    caches = [step["with"] for step in load("quality.yml")["jobs"]["check"]["steps"] if step.get("uses", "").startswith("actions/cache/")]
+    keys = [settings[key] for settings in caches for key in ("key", "restore-keys") if key in settings]
+    assert len(keys) == 3
+    assert all("${{ steps.quality.outputs.ref }}" in key and "inputs.quality-ref" not in key for key in keys)
+
+
+def test_tool_runs_the_named_package_of_its_own_flake():
+    workflow = load("tool.yml")
+    inputs = triggers(workflow)["workflow_call"]["inputs"]
+    assert {name: (spec["required"], spec["type"]) for name, spec in inputs.items()} == {"tool": (True, "string"), "args": (True, "string")}
+    assert all("permissions" not in job for job in workflow["jobs"].values())
+    job = workflow["jobs"]["run"]
+    run = job["steps"][step_index(job, lambda step: FLAKE_RUN in step.get("run", ""))]
+    assert run["env"] == {"QUALITY_REF": OWN_COMMIT, "TOOL": "${{ inputs.tool }}", "ARGS": "${{ inputs.args }}"}
+    assert '[[ ! "$QUALITY_REF" =~ ^[0-9a-f]{40}$ ]]' in run["run"]
+    assert '[[ ! "$TOOL" =~ ^[a-z][a-z0-9-]*$ ]]' in run["run"]
+    assert run["run"].rstrip().endswith(FLAKE_RUN)
+    assert "${{" not in run["run"]
 
 
 def test_quality_fetches_the_database_before_an_offline_scan():
@@ -123,7 +148,7 @@ def test_quality_jobs_add_no_permissions():
 
 @pytest.mark.parametrize(
     ("name", "holders"),
-    [("ort.yml", set()), ("quality.yml", set()), ("release.yml", {"publish"}), ("tests.yml", set()), ("update.yml", set())],
+    [("ort.yml", set()), ("quality.yml", set()), ("release.yml", {"publish"}), ("tests.yml", set()), ("tool.yml", set()), ("update.yml", set())],
     ids=FILES,
 )
 def test_id_token_only_in_the_publish_job(name: str, holders: set):

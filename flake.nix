@@ -153,7 +153,7 @@
         meta.mainProgram = "quality";
       };
     in {
-      packages = {
+      packages = toolPackages // {
         default = quality;
         image = pkgs.dockerTools.buildLayeredImage {
           name = "quality";

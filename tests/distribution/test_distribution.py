@@ -125,7 +125,18 @@ def test_every_package_evaluates_for_both_platforms():
     paths = json.loads(result.stdout)
     assert sorted(paths) == sorted(SYSTEMS)
     for system in SYSTEMS:
-        assert sorted(paths[system]) == sorted(PACKAGES), system
+        assert sorted(paths[system]) == sorted([*PACKAGES, *tools()]), system
+
+
+@needs_nix
+@pytest.mark.parametrize("system", SYSTEMS)
+def test_every_bundled_tool_is_a_package_of_its_own(system):
+    pins = nix_json(ROOT, f"packages.{system}.default.passthru.pins")
+    expression = "packages: builtins.mapAttrs (_: package: (package.bin or package).outPath) packages"
+    result = nix("eval", "--json", f"{flake_ref(ROOT)}#packages.{system}", "--apply", expression)
+    assert result.returncode == 0, result.stderr
+    paths = json.loads(result.stdout)
+    assert {name: pins[name]["path"] for name in tools()} == {name: f"{paths[name]}/bin/{name}" for name in tools()}
 
 
 @needs_nix

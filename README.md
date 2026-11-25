@@ -36,6 +36,21 @@ quality-check:
 
 `--staged` needs no database. `--base` and `--all` add the deep tier, which reads the bundle of `quality db update`: mount it with `- <db>:/db:ro` and pass `--db /db`. `quality db update --licenses <repo>`, repeatable, also stores the registry licences of the exact pins at each named repository's HEAD and in its staging index for `legal.dependency-license`; a pin without an SPDX licence there stays `unchecked`, and an update without `--licenses` keeps the stored licences. Run the service from a main checkout, because a linked worktree's `.git` file points outside `/src`.
 
+## CI
+
+Another repository calls the reusable workflows by the commit of a release tag. Each workflow builds its tools from the flake at the commit it is called at (`job.workflow_sha`), so that `uses:` line is the only pin, and Dependabot's `github-actions` ecosystem moves it to the next release. `quality.yml` gates the range a pull request or push adds and scans every commit of it for secrets; `tool.yml` runs one tool of the flake, under its package name, over the whole tree:
+
+```yaml
+jobs:
+  quality:
+    uses: infinito-nexus/quality/.github/workflows/quality.yml@<commit> # <release-tag>
+  ruff:
+    uses: infinito-nexus/quality/.github/workflows/tool.yml@<commit> # <release-tag>
+    with:
+      tool: ruff
+      args: check src tests
+```
+
 ## Layer contracts
 
 A repository that holds `.quality/architecture.yml` gets the rules `architecture.layer` and `architecture.cycle` ([requirement 005](docs/requirements/005-architecture-score.md), decision 3); each new hit lowers the architecture score by 25. Python runs through `lint-imports` of import-linter, JavaScript through `depcruise` of dependency-cruiser, both bundled like every other tool. Each section is optional, every key inside it is required, and a malformed file stops the check with an error naming the key. `source` is the directory holding the code, `.` for the root, and for JavaScript also the scope of the cycle check; `layers` lists the highest layer first, and no layer may import one above it:

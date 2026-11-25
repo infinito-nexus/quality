@@ -1,0 +1,44 @@
+name: tool
+
+on:
+  workflow_call:
+    inputs:
+      tool:
+        description: Package of the quality flake to run, such as ruff or shellcheck; its version is the one quality bundles at the commit this workflow is called at
+        required: true
+        type: string
+      args:
+        description: Arguments for the tool, split on whitespace
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9 # v32.0.0
+
+      - name: Run the tool from the quality flake
+        env:
+          QUALITY_REF: ${{ job.workflow_sha }}  # nocheck: coding.workflow-lint -- actionlint 1.7.12 predates job.workflow_sha, which GitHub documents as the commit of the reusable workflow
+          TOOL: ${{ inputs.tool }}
+          ARGS: ${{ inputs.args }}
+        run: |
+          if [[ ! "$QUALITY_REF" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::job.workflow_sha is no full commit SHA" >&2; exit 2; fi
+          if [[ ! "$TOOL" =~ ^[a-z][a-z0-9-]*$ ]]; then echo "::error::inputs.tool must name a package of the quality flake" >&2; exit 2; fi
+          read -ra args <<< "$ARGS"
+          nix shell "github:infinito-nexus/quality/${QUALITY_REF}#${TOOL}" --command "$TOOL" "${args[@]}"
