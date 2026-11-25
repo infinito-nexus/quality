@@ -217,7 +217,7 @@ flowchart TD
 - [x] `test_single_pin_source`: no tool version appears outside `flake.lock` and the flake input URLs it locks, and the inputs of one tool name one version (decision 28).
 - [x] `nix build .#default` yields `result/bin/quality`, and `env -i result/bin/quality doctor` lists every tool with its version.
 - [x] `nix build .#image` yields an OCI image, and its `quality doctor` output is identical to the host binary's.
-- [ ] The image is published for `linux/amd64` and `linux/arm64`, and its digest appears in the release notes.
+- [x] The image is published for `linux/amd64` and `linux/arm64`, and its digest appears in the release notes (v0.1.0, 2026-11-25: index `sha256:240a905c48275e9df8c5484354cf5a7f960c9847342a1acb554ea678b7ddd35f` lists both platforms, and the GitHub release names it).
 - [x] `docker run --rm --network none --read-only --tmpfs /tmp --user 65534 -v "$PWD:/src:ro" -v "$DB:/db:ro" <image> check --all --db /db` gives the same findings as `quality check --all --db "$DB"` on the host, both naming the same database digest.
 - [x] `test_vuln_offline`: a fixture lockfile with a known CVE is reported from the shared test bundle through trivy and through osv-scanner, each tool alone; `test_vuln_offline_image` reports it the same way from the image under `--network none`.
 - [x] `test_db_missing_exits_2`: the deep tier without a bundle exits 2 naming `quality db update`, and `--staged` needs no bundle.
