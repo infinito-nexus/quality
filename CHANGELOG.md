@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1] - 2026-11-25
+
+Changed:
+
+- Hosted scan: the scan image builds on *nixos/nix* 2.36.0
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [0.1.0] - 2026-11-25
 
 Added:
