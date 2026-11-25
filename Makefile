@@ -32,11 +32,11 @@ test-bench:
 
 $(SERVICE_VENV)/bin/pytest: service/web/requirements.txt tests/service/requirements.txt
 	python3 -m venv $(SERVICE_VENV)
-	$(SERVICE_VENV)/bin/pip install --quiet -r service/web/requirements.txt -r tests/service/requirements.txt
+	env -u PYTHONPATH $(SERVICE_VENV)/bin/pip install --quiet -r service/web/requirements.txt -r tests/service/requirements.txt
 	touch $@
 
 test-service: $(SERVICE_VENV)/bin/pytest
-	PATH="$(abspath $(SERVICE_VENV))/bin:$$PATH" PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/service
+	env -u PYTHONPATH PATH="$(abspath $(SERVICE_VENV))/bin:$$PATH" PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/service
 
 flake:
 	nix --extra-experimental-features "nix-command flakes" build path:.#default path:.#image --out-link $(FLAKE_RESULT)
