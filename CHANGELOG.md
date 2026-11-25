@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0] - 2026-11-25
+
+Added:
+
+- CI: reusable *tool.yml* runs one bundled tool from the quality flake
+- Distribution: every bundled tool is a package of the flake
+
+Changed:
+
+- CI: *quality-ref* is optional; the gate builds the commit it is called at
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [0.1.1] - 2026-11-25
 
 Changed:
