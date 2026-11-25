@@ -1,4 +1,4 @@
-FROM nixos/nix:2.35.2 AS closure
+FROM nixos/nix:2.36.0 AS closure
 ARG PACKAGE
 ARG INFINITO_CACHE_PACKAGE_URL
 WORKDIR /build
