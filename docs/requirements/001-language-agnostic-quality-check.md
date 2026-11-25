@@ -229,7 +229,7 @@ flowchart TD
 - [x] Neither the flake nor the image contains `medusa`.
 - [x] `README.md` holds the compose service and make target snippet for dev stacks.
 - [x] A reusable workflow with `workflow_call` fetches full history, fetches the vulnerability database in its own step, runs `--base` and scans every commit of the range for secrets.
-- [ ] `kvb-quality` publishes through PyPI Trusted Publishing and `git tag -v <release>` verifies.
+- [x] `kvb-quality` publishes through PyPI Trusted Publishing and `git tag -v <release>` verifies (v0.1.1, 2026-11-25, release run 45673780861: the verify job's `git tag -v` prints a good signature by `618DEE7B7F0293D09FF5B8C944D8F11FD62F878E`, and PyPI's provenance of both 0.1.1 files names the publisher GitHub `infinito-nexus/quality`, `release.yml`, environment `pypi`).
 
 ### Rollout
 
