@@ -13,7 +13,7 @@ services:
         INFINITO_CACHE_PACKAGE_URL: ${INFINITO_CACHE_PACKAGE_URL:-}
 
   state:
-    image: docker:29.0.1-cli
+    image: docker:29.10.0-cli
     entrypoint: ["sh", "-c"]
     command:
       - >-
