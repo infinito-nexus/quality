@@ -1,3 +1,5 @@
+import pytest
+
 from quality.ruledata import load
 from tests.integration.support import (
     ROOT,
@@ -182,3 +184,45 @@ def test_html_under_templates_stays_html(target):
     target.commit()
     assert "jinja" not in coverage(target.path)["kinds"]
     assert findings_of_rule(target.check("--all", "--json"), "clean.default-value") == []
+
+
+EM_DASH_RULE = "clean.em-dash"
+EM = chr(0x2014)
+EN = chr(0x2013)
+
+
+@pytest.mark.parametrize(
+    ("path", "text"),
+    [
+        ("tool.py", f"MESSAGE = 'a {EM} b'\n"),
+        ("notes.md", f"# Notes\n\nA {EM} b.\n"),
+        ("config.yml", f"name: a {EM} b\n"),
+    ],
+)
+def test_an_added_em_dash_is_one_hit(target, path, text):
+    target.write(path, text)
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1, result.stderr
+    assert [found for found, _ in findings_of_rule(result, EM_DASH_RULE)] == [path]
+
+
+def test_en_dash_hyphen_and_po_files_pass(target):
+    target.write("notes.md", f"# Notes\n\nA {EN} b - c.\n")
+    target.write("locale/de.po", f'msgid "a"\nmsgstr "a {EM} b"\n')
+    target.stage()
+    assert findings_of_rule(target.check("--staged", "--json"), EM_DASH_RULE) == []
+
+
+def test_an_em_dash_at_the_base_is_debt_not_a_hit(target):
+    target.write("notes.md", f"# Notes\n\nA {EM} b.\n")
+    target.start_feature("base")
+    target.write("notes.md", f"# Notes\n\nA {EM} b.\n\nC, d.\n")
+    target.advance("base")
+    assert findings_of_rule(target.judge("base", "--json"), EM_DASH_RULE) == []
+
+
+def test_a_nocheck_waives_an_em_dash(target):
+    target.write("tool.py", f"QUOTE = 'a {EM} b'  # nocheck: {EM_DASH_RULE} -- quotes upstream\n")
+    target.stage()
+    assert findings_of_rule(target.check("--staged", "--json"), EM_DASH_RULE) == []

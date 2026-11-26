@@ -58,6 +58,8 @@ documents:
     rule:
       matches: comment
       regex: '@pragma'
+      not:
+        regex: '@pragma-allowed'
   - id: clean.comment/narration
     severity: warning
     message: comment is neither a tool directive, a parameter doc nor an exception

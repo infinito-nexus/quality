@@ -192,7 +192,7 @@ def test_coverage_names_gaps(target, tmp_path):
     target.commit()
     document = coverage(target.path)
     assert document["gaps"] == ["unclassified *.xyz", "unclassified LICENSE"]
-    assert document["kinds"]["markdown"]["rules"] == ["coding.conflict-marker"]
+    assert document["kinds"]["markdown"]["rules"] == ["clean.em-dash", "coding.conflict-marker"]
     without_rg = rules_without_tool(tmp_path / "rules", "rg")
     assert coverage(target.path, "--rules", str(without_rg))["gaps"] == [
         "markdown",
@@ -212,6 +212,7 @@ def test_coverage_lists_only_rules_that_run(target):
     target.commit()
     kinds = coverage(target.path)["kinds"]
     assert kinds["shell"]["rules"] == [
+        "clean.em-dash",
         "clean.file-lines",
         "coding.conflict-marker",
         "legal.external-request",
@@ -220,6 +221,7 @@ def test_coverage_lists_only_rules_that_run(target):
     ]
     assert kinds["jinja"]["rules"] == [
         "clean.default-value",
+        "clean.em-dash",
         "clean.tool-pragma",
         "coding.conflict-marker",
         "legal.external-request",

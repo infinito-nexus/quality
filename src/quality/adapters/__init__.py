@@ -324,7 +324,7 @@ class Collector:
         if tool not in REGISTRY:
             raise QualityError(f"tool {tool} is allow-listed without an adapter")
         binary = self.runtime.resolve(tool)
-        settings = self.runtime.settings(self.data.tool(tool))
+        settings = self.tool_settings(tool, snapshot)
         hits = []
         commands = REGISTRY[tool].commands(bound, settings, self.config_file(tool, settings))
         for command in commands:
@@ -334,6 +334,12 @@ class Collector:
             for files in chunks:
                 hits += self.run_chunk(tool, binary, replace(command, files=files), snapshot)
         return one_per_line(hits) if settings.get("reports_lines") else hits
+
+    def tool_settings(self, tool: str, snapshot) -> dict:
+        settings = self.runtime.settings(self.data.tool(tool))
+        if hasattr(REGISTRY[tool], "declared"):
+            return REGISTRY[tool].declared(settings, snapshot)
+        return settings
 
     def config_file(self, tool: str, settings: dict) -> Path:
         """

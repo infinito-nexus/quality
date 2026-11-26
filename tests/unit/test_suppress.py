@@ -1,6 +1,42 @@
+import re
+
 import pytest
 
-from quality.suppress import line_comment, nocheck_rule, python_comments, rule_matches
+from quality import QualityError
+from quality.suppress import (
+    NOTHING,
+    declaration,
+    line_comment,
+    nocheck_rule,
+    python_comments,
+    rule_matches,
+    with_declaration,
+)
+
+
+def test_no_declaration_is_empty():
+    assert declaration(None, {"python"}) == {"directives": [], "pragmas_allowed": []}
+
+
+def test_a_declaration_joins_the_catalogue_groups():
+    catalogue = {"directives": [{"tool": "mypy", "spellings": ["type:"]}]}
+    found = declaration(b"directives:\n  - spellings: ['nocheck:']\npragmas_allowed: ['noqa: E']\n", {"python"})
+    merged = with_declaration(catalogue, found)
+    assert [group["spellings"] for group in merged["directives"]] == [["type:"], ["nocheck:"]]
+    assert merged["pragmas_allowed"] == ["noqa: E"]
+
+
+def test_without_allowed_pragmas_nothing_matches():
+    assert re.search(NOTHING, "# noqa") is None
+
+
+@pytest.mark.parametrize(
+    "content",
+    [b"- x\n", b"pragmas_allowed: []\n", b"directives: x\n", b"directives:\n  - [x]\n", b": :\n  - ["],
+)
+def test_a_malformed_declaration_is_refused(content):
+    with pytest.raises(QualityError, match=r"^\.quality/comments\.yml: "):
+        declaration(content, None)
 
 
 @pytest.mark.parametrize(

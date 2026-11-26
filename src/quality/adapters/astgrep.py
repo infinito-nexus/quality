@@ -17,7 +17,12 @@ from quality.ruledata import (
     read_yaml,
     require,
 )
-from quality.suppress import language_patterns
+from quality.suppress import (
+    DECLARATION_FILE,
+    declaration,
+    language_patterns,
+    with_declaration,
+)
 
 CONFIG_NAME = "sgconfig.yml"
 SHARED_FILE = "shared.yml"
@@ -70,6 +75,24 @@ def commands(bound: list, settings: dict, empty_file: Path) -> list:
         argv = ["scan", "--config", CONFIG_NAME, "--rule", str(target), *FLAGS, *thread_args(settings, "--threads"), "--"]
         found.append(Command(argv, all_files(items), items))
     return found
+
+
+def declared(settings: dict, snapshot) -> dict:
+    """
+    Args:
+        settings: The tool's entry in tools.yml with comments.yml.
+        snapshot: Snapshot under check.
+
+    Returns:
+        The settings with the snapshot's .quality/comments.yml merged into
+        comments.yml, unchanged when the snapshot has none.
+    """
+    if DECLARATION_FILE not in snapshot.files:
+        return settings
+    shared = read_yaml(Path(require(settings, RULE_DIR, "tools.yml ast-grep")) / SHARED_FILE)
+    languages = set(require(shared, "languages", SHARED_FILE))
+    found = declaration(snapshot.data(DECLARATION_FILE), languages)
+    return {**settings, COMMENTS: with_declaration(require(settings, COMMENTS, "tools.yml ast-grep"), found)}
 
 
 def prefix(rule_id: str) -> str:

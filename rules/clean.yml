@@ -80,6 +80,7 @@
     jinja: &pragma-text
       tool: rg
       comment_only: true
+      declared_pragmas: true
       pattern: '@pragma'
     dockerfile: *pragma-text
     python: {tool: ast-grep, language: python}
@@ -103,6 +104,33 @@
     css: {tool: ast-grep, language: css}
     nix: {tool: ast-grep, language: nix}
     hcl: {tool: ast-grep, language: hcl}
+- id: clean.em-dash
+  severity: medium
+  summary: Em dash added; use a colon, a semicolon or a comma
+  enforcer:
+    code: &em-dash
+      tool: rg
+      pattern: '\x{2014}'
+    yaml: *em-dash
+    json: *em-dash
+    markdown: *em-dash
+    html: *em-dash
+    css: *em-dash
+    xml: *em-dash
+    sql: *em-dash
+    toml: *em-dash
+    ini: *em-dash
+    conf: *em-dash
+    env: *em-dash
+    make: *em-dash
+    dockerfile: *em-dash
+    nginx: *em-dash
+    systemd: *em-dash
+    tex: *em-dash
+    nix: *em-dash
+    hcl: *em-dash
+    jinja: *em-dash
+    workflow: *em-dash
 - id: clean.comment
   severity: low
   summary: Comment is neither a tool directive, a parameter doc nor an Exception

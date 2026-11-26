@@ -7,6 +7,7 @@ from quality.adapters.base import Command, known_path, thread_args
 from quality.gate import code_hit
 from quality.ruledata import require
 from quality.shellview import code_view
+from quality.suppress import DECLARATION_FILE, PRAGMAS_ALLOWED, declaration
 
 
 def commands(bound: list, settings: dict, _empty_file) -> list:
@@ -104,9 +105,21 @@ def inside_comment(pattern: str, snapshot, path: str, row: int) -> bool:
     return comment is not None and re.search(pattern, comment) is not None
 
 
+def allowed_pragmas(settings: dict, snapshot) -> list:
+    if not settings.get("declared_pragmas") or DECLARATION_FILE not in snapshot.files:
+        return []
+    return declaration(snapshot.data(DECLARATION_FILE), None)[PRAGMAS_ALLOWED]
+
+
+def excused(allowed: list, snapshot, path: str, row: int) -> bool:
+    comment = snapshot.comment(path, row)
+    return comment is not None and any(re.search(pattern, comment) for pattern in allowed)
+
+
 def parse(stdout: bytes, command: Command, snapshot) -> list:
     binding = command.bound[0].binding
     pattern = binding.settings["pattern"]
+    allowed = allowed_pragmas(binding.settings, snapshot)
     hits = []
     for line in stdout.splitlines():
         event = json.loads(line)
@@ -115,6 +128,8 @@ def parse(stdout: bytes, command: Command, snapshot) -> list:
         path = known_path(reported_path(event["data"]), snapshot)
         comment_only = binding.settings.get("comment_only")
         for row in match_rows(event["data"]):
-            if not comment_only or inside_comment(pattern, snapshot, path, row):
+            if comment_only and not inside_comment(pattern, snapshot, path, row):
+                continue
+            if not excused(allowed, snapshot, path, row):
                 hits.append(code_hit(binding.rule, path, row, "", snapshot))
     return hits

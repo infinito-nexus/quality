@@ -2,6 +2,9 @@ import io
 import re
 import tokenize
 from dataclasses import dataclass
+from typing import NoReturn
+
+import yaml
 
 from quality import QualityError
 
@@ -9,6 +12,104 @@ NOCHECK = re.compile(r"nocheck:\s*(?P<rule>[A-Za-z0-9_.\-]+)\s+--\s+\S")
 QUOTES = "\"'`"
 BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
 COMMENTS_FILE = "comments.yml"
+DECLARATION_FILE = ".quality/comments.yml"
+DIRECTIVES = "directives"
+PRAGMAS_ALLOWED = "pragmas_allowed"
+GROUP_KEYS = frozenset({"tool", "spellings", "languages", "marker", "tight", "position"})
+NOTHING = "[^\\s\\S]"
+
+
+def refuse(key: str, problem: str) -> NoReturn:
+    raise QualityError(f"{DECLARATION_FILE}: {key} {problem}")
+
+
+def compiled(pattern: object, key: str) -> str:
+    if not isinstance(pattern, str):
+        refuse(key, "must hold regex strings")
+    try:
+        re.compile(pattern)
+    except re.error as error:
+        refuse(key, f"holds a regex that does not compile: {error}")
+    return pattern
+
+
+def regex_list(value: object, key: str) -> list:
+    if not isinstance(value, list) or not value:
+        refuse(key, "must be a non-empty list of regexes")
+    return [compiled(pattern, key) for pattern in value]
+
+
+def declared_group(group: object, position: int, languages: set | None) -> dict:
+    key = f"{DIRECTIVES}[{position}]"
+    if not isinstance(group, dict):
+        refuse(key, "must be a mapping")
+    unknown = sorted(set(group) - GROUP_KEYS)
+    if unknown:
+        refuse(key, f"has unknown keys {unknown}")
+    named = group.get("languages", [])
+    if not isinstance(named, list) or (languages is not None and not set(named) <= languages):
+        refuse(f"{key} languages", f"must be a list of {sorted(languages or [])}")
+    return {**group, "spellings": regex_list(group.get("spellings"), f"{key} spellings")}
+
+
+def top_level(data: bytes) -> dict:
+    try:
+        raw = yaml.safe_load(data)
+    except yaml.YAMLError:
+        refuse("content", "is not valid YAML")
+    if not isinstance(raw, dict):
+        refuse("top level", "must be a mapping")
+    unknown = sorted(set(raw) - {DIRECTIVES, PRAGMAS_ALLOWED})
+    if unknown:
+        refuse("top level", f"has unknown keys {unknown}")
+    return raw
+
+
+def declaration(data: bytes | None, languages: set | None) -> dict:
+    """
+    Args:
+        data: Content of the repository's .quality/comments.yml, or None
+            when it has none.
+        languages: ast-grep languages a directive group may name, or None
+            for a caller that reads only the allowed pragmas.
+
+    Returns:
+        The declared directive groups and allowed pragma regexes under
+        `directives` and `pragmas_allowed`, both empty without a file.
+
+    Raises:
+        QualityError: The file is not YAML, has an unknown key, a group
+            without spellings or with an unknown language, or a regex that
+            does not compile.
+    """
+    if data is None:
+        return {DIRECTIVES: [], PRAGMAS_ALLOWED: []}
+    raw = top_level(data)
+    groups = raw.get(DIRECTIVES, [])
+    if not isinstance(groups, list):
+        refuse(DIRECTIVES, "must be a list of groups")
+    allowed = regex_list(raw[PRAGMAS_ALLOWED], PRAGMAS_ALLOWED) if PRAGMAS_ALLOWED in raw else []
+    return {
+        DIRECTIVES: [declared_group(group, position, languages) for position, group in enumerate(groups)],
+        PRAGMAS_ALLOWED: allowed,
+    }
+
+
+def with_declaration(comments: dict, declared: dict) -> dict:
+    """
+    Args:
+        comments: Content of the catalogue's comments.yml.
+        declared: A repository's declaration, as `declaration` returns it.
+
+    Returns:
+        comments.yml with the declared directive groups after the
+        catalogue's and the declared allowed pragmas.
+    """
+    return {
+        **comments,
+        DIRECTIVES: [*spellings(comments, DIRECTIVES), *declared[DIRECTIVES]],
+        PRAGMAS_ALLOWED: declared[PRAGMAS_ALLOWED],
+    }
 
 
 def spellings(raw: dict, key: str):
@@ -77,6 +178,10 @@ def directive_form(marker: str, group: dict) -> str:
     return f"{own}{gap}(?:{'|'.join(group['spellings'])})\\s*(?:\\*/|-->)?\\s*"
 
 
+def allowed_pattern(raw: dict) -> str:
+    return "|".join(raw.get(PRAGMAS_ALLOWED, [])) or NOTHING
+
+
 def language_patterns(raw: dict, names: list, language: str) -> dict:
     """
     Args:
@@ -89,9 +194,10 @@ def language_patterns(raw: dict, names: list, language: str) -> dict:
         naming a catalogue rule among them; `@positional`, the directives a
         tool reads only at a place in the file, as pattern and position;
         `@starter`, the first line of an exception or parameter doc;
-        `@prose-starter`, the starters whose next lines may be prose; and
+        `@prose-starter`, the starters whose next lines may be prose;
         `@entry`, an indented line, the only kind a section line such as
-        `Returns:` carries.
+        `Returns:` carries; and `@pragma-allowed`, the pragmas a repository
+        declared allowed, matching nothing without a declaration.
     """
     marker = spellings(raw, "marker")
     sections = "|".join(spellings(raw, "sections"))
@@ -121,6 +227,7 @@ def language_patterns(raw: dict, names: list, language: str) -> dict:
         "@starter": f"^(?:{'|'.join([section, *prose])})$",
         "@prose-starter": f"^(?:{'|'.join(prose)})$",
         "@entry": f"^{marker}(?:(?:\\t|[ \\t]{{2,}})\\S[\\s\\S]*|[ \\t]*)$",
+        "@pragma-allowed": allowed_pattern(raw),
     }
 
 

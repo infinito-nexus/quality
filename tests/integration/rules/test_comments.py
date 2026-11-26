@@ -343,3 +343,69 @@ def test_nocheck_in_css_and_html(target):
     result = target.check("--all", "--json")
     assert findings_of_rule(result, "coding.structural") == [("a.css", 2), ("a.html", 2)]
     assert sorted((item["path"], item["line"]) for item in report(result)["nocheck"]) == [("a.css", 1), ("a.html", 1)]
+
+
+DECLARATION = ".quality/comments.yml"
+CORE_SPELLING = "directives:\n  - tool: core waivers\n    spellings: ['nocheck:\\s*[a-z0-9-]+(?:,\\s*[a-z0-9-]+)*']\n"
+RUFF_CODES = "pragmas_allowed: ['noqa:\\s*[A-Z]+\\d+(?:,\\s*[A-Z]+\\d+)*', 'shellcheck disable=SC\\d+']\n"
+CORE_MARKER = "# nocheck: self-path-reference\nx = 1\n"
+
+
+def staged_rule(target, rule: str) -> list:
+    target.stage()
+    return findings_of_rule(target.check("--staged", "--json"), rule)
+
+
+def test_a_declared_directive_is_no_narration(target):
+    target.write("a.py", CORE_MARKER)
+    assert staged_rule(target, "clean.comment") == [("a.py", 1)]
+    target.write(DECLARATION, CORE_SPELLING)
+    assert staged_rule(target, "clean.comment") == []
+
+
+def test_declared_pragmas_pass_and_bare_ones_stay_hits(target):
+    target.write(DECLARATION, RUFF_CODES)
+    target.write("a.py", "x = 1  # noqa: E501\ny = 2  # noqa\n")
+    target.write("deploy.sh.j2", "#!/bin/bash\n# shellcheck disable=SC2086\n# shellcheck disable=all\necho {{ a }}\n")
+    assert staged_rule(target, "clean.tool-pragma") == [("a.py", 2), ("deploy.sh.j2", 3)]
+
+
+def test_a_declared_directive_waives_nothing(target):
+    target.write(DECLARATION, CORE_SPELLING)
+    target.write("a.py", "import os  # nocheck: unused-import\n")
+    assert staged_rule(target, "coding.unused-import") == [("a.py", 1)]
+
+
+def test_a_language_limited_group_stays_in_its_language(target):
+    target.write(DECLARATION, CORE_SPELLING + "    languages: [python]\n")
+    target.write("a.py", CORE_MARKER)
+    target.write("a.sh", "#!/bin/bash\n" + CORE_MARKER.replace("x = 1", "echo x"))
+    assert staged_rule(target, "clean.comment") == [("a.sh", 2)]
+
+
+@pytest.mark.parametrize(
+    ("content", "key"),
+    [
+        ("directive: []\n", "top level"),
+        ("directives:\n  - tool: x\n", "directives[0] spellings"),
+        ("directives:\n  - spellings: ['(']\n", "directives[0] spellings"),
+        ("pragmas_allowed: ['[']\n", "pragmas_allowed"),
+        ("directives:\n  - spellings: [x]\n    languages: [cobol]\n", "directives[0] languages"),
+    ],
+)
+def test_a_malformed_declaration_exits_2(target, content, key):
+    target.write(DECLARATION, content)
+    target.write("a.py", "x = 1\n")
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 2
+    assert f"{DECLARATION}: {key}" in result.stderr
+
+
+def test_a_declaration_added_in_the_change_applies_to_it(target):
+    target.write("b.py", "y = 2\n")
+    target.start_feature("base")
+    target.write(DECLARATION, CORE_SPELLING)
+    target.write("a.py", CORE_MARKER)
+    target.advance("base")
+    assert findings_of_rule(target.judge("base", "--json"), "clean.comment") == []
