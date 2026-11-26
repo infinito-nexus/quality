@@ -44,8 +44,9 @@ FIELD = "\x00"
 RECORD = "\x1e"
 LOG_FORMAT = "%H%x00%P%x00%ct%x00%B%x1e"
 REFS = ("refs/heads/", "refs/remotes/origin/")
-LINE = re.compile(r"([^\x00-\x7f]\S*) ([A-Z][A-Za-z]*): (.+)")
-AMOUNT = re.compile(r"~?(\d+(?:\.\d+)?)(?: ?%)?")
+MARK = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+LINE = re.compile(rf"(?![{MARK}]+ )([^\x00-\x7f]\S*) ([A-Z][A-Za-z]*): (.+)")
+AMOUNT = re.compile(rf"~?(\d+(?:\.\d+)?)(?: ?%)?(?: [{MARK}]+)?")
 PARAGRAPH = re.compile(r"\n[ \t]*\n")
 MERGES = (
     re.compile(r"Merge pull request #\d+ from [^/\s]+/(\S+)"),

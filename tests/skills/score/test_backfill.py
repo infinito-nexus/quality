@@ -19,14 +19,31 @@ from tests.skills.score.support import (
     NEW_BLOCK,
     OLD_BLOCK,
     STATE,
+    TRAILER,
     Fixture,
     agent_tree,
     backfill,
     environment,
+    module,
     run,
 )
 
 UNKNOWN = ["backfill: unknown label Coverage, skipped", "backfill: unknown label Heat, skipped"]
+METRICS_BLOCK = (
+    "Metrics:\n🎯 Fix: 92 % ¹\n💥 Break: 2 %\n💸 Tokens: 100 %\n⏱️ Velocity: –\n🛡️ Security: 100 %\n"
+    "⚖️ Legal: ~100 %\n🏛️ Architecture: 90 % ²\n🏆 Score: 81\n---\n¹ Fix: 10 % in an older run\n"
+    "² 1 new hit: clean.complexity\n\n🚦 Gate: ⚠️ ask: architecture 90 % < 100"
+)
+
+
+class TestMetricsBlock(unittest.TestCase):
+    def test_a_metrics_block_parses_and_its_note_lines_never_count(self):
+        script = module(BACKFILL, "kvb_quality_backfill_metrics_block")
+        named, extras = script.aliases(json.loads(LABELS.read_text(encoding="utf-8")))
+        unknown = set()
+        values, _ = script.parse(f"feat: x\n\n{METRICS_BLOCK}\n\n{TRAILER}\n", named, extras, unknown)
+        self.assertEqual(values, {"fix": 92, "break": 2, "tokens": 100, "velocity": None, "security": 100, "score": 81})
+        self.assertEqual(unknown, set())
 
 
 class BackfillCase(unittest.TestCase):

@@ -19,7 +19,10 @@ from tests.skills.score.support import (
 
 FORMER = re.compile(r"💸 Cost|⏱️ Time|(?i:💸 cost|⏱️ time|\bcost (?:and|or) time\b|\bcost, time\b)")
 OLD = re.compile(r"cost|time", re.IGNORECASE)
-BASE = {"fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0"}
+BASE = {
+    "fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0",
+    "legal": "100", "legal-blockers": "0", "architecture": "100",
+}
 VARIANTS = (
     {},
     {"efficiency": "120", "speed": "130"},
@@ -27,7 +30,7 @@ VARIANTS = (
     {"fix": "80", "break": "10", "efficiency": "150"},
     {"critical": "1"},
 )
-LAYOUTS = ((), ("--table",), ("--message-block",))
+LAYOUTS = ((), ("--message-block",))
 
 
 class LabelCase(TempCase):
@@ -50,13 +53,12 @@ class LabelCase(TempCase):
 
 
 class TestScoreLabels(LabelCase):
-    def test_line_table_and_block_print_tokens_and_velocity_never_cost_or_time(self):
-        expected = {(): ("💸 tokens", "⏱️ velocity"), ("--table",): ("| 💸 Tokens |", "| ⏱️ Velocity |"), ("--message-block",): ("💸 Tokens: ", "⏱️ Velocity: ")}
+    def test_every_layout_prints_tokens_and_velocity_never_cost_or_time(self):
         for values in VARIANTS:
             for layout in LAYOUTS:
                 with self.subTest(values=values, layout=layout):
                     out = self.score(SCORE, *flags({**BASE, **values}), *layout).stdout
-                    for label in expected[layout]:
+                    for label in ("💸 Tokens: ", "⏱️ Velocity: "):
                         self.assertIn(label, out)
                     self.assertIsNone(OLD.search(out), out)
 
@@ -77,14 +79,13 @@ class TestScoreLabels(LabelCase):
         labels = json.loads(LABELS.read_text(encoding="utf-8"))
         labels["metrics"]["tokens"]["label"] = "Pennies"
         labels["metrics"]["velocity"].update(emoji="🐢", label="Pace")
+        labels["extras"]["legal"]["label"] = "Licence"
         script = self.copy_skill(json.dumps(labels, ensure_ascii=False))
-        line = self.score(script, *flags(BASE)).stdout.splitlines()
-        self.assertEqual(line[0], "🎯 fix 95 % · 💥 break 2 % · 💸 pennies 97 % · 🐢 pace – · 🛡️ security 100 % · 🏆 score 96")
-        self.assertEqual(line[1], "✅ gate: 90/5, pennies and pace <= 100, security 100 %")
-        table = self.score(script, *flags(BASE), "--table", "--value", "1:2").stdout.splitlines()
-        self.assertEqual(table[0], "| 🎯 Fix | 💥 Break | 💸 Pennies | 💰 Value | 🐢 Pace | 🛡️ Security | 🏆 Score | Gate |")
-        block = self.score(script, *flags(BASE), "--message-block").stdout.splitlines()
-        self.assertEqual(block[2:4], ["💸 Pennies: 97 %", "🐢 Pace: –"])
+        for layout in LAYOUTS:
+            with self.subTest(layout=layout):
+                block = self.score(script, *flags(BASE), *layout, "--value", "1:2").stdout.splitlines()
+                self.assertEqual(block[3:8], ["💸 Pennies: 97 %", "🐢 Pace: –", "🛡️ Security: 100 %", "💰 Value: 1:2", "⚖️ Licence: 100 %"])
+                self.assertEqual(block[-1], "🚦 Gate: ✅ 90/5, pennies and pace <= 100, security, licence and architecture 100 %")
 
     def test_a_malformed_label_file_exits_2_or_4_with_one_stderr_line_in_every_layout(self):
         labels = json.loads(LABELS.read_text(encoding="utf-8"))
@@ -93,6 +94,7 @@ class TestScoreLabels(LabelCase):
             json.dumps({"metrics": [], "extras": {}}),
             json.dumps({**labels, "metrics": {key: value for key, value in labels["metrics"].items() if key != "velocity"}}),
             json.dumps({**labels, "metrics": {**labels["metrics"], "fix": {"emoji": 1, "label": "Fix", "former": []}}}),
+            json.dumps({**labels, "extras": {key: value for key, value in labels["extras"].items() if key != "architecture"}}),
         ]
         script = self.copy_skill("{}")
         cases = [(index, text, layout, critical, code) for index, text in enumerate(broken) for layout in LAYOUTS for critical, code in (("0", 2), ("1", 4))]

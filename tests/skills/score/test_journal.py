@@ -34,7 +34,11 @@ REMOTES = (
     "https://user@github.com:443/org/repo.git/",
     "ssh://git@github.com/org/repo.git",
 )
-BASE = {"fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0"}
+BASE = {
+    "fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0",
+    "legal": "100", "legal-blockers": "0", "architecture": "100",
+}
+BLOCK_LINES = 11
 READERS = {"skills/kvb-quality-score/journal.md", "src/quality/agent/state.py"}
 TEXT = {".py", ".sh", ".md", ".js", ".j2", ".json", ".yml"}
 FIXTURE_REMOTE = "git@github.com:example/fixture.git"
@@ -109,7 +113,6 @@ class TestScoreJournal(JournalCase):
         self.assertEqual(rows[0]["values"], {"fix": 95, "break": 2, "tokens": 97, "velocity": None, "security": 100, "score": 96})
         self.assertEqual(rows[1]["values"], {"fix": 95, "break": 2, "tokens": 97, "velocity": None, "security": 80, "score": 77})
         self.score(*values({}), cwd=repo)
-        self.score(*values({}), "--table", cwd=repo)
         self.assertEqual(len(self.rows()), 2)
 
     def test_the_commit_table_of_a_commit_records_its_sha_and_commit_time_once_per_remote_and_sha(self):
@@ -136,7 +139,7 @@ class TestScoreJournal(JournalCase):
             with self.subTest(values=changed):
                 done = self.score(*values(changed), "--message-block", cwd=self.tmp)
                 self.assert_one_journal_line(done, code)
-                self.assertEqual(len(done.stdout.splitlines()), 7)
+                self.assertEqual(len(done.stdout.splitlines()), BLOCK_LINES)
 
     def test_a_deleted_working_directory_keeps_the_exit_code(self):
         gone = self.tmp / "gone"
@@ -147,7 +150,7 @@ class TestScoreJournal(JournalCase):
                 command = [sys.executable, "-B", "-c", wrapper, str(gone), sys.executable, "-B", str(SCORE), *values(changed), "--message-block"]
                 done = subprocess.run(command, env=self.env, capture_output=True, text=True, check=False)
                 self.assert_one_journal_line(done, code)
-                self.assertEqual(len(done.stdout.splitlines()), 7)
+                self.assertEqual(len(done.stdout.splitlines()), BLOCK_LINES)
 
     def test_git_output_outside_utf8_keeps_the_exit_code_and_the_row(self):
         repo = self.repo()

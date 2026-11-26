@@ -20,7 +20,11 @@ from tests.skills.score.support import (
     run,
 )
 
-BASE = {"fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0"}
+BASE = {
+    "fix": "95", "break": "2", "efficiency": "97", "speed": "-", "security": "100", "critical": "0",
+    "legal": "100", "legal-blockers": "0", "architecture": "100",
+}
+BLOCK_LINES = 11
 
 
 def values(changed: dict[str, str]) -> list[str]:
@@ -80,7 +84,7 @@ class TestUnusableHelpers(GuardCase):
                     done = self.score(*values(changed), "--message-block")
                     self.assertEqual(done.returncode, code)
                     self.assertEqual(done.stderr, f"score: journal {self.council / JOURNAL_NAME}: helper quality.agent.nofollow unusable ({kind}): {FIX}\n")
-                    self.assertEqual(len(done.stdout.splitlines()), 7)
+                    self.assertEqual(len(done.stdout.splitlines()), BLOCK_LINES)
                     self.assertFalse(self.council.exists())
 
     def test_a_missing_state_module_is_named_in_the_one_stderr_line(self):
@@ -90,7 +94,7 @@ class TestUnusableHelpers(GuardCase):
                 done = self.score(*values(changed), "--message-block")
                 self.assertEqual(done.returncode, code)
                 self.assertEqual(done.stderr, f"score: journal: helper quality.agent.state unusable (ModuleNotFoundError): {FIX}\n")
-                self.assertEqual(len(done.stdout.splitlines()), 7)
+                self.assertEqual(len(done.stdout.splitlines()), BLOCK_LINES)
                 self.assertFalse(self.council.exists())
 
 
@@ -104,7 +108,7 @@ class TestUnreadableGit(GuardCase):
             with self.subTest(values=changed):
                 done = self.score(*values(changed), "--commit-table", str(repo))
                 self.assertEqual((done.returncode, done.stderr), (code, ""))
-                self.assertIn("| caf� |", done.stdout)
+                self.assertIn("🌿 Branch: caf�\n", done.stdout)
                 failed = self.score(*values(changed), "--commit-table", str(repo), "--commit", "\udce9")
                 self.assertEqual((failed.returncode, failed.stdout), (unread, ""))
                 self.assert_one_line(failed, unread, "score: git show in ")

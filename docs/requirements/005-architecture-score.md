@@ -41,7 +41,7 @@ flowchart TD
 - [x] A new JavaScript clone found by jscpd lowers it by 10.
 - [x] Every counted rule in `rules/*.yml` has a `lens`.
 - [x] `quality --staged --json` reports `architecture` (number) and per counted hit its rule and lens.
-- [ ] `kvb-quality-score` takes `--architecture <n>`.
+- [x] `kvb-quality-score` takes `--architecture <n>`.
 
 ### Stage C
 

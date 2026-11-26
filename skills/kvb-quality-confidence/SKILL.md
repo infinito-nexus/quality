@@ -18,12 +18,14 @@ and never estimates one itself.
    one run. Otherwise pass both, with efficiency and velocity from one
    `kvb-quality-performance` run (`-` where no command runs the change) and
    security and the critical count from `security.py` of the
-   `kvb-quality-security` skill, to `kvb-quality-python
+   `kvb-quality-security` skill, legal, its blockers and architecture from
+   `quality check --staged --json`, to `kvb-quality-python
    ${CLAUDE_SKILL_DIR}/../kvb-quality-score/scripts/score.py --fix <n> --break
-   <n> --efficiency <n|-> --speed <n|-> --security <n|~n> --critical <count>`
-   and show its score line and gate line verbatim. Exit 4 forbids the commit
-   (critical finding); exit 1 fails the 90/5 rule; exit 3 means ask the
-   operator again before the commit, naming the causes the gate line prints.
+   <n> --efficiency <n|-> --speed <n|-> --security <n|~n> --critical <count>
+   --legal <n|~n> --legal-blockers <count> --architecture <n>` and show its
+   block verbatim. Exit 4 forbids the commit (critical finding or legal
+   blocker); exit 1 fails the 90/5 rule; exit 3 means ask the operator again
+   before the commit, naming the causes the gate line prints.
 3. **Evidence**: the strongest proof lines only: what was executed,
    reproduced, enumerated, or read from an authoritative source. Mark proven
    (ran it, saw it) apart from derived (reasoned statically).
