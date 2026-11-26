@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0] - 2026-11-26
+
+Added:
+
+- Skills: eight kvb-quality analysis skills, among them *kvb-quality-review*
+- Install: *make install* sets up the skills and *kvb-quality-python*
+- Package: *quality.agent* holds the helpers the skill scripts share
+- Review: *exceptions.py* asks to confirm each added Exception comment
+- Tests: live Playwright and e2e checks for the hosted scan stack
+
+Fixed:
+
+- Hosted scan: the scan image starts under the core CA trust wrapper
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [0.3.0] - 2026-11-26
 
 Added:
