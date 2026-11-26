@@ -236,8 +236,8 @@ flowchart TD
 - [ ] `kvb-code-clean` and `kvb-check-principles` call `quality` by absolute path, and a missing tool no longer counts as a pass.
 - [x] `package-manager` CI uses the reusable workflow, and its ruff version comes from the quality flake (PR #11, merge `895ec2f`, 2026-11-25: main CI run 45704364447 is green on all 33 jobs; `quality / check` builds `QUALITY_REF: 003eed6` (v0.2.0) through `job.workflow_sha` and ends `quality: 0 finding(s)`, and `lint-python` runs ruff from `tool.yml` at the same ref, "All checks passed!").
 - [x] `docs/rollout/core-rehearsal.md` records exit code and new-finding count of `--base main` for `store-i18n`, `feature/iam-profile-rbac` and `production`, each without a non-hard legacy finding reported as new.
-- [ ] Core has a `make quality-check` target and a compose service with profile `tools`.
-- [ ] `git diff` of core's adoption shows no change under `tests/lint`.
+- [x] Core has a `make quality-check` target and a compose service with profile `tools` (adoption commit `95643e742` on the IAM line, pushed as fork `feature/iam-profile-rbac` `dad9aa1ca7` on 2026-11-26 after gate p10-16 went green: `Makefile:912` holds `quality-check:`, and `compose.yml:180` holds the `quality` service with profile `tools`, pinned to `v0.2.0@sha256:8a7e5e29…`).
+- [x] `git diff` of core's adoption shows no change under `tests/lint` (`95643e742` touches 8 files: `Makefile`, `aliases`, `compose.yml`, `compose/stacks.yml`, `compose/worktree.override.yml`, two `cli/administration/deploy/development/` modules and one unit test, none under `tests/lint`).
 
 ### Tests
 
