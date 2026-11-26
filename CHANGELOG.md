@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.0] - 2026-11-26
+
+Breaking:
+
+- Score: *kvb-quality-score* prints one *Metrics:* block, one value per line
+- Score: *--table* and the two-line output are gone
+- Score: *--legal*, *--legal-blockers* and *--architecture* are required
+
+Added:
+
+- Score: legal and architecture lines; a legal blocker stops the commit
+- Score: *--note metric=text* adds a marked note below the block
+- Rules: *.quality/comments.yml* declares the directives of a repository
+- Rules: *pragmas_allowed* lets declared tool pragmas pass
+- Rules: *clean.em-dash* refuses an added em dash in every text kind
+
+Upgrade notes:
+
+- Callers of *score.py* pass the three new flags and read the new block
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [0.4.0] - 2026-11-26
 
 Added:
