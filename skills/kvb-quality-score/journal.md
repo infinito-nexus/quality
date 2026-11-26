@@ -1,0 +1,29 @@
+# Journal
+
+Each `--message-block` render appends one row to
+`scores.jsonl` in the council root that `quality.agent.state` resolves: time, origin
+remote, top level path, branch, `sha` null, the six values and the block's
+digest. The commit table after the commit (`--commit-table <repo> --commit
+<sha>`) appends the same row for that repository with the full sha and the
+commit time, unless the journal holds one for that remote and sha already;
+the hub counts each such row once as a commit. The hub's burndown draws the
+rows as overlays; no gate reads them. A failed
+append prints one stderr line and keeps the exit code; a linked council
+root or a link, FIFO or other non-regular file at the journal fails it
+without blocking, through `quality.agent.nofollow`; when that module or
+`quality.agent.state` is missing or unusable, the line names it. A new council root gets mode
+0700, a new journal 0600.
+
+The journal survives a reboot, but another PC starts empty. Refill
+it from the blocks in git history, without a model:
+
+```bash
+kvb-quality-python ${CLAUDE_SKILL_DIR}/scripts/backfill.py --repo <dir>... [--since <rev>] [--labels <file>]
+```
+
+It reads every local and origin branch, takes the last block of each commit
+message, old labels included, and adds one row per commit not yet keyed by
+(remote, sha), so a second run or another clone adds nothing. The branch is
+the one whose first-parent line holds the commit, the default branch first,
+else the one a merge subject names. An unknown label is reported once and
+skipped.

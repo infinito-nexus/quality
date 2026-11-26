@@ -19,7 +19,7 @@ dependencies = ["PyYAML", "pathspec"]
 quality = "quality.cli:main"
 
 [tool.setuptools]
-packages = ["quality", "quality.adapters", "quality.architecture", "quality.legal", "quality.rules"]
+packages = ["quality", "quality.adapters", "quality.agent", "quality.architecture", "quality.legal", "quality.rules"]
 include-package-data = false
 
 [tool.setuptools.package-dir]

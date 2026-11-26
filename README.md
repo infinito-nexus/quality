@@ -11,6 +11,16 @@ nix profile install github:infinito-nexus/quality/<release-tag>
 ~/.nix-profile/bin/quality check --staged
 ```
 
+### Agent skills
+
+The `kvb-quality-*` analysis skills ([requirement 003](docs/requirements/003-analysis-skills-in-quality.md)) install from a checkout:
+
+```sh
+make install
+```
+
+It mirrors `skills/kvb-quality-*` into `~/.claude/skills`, `~/.agents/skills` and, when `~/.codex` exists, `~/.codex/skills`; installs the checkout into `~/.local/share/kvb-quality/venv`; and writes `~/.local/bin/kvb-quality-python`, the interpreter every skill script starts with.
+
 ## Dev stack
 
 Hosts without Nix, CI and dev stacks use `packages.image` (`nix build .#image`), the OCI image of the same closure, published to ghcr by digest; the digest is in the release notes. A dev stack adds it as a compose service under the profile `tools` and a make target that runs it:

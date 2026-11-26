@@ -13,14 +13,18 @@ SERVICE_VENV := .venv/service
 TEST_WORKERS := 4
 FLAKE_RESULT := build/flake/result
 
-.PHONY: test-unit test-integration test-bench test-service test-egress test-distribution test-e2e test-live flake up down verify-test verify-compose verify-playwright
+.PHONY: install test-unit test-integration test-bench test-service test-egress test-distribution test-e2e test-live flake up down verify-test verify-compose verify-playwright
+
+install:
+	bash scripts/install.sh skills
+	bash scripts/install.sh python
 
 test-unit:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit tests/workflows
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit tests/workflows tests/skills --ignore=tests/skills/integration
 
 # Param: TEST_WORKERS - pytest-xdist workers; with each tool's parallel work capped at TOOL_THREADS of tests/integration/support.py, the run stays near this many cores on a shared host
 test-integration:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration -n $(TEST_WORKERS) --dist worksteal
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/integration tests/skills/integration -n $(TEST_WORKERS) --dist worksteal
 
 # Param: QUALITY_CORE_DIR (required) - core checkout the benchmarks read, never change; it must hold the core commit of tests/bench/default-value-hits.json
 # Param: QUALITY_DB_DIR (required) - fresh bundle of `quality db update` for the deep tier
