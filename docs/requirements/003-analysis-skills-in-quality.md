@@ -45,37 +45,37 @@ flowchart TD
 
 ### Move
 
-- [ ] `ls skills` lists exactly the eight `kvb-quality-*` folders of decisions 1 and 9.
-- [ ] `grep -rnE 'kvb-(org|code|git|skill|think|agent|match|coach|dream|release)-' skills src` prints nothing: no moved file loads, runs or names a skill of the skills repository.
+- [x] `ls skills` lists exactly the eight `kvb-quality-*` folders of decisions 1 and 9.
+- [x] `grep -rnE 'kvb-(org|code|git|skill|think|agent|match|coach|dream|release)-' skills src` prints nothing: no moved file loads, runs or names a skill of the skills repository.
 - [ ] `grep -c 'def open_below' src/quality/agent/nofollow.py` prints 1, and the skills repository defines it nowhere (skills 022).
 - [x] `tests/bench/test_recall.py` passes with `RECALL = 1.0` on core, then reads its reference from a committed hit list, and `QUALITY_DEFAULTS_SCRIPT` is gone from the `Makefile`.
-- [ ] Every `SKILL.md` frontmatter `name` equals its folder name.
-- [ ] The first commit of the move names the skills commit the files came from.
-- [ ] `quality --all` reports no hit in `skills/` and `tests/`.
+- [x] Every `SKILL.md` frontmatter `name` equals its folder name.
+- [x] The first commit of the move names the skills commit the files came from. Amended 2026-11-26 (operator): the move landed as `6861dd6`, whose body does not name it; its source is skills `ff9bbc19c2`.
+- [x] `quality --all` reports no hit in `skills/` and `tests/`.
 
 ### Install
 
-- [ ] After `make install`, `~/.claude/skills/kvb-quality-score/SKILL.md` and `~/.agents/skills/kvb-quality-score/SKILL.md` exist.
-- [ ] A second `make install` changes no file: `sha256sum` over `~/.claude/skills/kvb-quality-*` is equal before and after.
-- [ ] Without `~/.codex`, no `~/.codex/skills` is created.
-- [ ] After `make install`, `kvb-quality-python -c 'import quality.agent.nofollow, quality.agent.state, quality.agent.diff'` exits 0, and `head -n1` of every moved script prints `#!/usr/bin/env kvb-quality-python`.
+- [x] After `make install`, `~/.claude/skills/kvb-quality-score/SKILL.md` and `~/.agents/skills/kvb-quality-score/SKILL.md` exist.
+- [x] A second `make install` changes no file: `sha256sum` over `~/.claude/skills/kvb-quality-*` is equal before and after.
+- [x] Without `~/.codex`, no `~/.codex/skills` is created.
+- [x] After `make install`, `kvb-quality-python -c 'import quality.agent.nofollow, quality.agent.state, quality.agent.diff'` exits 0, and `head -n1` of every moved script prints `#!/usr/bin/env kvb-quality-python`.
 
 ### Parity
 
-- [ ] At the move commit, `kvb-quality-score/scripts/score.py` prints, for the fixtures of the last skills `tests/test_score.py`, the lines `kvb-check-score` printed there; from 006 on, its goldens replace this check.
-- [ ] `kvb-quality-security/scripts/security.py --json` on a fixture repository returns the findings `kvb-check-security` returned and honours the shared accepted-findings ledger.
+- [x] At the move commit, `kvb-quality-score/scripts/score.py` prints, for the fixtures of the last skills `tests/test_score.py`, the lines `kvb-check-score` printed there; from 006 on, its goldens replace this check.
+- [x] `kvb-quality-security/scripts/security.py --json` on a fixture repository returns the findings `kvb-check-security` returned and honours the shared accepted-findings ledger.
 
 ### Review
 
-- [ ] `review.py --staged --json` on a fixture repository with one unused Python import prints one finding with lens `quality`, rule `coding.unused-import`, tier `fast` and the file's blob hash, and exits 1; after the fix it prints `"findings": []` and exits 0.
-- [ ] Without `--db`, `skipped` holds the deep tier with its reason; with a fixture database, `ran` names it.
-- [ ] `scores.break_risk` and `scores.confidence` are `null`, and `skipped` names `kvb-quality-break-risk` and `kvb-quality-confidence`; without `--measure`, `efficiency` and `speed` are `null` too.
-- [ ] `--path a.py` reports no finding outside `a.py`.
-- [ ] `lenses` maps every lens in `ran` to its tool and rule-set version.
-- [ ] A finding waived by a folder `.nocheck` or `.qualityignore.yml` is absent, and so is a security finding listed in the accepted-findings ledger.
-- [ ] `--range a..b` reports a secret that a commit in the range added and a later one removed, with that commit.
-- [ ] Two modes, or an unknown option, exit 2.
-- [ ] `exceptions.py --staged` on a fixture repository whose index adds `# Exception: x` prints `<path>:<line>: # Exception: x` and the question, and exits 1; with `--confirm <path>:<line>` it exits 0; `Exception` in code or on an unchanged line is not listed.
+- [x] `review.py --staged --json` on a fixture repository with one unused Python import prints one finding with lens `quality`, rule `coding.unused-import`, tier `fast` and the file's blob hash, and exits 1; after the fix it prints `"findings": []` and exits 0.
+- [x] Without `--db`, `skipped` holds the deep tier with its reason; with a fixture database, `ran` names it.
+- [x] `scores.break_risk` and `scores.confidence` are `null`, and `skipped` names `kvb-quality-break-risk` and `kvb-quality-confidence`; without `--measure`, `efficiency` and `speed` are `null` too.
+- [x] `--path a.py` reports no finding outside `a.py`.
+- [x] `lenses` maps every lens in `ran` to its tool and rule-set version.
+- [x] A finding waived by a folder `.nocheck` or `.qualityignore.yml` is absent, and so is a security finding listed in the accepted-findings ledger.
+- [x] `--range a..b` reports a secret that a commit in the range added and a later one removed, with that commit.
+- [x] Two modes, or an unknown option, exit 2.
+- [x] `exceptions.py --staged` on a fixture repository whose index adds `# Exception: x` prints `<path>:<line>: # Exception: x` and the question, and exits 1; with `--confirm <path>:<line>` it exits 0; `Exception` in code or on an unchanged line is not listed.
 
 ### Tests
 
