@@ -35,6 +35,7 @@ STATUS_NAMES = {
 ZERO_MODE = "000000"
 COPY_CHUNK = 1 << 20
 IGNORE_FILE = ".qualityignore.yml"
+NOCHECK_FILE = ".nocheck"
 
 
 @dataclass(frozen=True)

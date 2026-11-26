@@ -1,33 +1,55 @@
+import json
 from pathlib import Path
+
+import jinja2
+import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE = ROOT / "ansible" / "roles" / "web-app-cst-quality-check" / "templates" / "compose.yml.j2"
-REQUIRED = (
-    'command: ["sleep", "infinity"]',
-    "{{ lookup('compose_restart') }}",
-    "{{ lookup('template', 'roles/sys-svc-container/templates/logging.yml.j2') | indent(4) }}",
-    "network_mode: none",
-    "read_only: true",
-    'user: "{{ QUALITY_CHECK_STEP_UID }}:{{ QUALITY_CHECK_STEP_UID }}"',
-    "- ALL",
-    "- no-new-privileges:true",
-)
-FORBIDDEN = ("env_file", "environment", "volumes", "base.yml.j2", "networks", "ports")
+INCLUDES = {
+    "roles/sys-svc-compose/templates/base.yml.j2": "services:",
+    "roles/sys-svc-container/templates/base.yml.j2": "base: included",
+    "roles/sys-svc-container/templates/deploy.yml.j2": "deploy: included",
+}
+OPENS = {"compose_networks": "networks:"}
 
 
-def anchor_block() -> list:
-    lines = COMPOSE.read_text(encoding="utf-8").splitlines()
-    start = lines.index("  {% set service_name = 'scan' %}")
-    assert lines[start + 1] == "  {{ service_name }}:"
-    end = next(index for index in range(start + 2, len(lines)) if not lines[index].strip())
-    return [line.strip() for line in lines[start + 2 : end]]
+class Named(jinja2.ChainableUndefined):
+    def __str__(self):
+        return self._undefined_name
+
+
+def lookup(name, *args, **_kwargs):
+    if name in OPENS:
+        return OPENS[name]
+    return f"{name}: {json.dumps([str(arg) for arg in args])}"
+
+
+def services() -> dict:
+    """
+    Returns:
+        The template's services, rendered with each include and lookup as a
+        key that names it and each undefined variable as its name.
+    """
+    environment = jinja2.Environment(loader=jinja2.DictLoader(INCLUDES), undefined=Named)
+    environment.filters["bool"] = bool
+    rendered = environment.from_string(COMPOSE.read_text(encoding="utf-8")).render(lookup=lookup)
+    return yaml.safe_load(rendered)["services"]
 
 
 def test_scan_anchor_holds_nothing():
-    block = anchor_block()
-    assert block[:2] == [
-        "{% include 'roles/sys-svc-container/templates/deploy.yml.j2' %}",
-        "{{ lookup('container_image', application_id, 'scan') }}",
-    ]
-    assert [line for line in REQUIRED if line not in block] == []
-    assert [line for line in block if any(word in line for word in FORBIDDEN)] == []
+    assert services()["scan"] == {
+        "deploy": "included",
+        "container_image": ["application_id", "scan"],
+        "compose_only": ["container_name", "QUALITY_CHECK_SCAN"],
+        "command": ["sleep", "infinity"],
+        "compose_restart": [],
+        "template": ["roles/sys-svc-container/templates/logging.yml.j2"],
+        "network_mode": "none",
+        "read_only": True,
+        "user": "QUALITY_CHECK_STEP_UID:QUALITY_CHECK_STEP_UID",
+        "cap_drop": ["ALL"],
+        "security_opt": ["no-new-privileges:true"],
+        "mem_limit": "16m",
+        "pids_limit": 4,
+    }

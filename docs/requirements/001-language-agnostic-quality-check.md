@@ -34,6 +34,7 @@ As a maintainer of many repositories, I want one `quality` command that checks s
 26. **Hosted scan stays outside the package**: the role and service that scan a submitted repository live in this repository, specified by requirement 002, and consume the image and `--json`. Wheel, image and `[project] dependencies` hold none of it, so decisions 2, 3 and 17 keep governing `kvb-quality` alone. Rejected: a separate repository (the operator wants tool and role in one place).
 27. **Thread cap**: `quality check --threads <n>` (1 to the host's cores) caps the parallel work of every tool that takes a cap: `GOMAXPROCS` for the Go tools (gitleaks, trivy, osv-scanner, actionlint), `RAYON_NUM_THREADS` for ruff's linting, `--threads` for ripgrep and ast-grep, `--jobs` for Semgrep, `--workers` for jscpd and `+RTS -N` for hadolint; lizard and shellcheck run on one thread already. Runtime threads outside that work stay (Go's scheduler and garbage collector, ruff's file walker, jscpd's I/O pool), so a capped tool can still show more OS threads than n. Without it every tool keeps its default of about one thread per core; findings do not depend on it. `make test-integration` runs `TEST_WORKERS` (4) xdist workers and every check with `TOOL_THREADS` (1), so the suite stays near four cores on a host many agents share (operator, 2026-11-12; measured: peak 8.5 cores, gitleaks on all 20 threads, fell to 4.3 with test ids and outcomes unchanged). Rejected: a cap only inside the test helpers (production runs would keep the bursts, and the tests would no longer run the code production runs); `GHCRTS` for hadolint (it reaches shellcheck too, whose runtime is not threaded and aborts on `-N`).
 28. **One version source per tool**: a tool nixpkgs ships takes its version from the nixpkgs revision `flake.lock` pins. A tool nixpkgs lacks (jscpd) is a flake input per platform whose URL names its release, and `flake.lock` locks each URL by hash; that URL is the tool's one version source, and `test_single_pin_source` fails on any other version text and on inputs of one tool naming different versions (operator, 2026-11-12). Rejected: a stricter test that counts the input URL as a violation (no fetch of a tool outside nixpkgs works without a version in `flake.nix`, so WP-1 would stay red); building jscpd from source (its version and hash would sit in `flake.nix` all the same, at a far larger build cost).
+29. **Folder `.nocheck`**: a `.nocheck` file waives rules for its folder and every folder below it, one `# nocheck: <rule> -- <reason>` per line, the convention core's own lints already read. A line naming nothing in the catalogue belongs to the project's lints and is skipped; a catalogue line without a reason, or naming only hard or changed_only rules, exits 2, because those stay with `.qualityignore.yml`, whose `--base` entries come from the base side; a group line waives only its other members (operator, 2026-11-26). Rejected: the folder alone without its subfolders (each subfolder would need its own file); only `.qualityignore.yml` (core contributors already waive per folder with `.nocheck`).
 
 ## Approach
 
@@ -114,6 +115,9 @@ flowchart TD
 - [x] `test_merge_both_parents`: during a merge, a finding present in either parent is not new.
 - [x] `test_conflict_aborts`: an unresolved conflict exits 2.
 - [x] `test_exit_codes`: no finding exits 0, findings exit 1, usage, config and missing-tool errors exit 2.
+- [ ] `test_rule_runs_only_the_named_rules`: under `--staged` and `--all`, `--rule <id>` reports and runs only the named rules, and a repeated `--rule` adds one.
+- [ ] `test_rule_of_the_fast_tier_checks_a_base_without_the_database`: `--base main --rule test.text-presence` runs without a vulnerability database, which the whole catalogue requires.
+- [ ] `test_unknown_rule_id_exits_2`: an unknown id passed to `--rule` exits 2 naming it.
 
 ### Differential gate
 
@@ -182,10 +186,15 @@ flowchart TD
 - [x] `test_nocheck_comment_only`: `x = "nocheck: rule -- reason"` does not suppress.
 - [x] `test_unused_nocheck_is_a_finding`: a new nocheck that waives nothing exits 1, an old one in a touched file stays in the baseline, and `--all` names every one.
 - [x] `test_nocheck_waives_one_line_of_an_unreadable_region`: a nocheck on the first line of a 34-line unreadable region leaves every other line a finding.
+- [ ] `test_folder_nocheck_waives_its_folder_and_every_folder_below`: `pkg/.nocheck` waives `pkg/a.py` and `pkg/sub/b.py`, not `pkgs/c.py` or `d.py`, and lists the entry with paths `/pkg/`.
+- [ ] `test_folder_nocheck_skips_names_outside_the_catalogue`: a `.nocheck` holding only project lint names waives nothing.
+- [ ] `test_folder_nocheck_needs_a_reason` and `test_folder_nocheck_refuses_a_hard_rule`: both exit 2 and name the file and line, or `.qualityignore.yml`.
+- [ ] `test_stale_folder_nocheck_fails_under_all`: a `.nocheck` line that waives nothing exits 2 under `--all`.
+- [ ] `test_root_nocheck_waives_the_whole_repository`, `test_folder_nocheck_waives_a_group` and `test_folder_nocheck_applies_under_base_and_all`: a root `.nocheck` waives every folder, `coding` waives its soft rules although it holds the changed_only `coding.parse-incomplete`, and `--base` and `--all` read the same entries.
 
 ### Rules and languages
 
-- [x] `test_catalogue_schema`: every entry of `rules/*.yml` has id, severity, summary and enforcer, and every id starts with `security.`, `coding.` or `clean.`.
+- [x] `test_catalogue_schema`: every entry of `rules/*.yml` has id, severity, summary and enforcer, and every id starts with `security.`, `coding.`, `clean.`, `legal.`, `architecture.` or `test.`.
 - [x] `test_coverage_census`: `quality coverage` shows at least one rule each for Python, YAML, Markdown, JavaScript, TypeScript, TSX, Jinja, shell, JSON, env, conf, ini, nginx, GitHub workflows, Dockerfile, HTML, CSS, SQL, TOML, PHP, Make, Ruby, Rust, XML, Nix, systemd, TeX, Lua and HCL.
 - [x] `test_coverage_names_gaps`: a file kind without rules is listed by name in `quality coverage`.
 - [x] `test_shebang_mapping`: an extensionless script with a bash shebang gets the shell rules.
@@ -195,6 +204,8 @@ flowchart TD
 - [x] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
 - [x] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
 - [x] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.
+- [ ] `test_only_a_test_that_reads_a_file_for_text_is_flagged` and `test_only_the_positive_case_of_a_rule_is_flagged`: `test.text-presence` flags a test in Python, JavaScript, TypeScript, TSX or shell whose only check is that a file it reads holds or lacks a text, and passes each paired negative case, a test that parses or runs what it reads.
+- [ ] `test_a_helper_imported_from_another_module_is_followed`: a read through a helper imported from another test module counts as a read of the file.
 - [x] `test_size_limits`: a new 501-line shell file fails, also under `tests/`; JSON, locale, lockfile and generated files of that length pass.
 - [x] `test_folder_limit`: a thirteenth item fails under `--base`, and a folder already at 20 items that does not grow passes.
 - [x] `test_prefix_groups`: two sibling files sharing a prefix fail, and dunder, numeric and `test` prefixes pass.

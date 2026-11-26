@@ -18,7 +18,7 @@ from tests.integration.support import (
     rules_without_tool,
 )
 
-PREFIXES = ("security.", "coding.", "clean.", "legal.", "architecture.")
+PREFIXES = ("security.", "coding.", "clean.", "legal.", "architecture.", "test.")
 LEGAL = {
     "legal.license-declared": ({"license-declared"}, "medium", 25),
     "legal.vendored-license": ({"vendored-license"}, "critical", 50),

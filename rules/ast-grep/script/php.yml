@@ -6,3 +6,150 @@ rule:
   any:
     - pattern: var_dump($$$)
     - pattern: var_export($VALUE)
+---
+id: test.text-presence/php
+language: php
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  read-call:
+    kind: function_call_expression
+    has:
+      field: function
+      regex: '^\\?(?:file_get_contents|file)$'
+  reads:
+    any:
+      - matches: read-call
+      - has:
+          stopBy: end
+          matches: read-call
+  method-call:
+    any:
+      - kind: member_call_expression
+      - kind: scoped_call_expression
+  includes:
+    any:
+      - kind: function_call_expression
+        has:
+          field: function
+          regex: '^\\?(?:str_contains|preg_match)$'
+      - kind: unary_op_expression
+        regex: '^!'
+        has:
+          matches: includes
+  check-call:
+    matches: method-call
+    has:
+      field: name
+      regex: '^(?:assert\w*|expect\w*|fail)$'
+  containment-call:
+    matches: method-call
+    any:
+      - has:
+          field: name
+          regex: '^assert(?:String(?:Not)?ContainsString(?:IgnoringCase)?|MatchesRegularExpression|DoesNotMatchRegularExpression|(?:Not)?RegExp|(?:Not)?Contains)$'
+      - all:
+          - has:
+              field: name
+              regex: '^assert(?:True|False)$'
+          - has:
+              field: arguments
+              has:
+                kind: argument
+                nthChild: 1
+                has:
+                  matches: includes
+  other-check:
+    matches: check-call
+    not:
+      matches: containment-call
+  acts:
+    any:
+      - kind: function_call_expression
+        has:
+          field: function
+          regex: '(?i)^\\?\w*(?:parse|decode|load|eval|exec|system|passthru|proc_open|popen|put_contents|tempnam|temp_dir|render|unserialize|run|write)\w*$'
+      - matches: method-call
+        has:
+          field: name
+          regex: '(?i)^\w*(?:parse|decode|load|eval|exec|run|render|write|dump)\w*$'
+      - kind: include_expression
+      - kind: include_once_expression
+      - kind: require_expression
+      - kind: require_once_expression
+      - kind: shell_command_expression
+  haystack:
+    kind: argument
+    has:
+      pattern: $H
+  positive:
+    any:
+      - matches: method-call
+        all:
+          - has:
+              field: name
+              regex: '^assert(?:StringContainsString(?:IgnoringCase)?|MatchesRegularExpression|RegExp|Contains)$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 2
+                matches: haystack
+      - matches: method-call
+        all:
+          - has:
+              field: name
+              regex: '^assertTrue$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                has:
+                  any:
+                    - pattern: str_contains($H, $$$)
+                    - pattern: preg_match($_P, $H)
+  source:
+    kind: assignment_expression
+    all:
+      - has:
+          field: left
+          pattern: $H
+      - has:
+          field: right
+          matches: reads
+rule:
+  kind: method_declaration
+  all:
+    - any:
+        - has:
+            field: name
+            regex: '^test'
+        - has:
+            field: attributes
+            regex: '#\[\s*(?:\\?\w+\\)*Test\b'
+    - has:
+        field: name
+        pattern: $AT
+    - not:
+        has:
+          stopBy: end
+          matches: acts
+    - not:
+        has:
+          stopBy: end
+          matches: other-check
+    - has:
+        field: body
+        any:
+          - all:
+              - has:
+                  stopBy: end
+                  matches: positive
+              - has:
+                  stopBy: end
+                  matches: source
+          - has:
+              stopBy: end
+              matches: positive
+              has:
+                stopBy: end
+                matches: read-call

@@ -17,9 +17,11 @@ def unused_nochecks(data: RuleData, snapshot, paths: list, applied: list) -> lis
     Returns:
         One finding per nocheck that waived nothing on its line although
         a rule it names ran on the file, or although no rule it names can
-        fire there in any run.
+        fire there in any run; none when --rule leaves this check out.
     """
     rule = data.runner_rule(UNUSED_NOCHECK)
+    if not data.runs(rule):
+        return []
     used = {(item.path, item.line) for item in applied}
     files = {path: snapshot.kinds_of(path) for path in paths if NOCHECK_BYTES in snapshot.data(path)}
     able = data.ids_per_path(data.every_binding(), files)

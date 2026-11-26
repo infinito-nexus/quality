@@ -7,8 +7,10 @@ import pytest
 from quality.repo import Repo, hardened_env
 from tests.integration.support import (
     DEEP_TOOLS,
+    RULES,
     SECRET_ENV_LINE,
     UNTAGGED_DOCKERFILE,
+    findings_of_rule,
     path_without,
     quality,
     raw_tool,
@@ -20,6 +22,8 @@ from tests.integration.support import (
 )
 
 F401 = rule_for("F401")
+PRESENCE = "test.text-presence"
+PRESENCE_TEST = "from pathlib import Path\n\n\ndef test_role():\n    assert 'become' in Path('role.yml').read_text()\n"
 LONG_FILE = "".join(f"value_{index} = {index}\n" for index in range(30))
 FAST_TIER_TOOLS = ("quality: tool gitleaks:", "quality: tool hadolint:")
 
@@ -231,6 +235,43 @@ def test_exit_codes(target, tmp_path):
     missing = target.check("--staged", path_value=no_ruff)
     assert missing.returncode == 2
     assert "ruff" in missing.stderr
+
+
+@pytest.mark.parametrize("flags", [("--staged",), ("--all",)], ids=["staged", "all"])
+def test_rule_runs_only_the_named_rules(target, flags):
+    target.write("a.py", "x = 1\n")
+    target.commit()
+    target.write("a.py", "x = 1  # nocheck: coding.unused-import -- fixture\nimport os\n")
+    target.write("test_role.py", PRESENCE_TEST)
+    target.stage()
+    assert {F401, "clean.unused-nocheck", PRESENCE} <= set(rule_ids(target.check(*flags, "--json")))
+    only = target.check(*flags, "--json", "--verbose", "--rule", PRESENCE)
+    assert rule_ids(only) == [PRESENCE], only.stderr
+    assert tool_lines(only, "ruff") == []
+    both = target.check(*flags, "--json", "--rule", PRESENCE, "--rule", F401)
+    assert sorted(rule_ids(both)) == sorted([F401, PRESENCE])
+
+
+def test_rule_of_the_fast_tier_checks_a_base_without_the_database(target):
+    target.write("a.py", "x = 1\n")
+    target.commit()
+    target.git("checkout", "-q", "-b", "feature")
+    target.write("test_role.py", PRESENCE_TEST)
+    target.commit()
+    every = target.check("--base", "main", "--rules", str(RULES))
+    assert every.returncode == 2
+    assert "no vulnerability database" in every.stderr
+    result = target.check("--base", "main", "--json", "--rules", str(RULES), "--rule", PRESENCE)
+    assert result.returncode == 1, result.stderr
+    assert findings_of_rule(result, PRESENCE) == [("test_role.py", 4)]
+
+
+def test_unknown_rule_id_exits_2(target):
+    target.write("a.py", "x = 1\n")
+    target.commit()
+    result = target.check("--all", "--rule", PRESENCE, "--rule", "test.no-such-rule")
+    assert result.returncode == 2
+    assert "test.no-such-rule" in result.stderr
 
 
 def test_exit_2_outside_a_repository(tmp_path):

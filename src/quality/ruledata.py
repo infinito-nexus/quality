@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pathspec
@@ -105,6 +105,30 @@ class RuleData:
     tools: dict
     limits: dict
     kinds: KindMap
+    selected: frozenset | None
+
+    def runs(self, rule: Rule) -> bool:
+        return self.selected is None or rule.id in self.selected
+
+    def select(self, ids: list | None) -> "RuleData":
+        """
+        Args:
+            ids: The --rule values, or None to run every rule.
+
+        Returns:
+            The rule data whose bindings, pending and history rules and
+            runner checks are only those rules; nochecks and ignore entries
+            are still read against the whole catalogue.
+
+        Raises:
+            QualityError: An id names no catalogue rule.
+        """
+        if ids is None:
+            return self
+        unknown = sorted(set(ids) - {rule.id for rule in self.rules})
+        if unknown:
+            raise QualityError(f"--rule names no catalogue rule: {', '.join(unknown)}")
+        return replace(self, selected=frozenset(ids))
 
     def limit(self, key: str):
         return require(self.limits, key, "limits.yml")
@@ -116,7 +140,7 @@ class RuleData:
         return [rule for rule in self.rules if rule.id == name or rule.id.startswith(f"{name}.")]
 
     def pending_rules(self, tiers: tuple) -> list:
-        return [rule for rule in self.rules if rule.pending and rule.tier in tiers]
+        return [rule for rule in self.rules if rule.pending and rule.tier in tiers and self.runs(rule)]
 
     def runner_rule(self, enforcer: str) -> Rule:
         """
@@ -135,12 +159,12 @@ class RuleData:
         return found[0]
 
     def has_history_rules(self) -> bool:
-        return any(rule.history and not rule.pending for rule in self.rules)
+        return any(rule.history and not rule.pending and self.runs(rule) for rule in self.rules)
 
     def bindings(self) -> dict:
         grouped = {}
         for rule in self.rules:
-            if not rule.pending and isinstance(rule.enforcer, dict):
+            if not rule.pending and isinstance(rule.enforcer, dict) and self.runs(rule):
                 for binding in rule_bindings(rule, self.kinds):
                     grouped.setdefault(binding.tool, []).append(binding)
         return grouped
@@ -442,4 +466,5 @@ def load(directory: Path) -> RuleData:
         tools=tools,
         limits=read_yaml(directory / "limits.yml"),
         kinds=load_kinds(read_yaml(directory / "kinds.yml")),
+        selected=None,
     )

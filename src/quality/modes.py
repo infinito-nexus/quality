@@ -18,7 +18,7 @@ from quality.adapters.builtin import (
 from quality.environment import open_repository, tool_environment, validated_path
 from quality.gate import baseline_of, code_hit, merge_baselines, new_hits
 from quality.history import finding_key, history_hits
-from quality.ignorefile import audit_lines, refuse_stale, stale_names
+from quality.ignorefile import audit_lines, folder_entries, refuse_stale, stale_names
 from quality.ignorefile import parse as parse_ignore
 from quality.legal import index, registry
 from quality.legal.checks import split_unchecked, unchecked_notes
@@ -61,6 +61,7 @@ class Options:
     verbose: bool
     cwd: str
     threads: int | None
+    selected: list | None
 
 
 def tier_of(rule) -> str:
@@ -108,7 +109,7 @@ class Session:
         return [] if self.bundle is None else [self.bundle.note()]
 
     def file_gap_rules(self) -> set:
-        return {rule.id for rule in self.data.rules if rule.file_gap() and tier_of(rule) in self.tiers}
+        return {rule.id for rule in self.data.rules if rule.file_gap() and tier_of(rule) in self.tiers and self.data.runs(rule)}
 
     def snapshot(self, entries: list, label: str) -> Snapshot:
         build = catalogue if self.lazy else materialize
@@ -149,7 +150,7 @@ class Session:
         return [
             code_hit(rule, path, None, "", snapshot)
             for path in paths
-            if self.data.kinds.code_name(path) or self.read_by_name(path)
+            if self.data.runs(rule) and (self.data.kinds.code_name(path) or self.read_by_name(path))
         ]
 
     def read_by_name(self, path: str) -> bool:
@@ -166,13 +167,15 @@ class Session:
             folders: Folders to measure, or None for every folder.
 
         Returns:
-            Folder size and prefix group findings of those folders.
+            Folder size and prefix group findings of those folders, of the
+            checks --rule keeps.
         """
         children = tree_children(snapshot)
         chosen = sorted(children) if folders is None else folders
-        return folder_items(self.data.runner_rule(FOLDER_ITEMS), children, chosen) + prefix_groups(
+        found = folder_items(self.data.runner_rule(FOLDER_ITEMS), children, chosen) + prefix_groups(
             self.data.runner_rule(PREFIX_GROUPS), children, chosen
         )
+        return [hit for hit in found if self.data.runs(hit.rule)]
 
     def pending_notes(self, tiers: tuple) -> list:
         return [
@@ -216,7 +219,7 @@ def open_database(options: Options, data: RuleData, tiers: tuple) -> db.Bundle |
 
 def open_session(options: Options, scratch: Path) -> Session:
     rules_dir = locate(options.rules)
-    data = load(rules_dir)
+    data = load(rules_dir).select(options.selected)
     path_value = validated_path(os.environ)
     repo = open_repository(options.cwd, data.limit("git_timeout"), path_value, os.environ)
     tiers = MODE_TIERS[options.mode]
@@ -400,8 +403,10 @@ def check_all(session: Session, _options: Options) -> Outcome:
     hits += session.oversized(head, head.unchecked) + session.binary_code(head)
     hits += session.structure(head, None)
     entries = parse_ignore(head.ignore_data(), session.data)
-    kept, unused, ignored, nocheck = suppressed(session.data, head, head.paths(), hits, (entries, entries))
-    refuse_stale([entry for entry in entries if entry not in ignored])
+    soft = entries + folder_entries(head.nocheck_data(), session.data)
+    kept, unused, ignored, nocheck = suppressed(session.data, head, head.paths(), hits, (soft, entries))
+    ran = [entry for entry in soft if all(map(session.data.runs, session.data.members(entry.rule)))]
+    refuse_stale([entry for entry in ran if entry not in ignored])
     findings, undecided = split_unchecked(without_changed_only(kept + unused))
     notes = session.database_notes() + session.pending_notes(ALL_TIERS) + unparsed_notes(kept) + unchecked_notes(undecided)
     if session.repo.is_shallow():
@@ -425,7 +430,8 @@ def check_staged(session: Session, _options: Options) -> Outcome:
     merge_head = repo.merge_head()
     parents = [first_parent, merge_head] if merge_head else [first_parent]
     entries = parse_ignore(head.ignore_data(), session.data)
-    plan = Plan(head, changes, parents, repo.staged_changes, entries, entries, lambda paths: repo.added_lines(first_parent, None, paths))
+    soft = entries + folder_entries(head.nocheck_data(), session.data)
+    plan = Plan(head, changes, parents, repo.staged_changes, soft, entries, lambda paths: repo.added_lines(first_parent, None, paths))
     return judged(session, plan, notes)
 
 
@@ -445,6 +451,7 @@ def check_base(session: Session, options: Options) -> Outcome:
     head_tree = repo.tree_entries("HEAD")
     head = session.snapshot(head_tree, "head")
     head_entries = parse_ignore(head.ignore_data(), session.data)
+    soft = head_entries + folder_entries(head.nocheck_data(), session.data)
     base_entries = base_side_entries(session, base)
     notes = (
         session.database_notes()
@@ -455,7 +462,7 @@ def check_base(session: Session, options: Options) -> Outcome:
     def diff(parent: str) -> list:
         return repo.range_changes(parent, "HEAD")
 
-    plan = Plan(head, changes, [base], diff, head_entries, base_entries, lambda paths: repo.added_lines(base, "HEAD", paths))
+    plan = Plan(head, changes, [base], diff, soft, base_entries, lambda paths: repo.added_lines(base, "HEAD", paths))
     outcome = judged(session, plan, notes)
     head_blobs = {(entry.path, entry.oid) for entry in head_tree}
     history = history_hits(session, base, base_entries, head_blobs)

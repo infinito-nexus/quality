@@ -7,3 +7,201 @@ rule:
     - pattern: binding.pry
     - pattern: binding.irb
     - pattern: byebug
+---
+id: test.text-presence/ruby
+language: ruby
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  read-call:
+    kind: call
+    all:
+      - has:
+          field: receiver
+          regex: '^(?:::)?(?:File|IO)$|^Pathname\.new\('
+      - has:
+          field: method
+          regex: '^(?:read|readlines|binread)$'
+  reads:
+    any:
+      - matches: read-call
+      - has:
+          stopBy: end
+          matches: read-call
+  includes:
+    kind: call
+    has:
+      field: method
+      regex: '^(?:include\?|match\?|match|start_with\?|end_with\?)$'
+  check-call:
+    kind: call
+    not:
+      has:
+        field: receiver
+        regex: '\S'
+    has:
+      field: method
+      regex: '^(?:assert\w*|refute\w*|flunk|expect)$'
+  containment-call:
+    kind: call
+    any:
+      - has:
+          field: method
+          regex: '^(?:assert|refute)_(?:includes|match)$|^expect$'
+      - all:
+          - has:
+              field: method
+              regex: '^(?:assert|refute)$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                any:
+                  - matches: includes
+                  - kind: unary
+                    has:
+                      matches: includes
+  matcher-call:
+    kind: call
+    all:
+      - has:
+          field: receiver
+          kind: call
+          has:
+            field: method
+            regex: '^expect$'
+      - has:
+          field: method
+          regex: '^(?:to|not_to|to_not)$'
+  other-check:
+    any:
+      - matches: check-call
+        not:
+          matches: containment-call
+      - matches: matcher-call
+        not:
+          has:
+            field: arguments
+            has:
+              nthChild: 1
+              kind: call
+              has:
+                field: method
+                regex: '^(?:include|match)$'
+  acts:
+    any:
+      - kind: call
+        has:
+          field: method
+          regex: '(?i)^\w*(?:load|parse|result|render|system|exec|spawn|popen|capture|eval|require|write|mktmpdir|tempfile|run)\w*[!?]?$'
+      - kind: call
+        has:
+          field: receiver
+          regex: '^(?:::)?(?:Open3|Tempfile|ERB|Dir)$'
+      - kind: subshell
+  haystack:
+    any:
+      - pattern: $H.$_M
+      - pattern: $H
+  positive:
+    any:
+      - kind: call
+        all:
+          - has:
+              field: method
+              regex: '^assert_includes$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                matches: haystack
+      - kind: call
+        all:
+          - has:
+              field: method
+              regex: '^assert_match$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 2
+                matches: haystack
+      - kind: call
+        all:
+          - has:
+              field: method
+              regex: '^assert$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                any:
+                  - pattern: $H.include?($$$)
+                  - pattern: $H.match?($$$)
+      - matches: matcher-call
+        all:
+          - has:
+              field: method
+              regex: '^to$'
+          - has:
+              field: receiver
+              has:
+                field: arguments
+                has:
+                  nthChild: 1
+                  matches: haystack
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                kind: call
+                has:
+                  field: method
+                  regex: '^(?:include|match)$'
+  source:
+    kind: assignment
+    all:
+      - has:
+          field: left
+          pattern: $H
+      - has:
+          field: right
+          matches: reads
+rule:
+  any:
+    - kind: method
+      has:
+        field: name
+        regex: '^test_'
+        pattern: $AT
+    - kind: call
+      all:
+        - has:
+            field: method
+            regex: '^(?:it|specify|test)$'
+            pattern: $AT
+        - has:
+            field: block
+            regex: '\S'
+  all:
+    - not:
+        has:
+          stopBy: end
+          matches: acts
+    - not:
+        has:
+          stopBy: end
+          matches: other-check
+    - any:
+        - all:
+            - has:
+                stopBy: end
+                matches: positive
+            - has:
+                stopBy: end
+                matches: source
+        - has:
+            stopBy: end
+            matches: positive
+            has:
+              stopBy: end
+              matches: read-call

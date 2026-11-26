@@ -6,6 +6,7 @@ import tempfile
 import tomllib
 import zipfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -73,10 +74,9 @@ def test_name_and_script():
 
 
 def test_mirrors_list_the_right_project():
-    lines = (ROOT / "MIRRORS").read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "git@github.com:infinito-nexus/quality.git"
-    assert "https://pypi.org/project/kvb-quality/" in lines
-    assert "https://pypi.org/project/quality/" not in lines
+    remote, *packages = (ROOT / "MIRRORS").read_text(encoding="utf-8").splitlines()
+    assert remote == "git@github.com:infinito-nexus/quality.git"
+    assert [urlsplit(url)[:3] for url in packages] == [("https", "pypi.org", f"/project/{project()['project']['name']}/")]
 
 
 def test_dependencies_are_only_pyyaml_and_pathspec():

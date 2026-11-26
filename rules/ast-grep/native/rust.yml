@@ -45,3 +45,96 @@ message: serde default; fail early, make the field required and deny unknown fie
 rule:
   kind: attribute_item
   regex: '^#\[serde\([^\]]*\bdefault\b'
+---
+id: test.text-presence/rust
+language: rust
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  read-call:
+    any:
+      - kind: macro_invocation
+        has:
+          field: macro
+          regex: '^include_str$'
+      - kind: call_expression
+        has:
+          field: function
+          regex: '(?:^|::)(?:read_to_string|fs::read)$'
+  reads:
+    any:
+      - matches: read-call
+      - has:
+          stopBy: end
+          matches: read-call
+  check-macro:
+    kind: macro_invocation
+    has:
+      field: macro
+      regex: '^(?:debug_)?assert(?:_eq|_ne)?$|^assert_matches$'
+  containment-macro:
+    kind: macro_invocation
+    regex: '^(?:debug_)?assert!\s*\(\s*!?[^,;]*?\.contains\('
+  other-check:
+    matches: check-macro
+    not:
+      matches: containment-macro
+  acts:
+    any:
+      - kind: call_expression
+        has:
+          field: function
+          regex: '(?i)(?:^|::|\.)\w*(?:from_str|from_slice|from_reader|parse|command|write|create|temp|render|template|exec|spawn|load)\w*$'
+      - kind: generic_function
+        regex: '(?i)(?:^|::|\.)\w*(?:from_str|parse)\w*::'
+  positive:
+    any:
+      - pattern: assert!($H.contains($$$))
+      - pattern: assert!($H.contains($$$), $$$)
+  direct:
+    kind: macro_invocation
+    regex: '^assert!\s*\(\s*(?:include_str!|(?:std::)?fs::read_to_string)[^;]*\.contains\('
+  source:
+    kind: let_declaration
+    all:
+      - has:
+          field: pattern
+          pattern: $H
+      - has:
+          field: value
+          matches: reads
+rule:
+  kind: function_item
+  all:
+    - follows:
+        stopBy:
+          not:
+            any:
+              - kind: attribute_item
+              - kind: line_comment
+        kind: attribute_item
+        regex: '^#\[(?:\w+::)*test\]$'
+    - has:
+        field: name
+        pattern: $AT
+    - not:
+        has:
+          stopBy: end
+          matches: acts
+    - not:
+        has:
+          stopBy: end
+          matches: other-check
+    - has:
+        field: body
+        any:
+          - all:
+              - has:
+                  stopBy: end
+                  matches: positive
+              - has:
+                  stopBy: end
+                  matches: source
+          - has:
+              stopBy: end
+              matches: direct

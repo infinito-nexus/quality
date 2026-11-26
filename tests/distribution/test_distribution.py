@@ -1,3 +1,4 @@
+import base64
 import json
 import statistics
 import subprocess
@@ -114,7 +115,9 @@ def test_single_pin_source_passes_prose_and_locked_inputs(text):
 def test_every_flake_input_is_locked():
     lock = json.loads((ROOT / PIN_SOURCE).read_text(encoding="utf-8"))
     for name in lock["nodes"]["root"]["inputs"].values():
-        assert lock["nodes"][name]["locked"]["narHash"].startswith("sha256-"), name
+        algorithm, _, digest = lock["nodes"][name]["locked"]["narHash"].partition("-")
+        assert algorithm == "sha256", name
+        assert len(base64.b64decode(digest, validate=True)) == 32, name
 
 
 @needs_nix

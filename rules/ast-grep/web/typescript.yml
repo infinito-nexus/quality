@@ -86,3 +86,247 @@ rule:
     regex: '^(?:[''"`\[{]|-?\.?\d|true\b)'
     not:
       regex: '^\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*$'
+---
+id: test.text-presence/typescript
+language: typescript
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  read-call:
+    kind: call_expression
+    any:
+      - has:
+          field: function
+          regex: '(?:^|\.)(?:readFileSync|readFile|readTextFile|readTextFileSync)$'
+      - regex: '^[\w$.]+\.toString\(\s*\)$'
+  read-constant:
+    kind: identifier
+    all:
+      - pattern: $C
+      - inside:
+          stopBy: end
+          kind: program
+          has:
+            any:
+              - kind: lexical_declaration
+              - kind: variable_declaration
+            has:
+              kind: variable_declarator
+              all:
+                - has:
+                    field: name
+                    pattern: $C
+                - has:
+                    field: value
+                    matches: reads
+  on-constant:
+    any:
+      - matches: read-constant
+      - has:
+          stopBy: end
+          matches: read-constant
+  text-equality:
+    kind: call_expression
+    all:
+      - has:
+          field: function
+          regex: '^assert\.(?:equal|strictEqual|deepEqual|deepStrictEqual)$'
+      - has:
+          field: arguments
+          has:
+            nthChild: 1
+            matches: on-constant
+  constant-positive:
+    any:
+      - matches: text-equality
+      - kind: call_expression
+        all:
+          - has:
+              field: function
+              regex: '^assert(?:\.(?:match|include|ok|isTrue))?$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                matches: on-constant
+  reads:
+    any:
+      - matches: read-call
+      - has:
+          stopBy: end
+          matches: read-call
+  includes:
+    any:
+      - kind: call_expression
+        has:
+          field: function
+          kind: member_expression
+          has:
+            field: property
+            regex: '^(?:includes|match|test)$'
+      - kind: unary_expression
+        regex: '^!'
+        has:
+          field: argument
+          matches: includes
+      - kind: parenthesized_expression
+        has:
+          matches: includes
+  check-call:
+    kind: call_expression
+    has:
+      field: function
+      regex: '^(?:expect(?:\.soft)?\s*\(|assert\b)'
+  containment-call:
+    kind: call_expression
+    any:
+      - has:
+          field: function
+          kind: member_expression
+          regex: '^expect(?:\.soft)?\s*\('
+          has:
+            field: property
+            regex: '^(?:toContain|toMatch|include|contain|match)$'
+      - has:
+          field: function
+          regex: '^assert\.(?:match|doesNotMatch|include|notInclude)$'
+      - all:
+          - has:
+              field: function
+              regex: '^assert(?:\.(?:ok|isTrue|isFalse|notOk))?$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                matches: includes
+  other-check:
+    matches: check-call
+    not:
+      any:
+        - matches: containment-call
+        - matches: text-equality
+        - matches: constant-positive
+  acts:
+    any:
+      - kind: call_expression
+        not:
+          regex: '^require\(\s*[''"](?:node:)?(?:fs|path)[''"]\s*\)$'
+        has:
+          field: function
+          any:
+            - kind: import
+            - kind: identifier
+              regex: '(?i)^\w*(?:parse|load|render|compile|eval|exec|spawn|fork|require|import|write|copy|mkdtemp|tmpdir|transform|run|goto|fetch|request)\w*$'
+            - kind: member_expression
+              has:
+                field: property
+                regex: '(?i)^\w*(?:parse|load|render|compile|eval|exec|spawn|fork|require|import|write|copy|mkdtemp|tmpdir|transform|run|goto|fetch|request)\w*$'
+      - kind: new_expression
+        has:
+          field: constructor
+          regex: '(?:^|\.)(?:Function|Script|DOMParser|JSDOM|\w*Parser)$'
+  haystack:
+    any:
+      - pattern: $H.$_M($$$)
+      - pattern: $H
+  positive:
+    any:
+      - kind: call_expression
+        all:
+          - has:
+              field: function
+              kind: member_expression
+              regex: '^expect(?:\.soft)?\s*\('
+              not:
+                regex: '\.not\b'
+              has:
+                field: property
+                regex: '^(?:toContain|toMatch|include|contain|match)$'
+          - has:
+              field: function
+              has:
+                stopBy: end
+                kind: call_expression
+                has:
+                  field: arguments
+                  has:
+                    nthChild: 1
+                    matches: haystack
+      - kind: call_expression
+        all:
+          - has:
+              field: function
+              regex: '^assert\.(?:match|include)$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                matches: haystack
+      - kind: call_expression
+        all:
+          - has:
+              field: function
+              regex: '^assert(?:\.(?:ok|isTrue))?$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 1
+                any:
+                  - pattern: $H.includes($$$)
+                  - pattern: $H.match($$$)
+                  - pattern: $_R.test($H)
+  source:
+    any:
+      - kind: variable_declarator
+        all:
+          - has:
+              field: name
+              pattern: $H
+          - has:
+              field: value
+              matches: reads
+      - kind: assignment_expression
+        all:
+          - has:
+              field: left
+              pattern: $H
+          - has:
+              field: right
+              matches: reads
+rule:
+  kind: call_expression
+  all:
+    - has:
+        field: function
+        regex: '^(?:test|it)(?:\.(?:only|skip|concurrent|fixme|fail|slow))?$'
+    - has:
+        field: arguments
+        has:
+          any:
+            - kind: arrow_function
+            - kind: function_expression
+    - not:
+        has:
+          stopBy: end
+          matches: acts
+    - not:
+        has:
+          stopBy: end
+          matches: other-check
+    - any:
+        - all:
+            - has:
+                stopBy: end
+                matches: positive
+            - has:
+                stopBy: end
+                matches: source
+        - has:
+            stopBy: end
+            matches: positive
+            has:
+              stopBy: end
+              matches: read-call
+        - has:
+            stopBy: end
+            matches: constant-positive

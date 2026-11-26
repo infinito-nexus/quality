@@ -1,15 +1,25 @@
+import posixpath
 import re
 from dataclasses import dataclass
 
 import yaml
 
 from quality import QualityError
-from quality.repo import IGNORE_FILE
+from quality.repo import IGNORE_FILE, NOCHECK_FILE
 from quality.ruledata import RuleData, gitignore_spec
 from quality.suppress import rule_matches
 
 ALLOWED_KEYS = {"rule", "paths", "reason"}
 GLOB_CHARACTERS = re.compile(r"[*?\[\\]")
+FOLDER_DIRECTIVE = re.compile(r"^\s*#\s*nocheck:\s*(?P<rule>[A-Za-z0-9_.\-]+)(?:\s+--\s+(?P<reason>\S.*?))?\s*$")
+
+
+@dataclass(frozen=True)
+class FolderSpec:
+    prefix: str
+
+    def match_file(self, path: str) -> bool:
+        return path.startswith(self.prefix)
 
 
 @dataclass(frozen=True, eq=False)
@@ -18,6 +28,7 @@ class IgnoreEntry:
     paths: tuple
     reason: str
     spec: object
+    source: str
 
     def covers(self, rule_id: str, path: str) -> bool:
         if not rule_matches(rule_id, self.rule):
@@ -106,7 +117,7 @@ def parse_entry(raw: object, position: int, data: RuleData) -> IgnoreEntry:
     reason = text_field(raw, "reason", position)
     check_hard(rule, paths, position, data)
     check_literal(rule, paths, position, data)
-    return IgnoreEntry(rule, paths, reason, gitignore_spec(paths) if paths else None)
+    return IgnoreEntry(rule, paths, reason, gitignore_spec(paths) if paths else None, IGNORE_FILE)
 
 
 def parse(content: bytes | None, data: RuleData) -> list:
@@ -135,6 +146,43 @@ def parse(content: bytes | None, data: RuleData) -> list:
     return [parse_entry(raw, index, data) for index, raw in enumerate(document, start=1)]
 
 
+def folder_entries(files: dict, data: RuleData) -> list:
+    """
+    Args:
+        files: Folder, "" for the root, to the content of its `.nocheck` file.
+        data: Rule data naming the catalogue rules and groups.
+
+    Returns:
+        One entry per `# nocheck: <rule> -- <reason>` line naming a catalogue
+        rule or group, waiving its soft members in that folder and every
+        folder below. Lines naming anything else belong to the project's own
+        lints and are skipped.
+
+    Raises:
+        QualityError: A line naming a catalogue rule has no reason, or names
+            only hard or changed_only rules, which only .qualityignore.yml
+            waives.
+    """
+    entries = []
+    for folder, content in sorted(files.items()):
+        source = posixpath.join(folder, NOCHECK_FILE)
+        for number, line in enumerate(content.decode("utf-8", "replace").splitlines(), start=1):
+            match = FOLDER_DIRECTIVE.match(line)
+            if match is not None and data.members(match["rule"]):
+                entries.append(folder_entry(match["rule"], match["reason"], f"{source}:{number}", folder, data))
+    return entries
+
+
+def folder_entry(rule: str, reason: str | None, where: str, folder: str, data: RuleData) -> IgnoreEntry:
+    if reason is None:
+        raise QualityError(f"{where}: nocheck: {rule} needs a reason after --")
+    if all(member.waived_from_base() for member in data.members(rule)):
+        raise QualityError(f"{where}: {rule} names a hard or changed_only rule, which only {IGNORE_FILE} waives")
+    if not folder:
+        return IgnoreEntry(rule, (), reason, None, where)
+    return IgnoreEntry(rule, (f"/{folder}/",), reason, FolderSpec(f"{folder}/"), where)
+
+
 def split_ignored(hits: list, soft_entries: list, hard_entries: list) -> tuple:
     """
     Args:
@@ -160,7 +208,7 @@ def split_ignored(hits: list, soft_entries: list, hard_entries: list) -> tuple:
 
 def refuse_stale(stale: list) -> None:
     if stale:
-        raise QualityError(f"stale {IGNORE_FILE} entry: {describe(stale[0])}")
+        raise QualityError(f"stale {stale[0].source} entry: {describe(stale[0])}")
 
 
 def stale_names(entries: list, hits: list, checked: set, rule_ids: set) -> list:

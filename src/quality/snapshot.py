@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from quality import QualityError
 from quality.kinds import KindMap
-from quality.repo import IGNORE_FILE, Repo
+from quality.repo import IGNORE_FILE, NOCHECK_FILE, Repo
 from quality.suppress import marker_comments, python_comments
 
 REGULAR_MODES = ("100644", "100755", "100664")
@@ -241,6 +241,25 @@ class Snapshot:
         if IGNORE_FILE in self.irregular or IGNORE_FILE in self.unchecked:
             raise QualityError(f"{IGNORE_FILE} must be a regular file under the size limit")
         return self.data(IGNORE_FILE) if IGNORE_FILE in self.files else None
+
+    def nocheck_data(self) -> dict:
+        """
+        Returns:
+            Folder relative to the root, "" for the root itself, to the
+            content of the `.nocheck` file it holds on this side.
+
+        Raises:
+            QualityError: Such a file is a symlink or over the size limit.
+        """
+        found = [
+            path
+            for path in (*self.files, *self.unchecked, *self.irregular)
+            if posixpath.basename(path) == NOCHECK_FILE
+        ]
+        for path in found:
+            if path not in self.files:
+                raise QualityError(f"{path} must be a regular file under the size limit")
+        return {posixpath.dirname(path): self.data(path) for path in found}
 
 
 def materialize(repo, entries: list, root: Path, blob_limit: int, kind_map: KindMap) -> Snapshot:

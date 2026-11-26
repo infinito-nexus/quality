@@ -35,3 +35,203 @@ rule:
             - nthChild:
                 position: 1
                 reverse: true
+---
+id: test.text-presence/java
+language: java
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  read-call:
+    kind: method_invocation
+    all:
+      - has:
+          field: object
+          regex: '(?:^|\.)Files$'
+      - has:
+          field: name
+          regex: '^(?:readString|readAllLines|readAllBytes|lines)$'
+  reads:
+    any:
+      - matches: read-call
+      - has:
+          stopBy: end
+          matches: read-call
+  includes:
+    any:
+      - kind: method_invocation
+        has:
+          field: name
+          regex: '^(?:contains|matches)$'
+      - kind: unary_expression
+        regex: '^!'
+        has:
+          field: operand
+          matches: includes
+  matcher:
+    regex: '^(?:not\(\s*)?(?:\w+\.)?(?:containsString|matchesPattern|matchesRegex)\('
+  assert-that:
+    kind: method_invocation
+    has:
+      field: name
+      regex: '^assertThat$'
+  on-assert-that:
+    has:
+      field: object
+      any:
+        - matches: assert-that
+        - has:
+            stopBy: end
+            matches: assert-that
+  check-call:
+    kind: method_invocation
+    any:
+      - has:
+          field: name
+          regex: '^(?:assert\w*|fail)$'
+      - matches: on-assert-that
+  containment-call:
+    kind: method_invocation
+    any:
+      - all:
+          - has:
+              field: name
+              regex: '^(?:assertTrue|assertFalse)$'
+          - has:
+              field: arguments
+              has:
+                matches: includes
+      - all:
+          - has:
+              field: name
+              regex: '^assertThat$'
+          - not:
+              has:
+                field: arguments
+                has:
+                  nthChild: 2
+      - all:
+          - has:
+              field: name
+              regex: '^assertThat$'
+          - has:
+              field: arguments
+              has:
+                nthChild: 2
+                matches: matcher
+      - all:
+          - has:
+              field: name
+              regex: '^(?:contains|containsPattern|containsIgnoringCase|containsSequence|doesNotContain|doesNotContainPattern|matches|doesNotMatch|as|describedAs|withFailMessage)$'
+          - matches: on-assert-that
+  other-check:
+    matches: check-call
+    not:
+      matches: containment-call
+  acts:
+    any:
+      - kind: method_invocation
+        has:
+          field: name
+          regex: '(?i)^\w*(?:load|parse|readvalue|readtree|exec|start|write|createtemp|render|eval|copy|unmarshal)\w*$'
+      - kind: object_creation_expression
+        has:
+          field: type
+          regex: '(?:^|\.)(?:ProcessBuilder|Yaml|ObjectMapper|\w*Parser|\w*Template|ScriptEngineManager)$'
+      - kind: identifier
+        regex: '^TempDir$'
+  positive:
+    any:
+      - kind: method_invocation
+        all:
+          - has:
+              field: name
+              regex: '^assertTrue$'
+          - has:
+              field: arguments
+              has:
+                any:
+                  - pattern: $H.contains($$$)
+                  - pattern: $H.matches($$$)
+      - kind: method_invocation
+        all:
+          - has:
+              field: name
+              regex: '^(?:contains|containsPattern|containsIgnoringCase|containsSequence|matches)$'
+          - has:
+              field: object
+              any:
+                - pattern: assertThat($H)
+                - has:
+                    stopBy: end
+                    pattern: assertThat($H)
+      - kind: method_invocation
+        all:
+          - has:
+              field: name
+              regex: '^assertThat$'
+          - has:
+              field: arguments
+              all:
+                - has:
+                    nthChild: 1
+                    pattern: $H
+                - has:
+                    nthChild: 2
+                    matches: matcher
+                    not:
+                      regex: '^not\('
+  source:
+    any:
+      - kind: variable_declarator
+        all:
+          - has:
+              field: name
+              pattern: $H
+          - has:
+              field: value
+              matches: reads
+      - kind: assignment_expression
+        all:
+          - has:
+              field: left
+              pattern: $H
+          - has:
+              field: right
+              matches: reads
+rule:
+  kind: method_declaration
+  all:
+    - has:
+        kind: modifiers
+        has:
+          any:
+            - kind: marker_annotation
+            - kind: annotation
+          regex: '^@(?:\w+\.)*(?:Parameterized)?Test\b'
+    - has:
+        field: name
+        pattern: $AT
+    - not:
+        has:
+          stopBy: end
+          matches: acts
+    - not:
+        has:
+          stopBy: end
+          matches: other-check
+    - has:
+        field: body
+        any:
+          - all:
+              - has:
+                  stopBy: end
+                  matches: positive
+              - has:
+                  stopBy: end
+                  matches: source
+          - has:
+              stopBy: end
+              matches: positive
+              has:
+                stopBy: end
+                matches: read-call

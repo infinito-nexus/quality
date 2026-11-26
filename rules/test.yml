@@ -1,0 +1,14 @@
+- id: test.text-presence
+  severity: medium
+  summary: "Test only checks that a file contains text; parse, render or run it and assert on the result"
+  enforcer:
+    python: {builtin: text-presence}
+    shell: {tool: ast-grep, language: bash}
+    javascript: {tool: ast-grep, language: javascript}
+    typescript: {tool: ast-grep, language: typescript}
+    tsx: {tool: ast-grep, language: tsx}
+    java: {tool: ast-grep, language: java}
+    rust: {tool: ast-grep, language: rust}
+    go: {tool: ast-grep, language: go}
+    ruby: {tool: ast-grep, language: ruby}
+    php: {tool: ast-grep, language: php}

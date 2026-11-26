@@ -5,6 +5,7 @@ from collections import Counter
 import yaml
 
 from quality import QualityError
+from quality.adapters.textpresence import text_presence
 from quality.gate import code_hit, metric_hit
 from quality.legal.checks import BUILTINS as LEGAL_BUILTINS
 from quality.ruledata import YAML_LOADER, require
@@ -310,6 +311,7 @@ BUILTINS = {
     "json-syntax": syntax(json_error),
     "yaml-syntax": syntax(yaml_error),
     "utf-8": syntax(utf8_error),
+    "text-presence": text_presence,
 }
 
 

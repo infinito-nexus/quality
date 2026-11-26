@@ -74,3 +74,84 @@ rule:
       regex: '[''"\\]'
 metadata:
   rows: '(?m)^(?:[^#\n]|(?<=[^ \t\n])#)*?(?<!\\)\\\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})'
+---
+id: test.text-presence/bash
+language: bash
+severity: warning
+message: test only checks that a file contains text; parse, render or run it and assert on the result
+utils:
+  allowed:
+    kind: command
+    has:
+      field: name
+      regex: '^(?:[ef]?grep|cat|assertContains|assertNotContains|assertTrue|assertFalse|fail|echo|printf|true)$'
+  reads:
+    any:
+      - kind: command
+        has:
+          field: name
+          regex: '^(?:[ef]?grep|cat)$'
+      - kind: file_redirect
+        regex: '^<[^<]'
+  positive:
+    any:
+      - kind: command
+        all:
+          - has:
+              field: name
+              regex: '^[ef]?grep$'
+          - not:
+              has:
+                field: argument
+                regex: '^-[A-Za-z]*[vLc]'
+          - not:
+              inside:
+                stopBy: end
+                any:
+                  - kind: negated_command
+                  - kind: if_statement
+                  - kind: while_statement
+                  - kind: list
+                    regex: '&&\s*fail\b'
+      - kind: command
+        all:
+          - has:
+              field: name
+              regex: '^assertContains$'
+          - has:
+              field: argument
+              has:
+                stopBy: end
+                any:
+                  - kind: simple_expansion
+                  - kind: expansion
+                  - matches: reads
+rule:
+  kind: function_definition
+  all:
+    - has:
+        field: name
+        regex: '^test'
+        pattern: $AT
+    - not:
+        has:
+          stopBy: end
+          any:
+            - kind: command
+              not:
+                matches: allowed
+            - kind: test_command
+            - kind: process_substitution
+            - kind: file_redirect
+              regex: '>'
+              not:
+                regex: '/dev/null$|>&\d$'
+    - has:
+        field: body
+        all:
+          - has:
+              stopBy: end
+              matches: reads
+          - has:
+              stopBy: end
+              matches: positive

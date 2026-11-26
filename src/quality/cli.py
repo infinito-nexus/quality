@@ -37,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--rules", metavar="DIR")
     check.add_argument("--db", metavar="DIR")
     check.add_argument("--threads", metavar="N", type=thread_count)
+    check.add_argument("--rule", metavar="ID", action="append")
     database = commands.add_parser("db", allow_abbrev=False)
     actions = database.add_subparsers(dest="action", required=True)
     update = actions.add_parser("update", allow_abbrev=False)
@@ -75,7 +76,7 @@ def execute(args: argparse.Namespace) -> int:
         print(printable(bundle.note()))
         return 0
     mode = selected_mode(args)
-    options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd(), args.threads)
+    options = Options(mode, args.base, args.rules, args.db, args.verbose, os.getcwd(), args.threads, args.rule)
     outcome = check(options)
     print(render_json(outcome) if args.as_json else render_text(outcome))
     return exit_code(outcome)
@@ -91,7 +92,7 @@ def execute_coverage(args: argparse.Namespace) -> int:
 
     scratch = Path(tempfile.mkdtemp(prefix="quality-")).resolve()
     try:
-        session = open_session(Options(COVERAGE, None, args.rules, None, False, os.getcwd(), None), scratch)
+        session = open_session(Options(COVERAGE, None, args.rules, None, False, os.getcwd(), None, None), scratch)
         snapshot = session.snapshot(session.repo.index_entries(), "head")
         counted = snapshot.census()
         files = {path: snapshot.kinds_of(path) for path in snapshot.paths()}

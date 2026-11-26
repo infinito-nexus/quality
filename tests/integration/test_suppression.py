@@ -2,6 +2,7 @@ from tests.integration.support import report, rule_for, rule_ids, rules_without_
 
 F401 = rule_for("F401")
 EVAL = "security.eval-exec"
+UNUSED = "import os\n"
 DOCKERFILE = "coding.dockerfile"
 IGNORE = ".qualityignore.yml"
 PARSE_GAP = "coding.parse-incomplete"
@@ -354,3 +355,97 @@ def test_a_stray_carriage_return_moves_no_nocheck_onto_the_next_line(target):
     assert ("clean.unused-nocheck", 3) in found
     assert (LINE_BREAK, 1) in found
     assert report(result)["nocheck"] == []
+
+
+def seeded(target):
+    target.write("seed.py", "x = 1\n")
+    for package in ("pkg", "pkg/sub", "pkgs"):
+        target.write(f"{package}/__init__.py", "")
+    target.commit()
+
+
+def found_paths(result) -> list:
+    return sorted(item["path"] for item in report(result)["findings"] if item["rule"] == F401)
+
+
+def test_folder_nocheck_waives_its_folder_and_every_folder_below(target):
+    seeded(target)
+    for path in ("pkg/a.py", "pkg/sub/b.py", "pkgs/c.py", "d.py"):
+        target.write(path, UNUSED)
+    target.write("pkg/.nocheck", f"# nocheck: {F401} -- fixture\n")
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1
+    assert found_paths(result) == ["d.py", "pkgs/c.py"]
+    assert report(result)["ignored"] == [{"rule": F401, "paths": ["/pkg/"], "reason": "fixture"}]
+
+
+def test_root_nocheck_waives_the_whole_repository(target):
+    seeded(target)
+    target.write("pkg/a.py", UNUSED)
+    target.write(".nocheck", f"# nocheck: {F401} -- fixture\n")
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 0, result.stderr
+    assert report(result)["ignored"] == [{"rule": F401, "paths": [], "reason": "fixture"}]
+
+
+def test_folder_nocheck_waives_a_group(target):
+    seeded(target)
+    target.write("pkg/a.py", UNUSED)
+    target.write("pkg/.nocheck", "# nocheck: coding -- fixture\n")
+    target.stage()
+    assert target.check("--staged").returncode == 0
+
+
+def test_folder_nocheck_skips_names_outside_the_catalogue(target):
+    seeded(target)
+    target.write("pkg/a.py", UNUSED)
+    target.write("pkg/.nocheck", "# nocheck: role-files-layout - a project lint\n# nocheck: prefix-grouped-files\n")
+    target.stage()
+    result = target.check("--staged", "--json")
+    assert result.returncode == 1
+    assert found_paths(result) == ["pkg/a.py"]
+
+
+def test_folder_nocheck_needs_a_reason(target):
+    seeded(target)
+    target.write("pkg/a.py", UNUSED)
+    target.write("pkg/.nocheck", f"# nocheck: role-files-layout - a project lint\n# nocheck: {F401}\n")
+    target.stage()
+    result = target.check("--staged")
+    assert result.returncode == 2
+    assert "pkg/.nocheck:2" in result.stderr
+    assert "reason" in result.stderr
+
+
+def test_folder_nocheck_refuses_a_hard_rule(target):
+    seeded(target)
+    target.write("pkg/a.py", "X = eval(input())\n")
+    target.write("pkg/.nocheck", f"# nocheck: {EVAL} -- fixture\n")
+    target.stage()
+    result = target.check("--staged")
+    assert result.returncode == 2
+    assert ".qualityignore.yml" in result.stderr
+
+
+def test_folder_nocheck_applies_under_base_and_all(target, tmp_path):
+    seeded(target)
+    target.git("checkout", "-q", "-b", "feature")
+    target.write("pkg/a.py", UNUSED)
+    target.write("pkg/.nocheck", f"# nocheck: {F401} -- fixture\n")
+    target.commit()
+    assert target.check("--base", "main").returncode == 0
+    reduced = rules_without_pending(tmp_path / "rules")
+    assert target.check("--all", "--rules", str(reduced)).returncode == 0
+
+
+def test_stale_folder_nocheck_fails_under_all(target, tmp_path):
+    target.write("a.py", "x = 1\n")
+    target.write("pkg/b.py", "y = 1\n")
+    target.write("pkg/.nocheck", f"# nocheck: {F401} -- stale\n")
+    target.commit()
+    reduced = rules_without_pending(tmp_path / "rules")
+    result = target.check("--all", "--rules", str(reduced))
+    assert result.returncode == 2
+    assert "stale pkg/.nocheck:1 entry" in result.stderr
