@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] - 2026-11-26
+
+Added:
+
+- Rules: *test.text-presence* flags tests that only check a file holds text
+- CLI: *--rule* runs only the named rules; an unknown id exits 2
+- Waivers: a *.nocheck* file waives the soft rules it names in its folder
+
+Fixed:
+
+- Hosted scan: the role takes a free subnet and host port
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [0.2.0] - 2026-11-25
 
 Added:
