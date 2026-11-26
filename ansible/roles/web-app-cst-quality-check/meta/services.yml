@@ -111,7 +111,7 @@ quality-check:
     internal:
       http: 8080
     local:
-      http: 7995
+      http: 7997
   healthcheck:
     test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8080/healthz', headers={'X-Real-IP': '127.0.0.1'}), timeout=4)"]
   lifecycle: alpha
