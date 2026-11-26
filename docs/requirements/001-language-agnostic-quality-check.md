@@ -115,9 +115,9 @@ flowchart TD
 - [x] `test_merge_both_parents`: during a merge, a finding present in either parent is not new.
 - [x] `test_conflict_aborts`: an unresolved conflict exits 2.
 - [x] `test_exit_codes`: no finding exits 0, findings exit 1, usage, config and missing-tool errors exit 2.
-- [ ] `test_rule_runs_only_the_named_rules`: under `--staged` and `--all`, `--rule <id>` reports and runs only the named rules, and a repeated `--rule` adds one.
-- [ ] `test_rule_of_the_fast_tier_checks_a_base_without_the_database`: `--base main --rule test.text-presence` runs without a vulnerability database, which the whole catalogue requires.
-- [ ] `test_unknown_rule_id_exits_2`: an unknown id passed to `--rule` exits 2 naming it.
+- [x] `test_rule_runs_only_the_named_rules`: under `--staged` and `--all`, `--rule <id>` reports and runs only the named rules, and a repeated `--rule` adds one.
+- [x] `test_rule_of_the_fast_tier_checks_a_base_without_the_database`: `--base main --rule test.text-presence` runs without a vulnerability database, which the whole catalogue requires.
+- [x] `test_unknown_rule_id_exits_2`: an unknown id passed to `--rule` exits 2 naming it.
 
 ### Differential gate
 
@@ -186,11 +186,11 @@ flowchart TD
 - [x] `test_nocheck_comment_only`: `x = "nocheck: rule -- reason"` does not suppress.
 - [x] `test_unused_nocheck_is_a_finding`: a new nocheck that waives nothing exits 1, an old one in a touched file stays in the baseline, and `--all` names every one.
 - [x] `test_nocheck_waives_one_line_of_an_unreadable_region`: a nocheck on the first line of a 34-line unreadable region leaves every other line a finding.
-- [ ] `test_folder_nocheck_waives_its_folder_and_every_folder_below`: `pkg/.nocheck` waives `pkg/a.py` and `pkg/sub/b.py`, not `pkgs/c.py` or `d.py`, and lists the entry with paths `/pkg/`.
-- [ ] `test_folder_nocheck_skips_names_outside_the_catalogue`: a `.nocheck` holding only project lint names waives nothing.
-- [ ] `test_folder_nocheck_needs_a_reason` and `test_folder_nocheck_refuses_a_hard_rule`: both exit 2 and name the file and line, or `.qualityignore.yml`.
-- [ ] `test_stale_folder_nocheck_fails_under_all`: a `.nocheck` line that waives nothing exits 2 under `--all`.
-- [ ] `test_root_nocheck_waives_the_whole_repository`, `test_folder_nocheck_waives_a_group` and `test_folder_nocheck_applies_under_base_and_all`: a root `.nocheck` waives every folder, `coding` waives its soft rules although it holds the changed_only `coding.parse-incomplete`, and `--base` and `--all` read the same entries.
+- [x] `test_folder_nocheck_waives_its_folder_and_every_folder_below`: `pkg/.nocheck` waives `pkg/a.py` and `pkg/sub/b.py`, not `pkgs/c.py` or `d.py`, and lists the entry with paths `/pkg/`.
+- [x] `test_folder_nocheck_skips_names_outside_the_catalogue`: a `.nocheck` holding only project lint names waives nothing.
+- [x] `test_folder_nocheck_needs_a_reason` and `test_folder_nocheck_refuses_a_hard_rule`: both exit 2 and name the file and line, or `.qualityignore.yml`.
+- [x] `test_stale_folder_nocheck_fails_under_all`: a `.nocheck` line that waives nothing exits 2 under `--all`.
+- [x] `test_root_nocheck_waives_the_whole_repository`, `test_folder_nocheck_waives_a_group` and `test_folder_nocheck_applies_under_base_and_all`: a root `.nocheck` waives every folder, `coding` waives its soft rules although it holds the changed_only `coding.parse-incomplete`, and `--base` and `--all` read the same entries.
 
 ### Rules and languages
 
@@ -204,8 +204,8 @@ flowchart TD
 - [x] `test_default_value_flags_the_old_avatar_shapes`: `process.env.AVATAR_PORT || 8765`, `process.env.AVATAR_HOST || '127.0.0.1'`, `process.env.AVATAR_PUBLIC_ORIGIN ||` a template URL, `neutralFrame(sequence = 0, timestampMs = 0)` and `constructor(limit = 10000)` each give a `clean.default-value` finding with path, line and severity, whose summary says to fail early with an error naming the missing key and where to set it; `packet?.receivedAt ?? null`, a value that throws when missing and `this.current || neutralFrame(0, 0)` pass.
 - [x] `test_default_value_takes_a_nocheck_never_a_plain_comment`: a plain comment next to a default leaves the finding, a `nocheck: clean.default-value -- reason` on that line waives it.
 - [x] `test_comment_rule`: the three allowed kinds pass, narration fails, and a shebang passes, for Python, JavaScript, shell, Java, Kotlin and Rust.
-- [ ] `test_only_a_test_that_reads_a_file_for_text_is_flagged` and `test_only_the_positive_case_of_a_rule_is_flagged`: `test.text-presence` flags a test in Python, JavaScript, TypeScript, TSX or shell whose only check is that a file it reads holds or lacks a text, and passes each paired negative case, a test that parses or runs what it reads.
-- [ ] `test_a_helper_imported_from_another_module_is_followed`: a read through a helper imported from another test module counts as a read of the file.
+- [x] `test_only_a_test_that_reads_a_file_for_text_is_flagged` and `test_only_the_positive_case_of_a_rule_is_flagged`: `test.text-presence` flags a test in Python, JavaScript, TypeScript, TSX or shell whose only check is that a file it reads holds or lacks a text, and passes each paired negative case, a test that parses or runs what it reads.
+- [x] `test_a_helper_imported_from_another_module_is_followed`: a read through a helper imported from another test module counts as a read of the file.
 - [x] `test_size_limits`: a new 501-line shell file fails, also under `tests/`; JSON, locale, lockfile and generated files of that length pass.
 - [x] `test_folder_limit`: a thirteenth item fails under `--base`, and a folder already at 20 items that does not grow passes.
 - [x] `test_prefix_groups`: two sibling files sharing a prefix fail, and dunder, numeric and `test` prefixes pass.
