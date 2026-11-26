@@ -18,6 +18,10 @@ The role deploys the web app, an egress proxy, and an idle anchor of the scan im
 - **Private reports:** a report is reachable only through its random link, sent with `no-referrer` and `noindex`.
 - **Cached Nix builds:** a source build fetches the Nix closure through the package cache's `raw-nixos-cache` repository when `dev-nix` names one in `services.nix.package_cache`, and from `cache.nixos.org` otherwise.
 
+## Biber coverage
+
+The `biber:` scenario takes the account out of the `member` group that [meta/rbac.yml](./meta/rbac.yml) declares and proves the role by its quota: `registered_per_user_hour` submissions pass and the next one gets 429, while the `administrator:` scenario puts the account into the group and passes one submission more. No assertion names the group or refuses an admin-scoped element, so the scenarios prove the role through its limit rather than through a role-scoped element.
+
 ## Further Resources
 
 - [quality repository](https://github.com/infinito-nexus/quality)

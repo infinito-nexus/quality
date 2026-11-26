@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Param $1: test runs core's full test suite with the role pulled in, deploy runs compose-deploy (required)
+# Param $1: test runs core's full test suite with the role pulled in, deploy runs compose-deploy, playwright reruns the role's spec against the stack deploy left running (required)
 # Param INFINITO_CORE_DIR: core checkout with custom-role support, make roles-pull (required)
 # Param VERIFY_APPS: comma-separated roles the deploy runs, this role and the roles it needs (required for deploy)
 # Param VERIFY_DISABLE: comma-separated core services the deploy disables, may be empty (required for deploy)
 # Param VERIFY_VARIANT: variant round the deploy pins (required for deploy)
 set -euo pipefail
 
-action="${1:?usage: core.sh test|deploy}"
+action="${1:?usage: core.sh test|deploy|playwright}"
 : "${INFINITO_CORE_DIR:?INFINITO_CORE_DIR must point at a core checkout with make roles-pull}"
 case "${action}" in
-test) ;;
+test | playwright) ;;
 deploy)
   : "${VERIFY_APPS:?VERIFY_APPS must list the roles to deploy}"
   : "${VERIFY_DISABLE?VERIFY_DISABLE must be set, empty disables nothing}"
   : "${VERIFY_VARIANT:?VERIFY_VARIANT must name the variant round}"
   ;;
 *)
-  echo "usage: core.sh test|deploy" >&2
+  echo "usage: core.sh test|deploy|playwright" >&2
   exit 2
   ;;
 esac
@@ -35,8 +35,14 @@ printf 'applications:\n  %s:\n    custom: true\n    source:\n      url: %s\n    
 export INFINITO_EXTRA_MOUNTS="${repo}"
 make -C "${core}" roles-pull inventory="${declaration}/inventory.yml"
 
+if [ "${action}" = playwright ]; then
+  make -C "${core}" compose-playwright role="${role}"
+  exit
+fi
+
+make -C "${core}" compose-up
+
 if [ "${action}" = test ]; then
-  make -C "${core}" compose-up
   cores="$(lscpu --parse=Core | grep -v '^#' | sort -u | wc -l)"
   docker update --cpuset-cpus "0-$((cores - 1))" "$(cd "${core}" && docker compose ps -q infinito)"
   make -k -C "${core}" test-external test-integration test-lint test-unit

@@ -13,7 +13,7 @@ SERVICE_VENV := .venv/service
 TEST_WORKERS := 4
 FLAKE_RESULT := build/flake/result
 
-.PHONY: test-unit test-integration test-bench test-service test-egress test-distribution test-e2e flake up down verify-test verify-compose
+.PHONY: test-unit test-integration test-bench test-service test-egress test-distribution test-e2e test-live flake up down verify-test verify-compose verify-playwright
 
 test-unit:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/unit tests/workflows
@@ -53,6 +53,15 @@ test-e2e:
 	QUALITY_E2E_BINARY=$(abspath $(FLAKE_RESULT))/bin/quality QUALITY_E2E_IMAGE=$(abspath $(FLAKE_RESULT))-1 \
 		PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/e2e/test_host_vs_image.py
 
+# Param: INFINITO_CORE_DIR (required) - core checkout whose stack `make verify-compose` deployed
+# Param: QUALITY_LIVE_MEMBER (required) - Keycloak member the realm test signs in as
+# Param: QUALITY_LIVE_MEMBER_PASSWORD_FILE (required) - file holding that member's password
+test-live: $(SERVICE_VENV)/bin/pytest
+	@test -n "$(INFINITO_CORE_DIR)" || { echo "INFINITO_CORE_DIR is required: the core checkout whose stack make verify-compose deployed" >&2; exit 2; }
+	@test -n "$(QUALITY_LIVE_MEMBER)" || { echo "QUALITY_LIVE_MEMBER is required: the Keycloak member test_add_to_existing_realm signs in as" >&2; exit 2; }
+	@test -n "$(QUALITY_LIVE_MEMBER_PASSWORD_FILE)" || { echo "QUALITY_LIVE_MEMBER_PASSWORD_FILE is required: the file holding that member's password" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 $(SERVICE_VENV)/bin/python -m pytest tests/e2e/test_live.py -rs
+
 # Fails without the running stack of `make up`: the tests join its images and fetch network
 # Param: INFINITO_CORE_DIR (required) - core checkout whose container wrapper test_stage_flags runs the step flags through
 # Param: EGRESS_RUNTIMES (required) - space-separated container runtimes, e.g. "runc sysbox-runc"; every launcher and test-proxy test runs once under each, and docker info must offer all of them
@@ -90,3 +99,8 @@ verify-test:
 verify-compose: verify-test
 	set -o pipefail; VERIFY_APPS='$(VERIFY_APPS)' VERIFY_DISABLE='$(VERIFY_DISABLE)' VERIFY_VARIANT='$(VERIFY_VARIANT)' \
 		bash service/verify/core.sh deploy 2>&1 | tee /tmp/quality-check-verify-compose.log
+
+# Param: INFINITO_CORE_DIR (required) - core checkout whose stack verify-compose deployed
+verify-playwright:
+	@test -n "$(INFINITO_CORE_DIR)" || { echo "INFINITO_CORE_DIR is required" >&2; exit 2; }
+	set -o pipefail; bash service/verify/core.sh playwright 2>&1 | tee /tmp/quality-check-verify-playwright.log

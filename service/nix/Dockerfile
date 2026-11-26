@@ -15,7 +15,10 @@ RUN test -n "${PACKAGE}" \
  && chmod 1777 /image/tmp
 
 FROM closure AS scan-closure
-RUN ln -s "$(readlink -f /package)/etc/ssl/certs/ca-bundle.crt" /image/etc/ssl/certs/ca-bundle.crt \
+RUN mkdir -p /image/usr/bin \
+ && ln -s /bin/env /image/usr/bin/env \
+ && ln -s "$(readlink -f /package)/etc/ssl/certs/ca-bundle.crt" /image/etc/ssl/certs/ca-bundle.crt \
+ && ln -s ca-bundle.crt /image/etc/ssl/certs/ca-certificates.crt \
  && printf '#!/bin/sh\nexec python3 -c "import sys; from quality.cli import main; sys.exit(main(sys.argv[1:]))" "$@"\n' > /image/bin/quality \
  && chmod 0555 /image/bin/quality
 

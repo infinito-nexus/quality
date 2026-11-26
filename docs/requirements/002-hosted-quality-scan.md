@@ -82,7 +82,7 @@ flowchart TD
 - [x] `meta/services.yml` sets `quality-check.modes.swarm.enabled: false`, `retention_hours: 48`, `access.anonymous: true`, `access.captcha: true`, and `css`, `javascript`, `matomo`, `logout`, `dashboard`, `design` and `tor` disabled.
 - [x] `test_deploy_refuses_swarm`: `tasks/00_core.yml` fails under `DEPLOYMENT_MODE=swarm`, naming the mode.
 - [x] `test_scan_anchor_holds_nothing`: the `scan` service of `templates/compose.yml.j2` runs `sleep infinity` with `network_mode: none`, `read_only: true`, the step uid, `cap_drop: ALL` and neither `env_file` nor `environment` nor volumes.
-- [ ] After `container system prune -a -f` on the deployed host, the scan image still exists and the next scan job ends `done`.
+- [x] After `container system prune -a -f` on the deployed host, the scan image still exists and the next scan job ends `done`.
 
 ### Inputs
 
@@ -182,13 +182,14 @@ flowchart TD
   - [x] `make test-egress INFINITO_CORE_DIR=<core>` runs every named egress, `[test proxy]` and isolation test above against real containers, the real proxy and temporary git servers, and it reports each skipped `[internet]` test by name; `make test-integration` stays the container-free suite of requirement 001 (operator, 2026-11-13).
 - **E2E**
   - [ ] `make compose-deploy apps=web-app-cst-quality-check` from core with this role mounted ends green.
-  - [ ] `test_live_no_socket`: on the deployed stack, `docker inspect` shows no container socket mount and exactly the role's own network on the web service.
-  - [ ] `test_live_fetch_network`: `docker network inspect` shows the fetch network with its fixed name, `internal: true`, no gateway address and the proxy as the only long-lived member.
-  - [ ] `test_reboot_state_mount`: with the state mount absent the web service does not start and nothing is written below the mount point on the root filesystem; after `mount -a` and `systemd-tmpfiles --create` it starts and both directories are writable.
-  - [ ] `test_add_to_existing_realm`: on a stack whose realm already exists, a run adding this role with `web-app-keycloak` creates the client, and a group member logging in gets the member tier from a real token.
-  - [ ] `test_upload_too_large`: through real openresty, an upload over the limit is refused, and no job or spooled body remains.
-  - [ ] `test_forwarded_for_ignored`: through real openresty, a client-sent `X-Forwarded-For` or `X-Real-IP` does not change the rate limit bucket.
-  - [ ] `test_no_address_on_disk`: after rate-limited submissions, an aborted report fetch and a 413, neither the web app's files nor openresty's container log holds the client address or a report id.
+  - [x] `test_live_no_socket`: on the deployed stack, `docker inspect` shows no container socket mount and exactly the role's own network on the web service.
+  - [x] `test_live_fetch_network`: `docker network inspect` shows the fetch network with its fixed name, `internal: true`, no gateway address and the proxy as the only long-lived member.
+  - [x] `test_scan_holder_runs`: the container that keeps the scan image on the host runs under core's CA trust override with no restart.
+  - [x] `test_reboot_state_mount`: with the state mount absent the web service does not start and nothing is written below the mount point on the root filesystem; after `mount -a` and `systemd-tmpfiles --create` it starts and both directories are writable.
+  - [x] `test_add_to_existing_realm`: on a stack whose realm already exists, a run adding this role with `web-app-keycloak` creates the client, and a group member logging in gets the member tier from a real token.
+  - [x] `test_upload_too_large`: through real openresty, an upload over the limit is refused, and no job or spooled body remains.
+  - [x] `test_forwarded_for_ignored`: through real openresty, a client-sent `X-Forwarded-For` or `X-Real-IP` does not change the rate limit bucket.
+  - [x] `test_no_address_on_disk`: after rate-limited submissions, an aborted report fetch and a 413, neither the web app's files nor openresty's container log holds the client address or a report id.
   - [ ] The Playwright spec submits this repository's public URL, a file and pasted text anonymously, submits at `/account/` as a group member beyond the per-user limit and as an account outside the group up to that limit, and finds no form at `/` in the `access.anonymous: false` variant.
   - [ ] During a deploy each submitted job shows as queued and its report test skips with the stopped timer as reason, because core stops every timer until its stage 03 (`sys-service/tasks/02_lockdown.yml`, `sys-service-terminator/tasks/02_unlock.yml`) and Playwright runs in stage 02; after the deploy, `make compose-playwright role=web-app-cst-quality-check` reads each report (operator, 2026-11-08).
   - [ ] Playwright sees a rendered CSP that allows the widget's worker from `'self'`, the captcha solved under it, and zero cross-origin requests on `/` and on a report page.
