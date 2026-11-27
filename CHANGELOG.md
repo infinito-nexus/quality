@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0] - 2026-11-27
+
+Added:
+
+- Image: *quality image* scans local images offline, Trivy plus osv-scanner
+- Image: *quality image report* gives one row per image, joining mirrors
+- Image: rule *security.vulnerable-image*; it never pulls an image
+- Database: *quality db update* also fetches Trivy's Java database
+
+Fixed:
+
+- Database: *quality db update* replaces a read-only bundle without an error
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): image scan, database
+
 ## [1.1.0] - 2026-11-27
 
 Added:
