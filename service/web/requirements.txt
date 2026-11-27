@@ -1,7 +1,7 @@
 altcha==2.3.0
 authlib==1.9.10
 blinker==1.9.0
-certifi==2026.10.23
+certifi==2026.11.20
 cffi==2.1.1
 charset-normalizer==3.5.2
 click==8.5.1
