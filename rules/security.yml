@@ -222,6 +222,10 @@
         - composer.lock
       parse_as:
         "**/requirements/*.txt": requirements.txt
+- id: security.vulnerable-image
+  severity: high
+  summary: Container image package with a known vulnerability, found by `quality image`
+  enforcer: image-scan
 - id: security.partial-scan
   severity: high
   summary: Changed file Semgrep read only in part or not at all, or lockfile trivy or osv-scanner could not parse, so a rule may miss code or packages anywhere in it; waive it per path

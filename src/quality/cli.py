@@ -4,6 +4,8 @@ import sys
 
 from quality import QualityError, __version__, printable
 
+IMAGE_REPORT = "report"
+
 
 def thread_count(text: str) -> int:
     """
@@ -50,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = commands.add_parser("doctor", allow_abbrev=False)
     doctor.add_argument("--db", metavar="DIR")
     doctor.add_argument("--rules", metavar="DIR")
+    image = commands.add_parser("image", allow_abbrev=False)
+    image.add_argument("targets", nargs="+", metavar="REF")
+    image.add_argument("--json", action="store_true", dest="as_json")
+    image.add_argument("--db", metavar="DIR")
+    image.add_argument("--rules", metavar="DIR")
     return parser
 
 
@@ -62,6 +69,8 @@ def selected_mode(args: argparse.Namespace) -> str:
 def execute(args: argparse.Namespace) -> int:
     if args.command == "coverage":
         return execute_coverage(args)
+    if args.command == "image":
+        return execute_image(args)
     if args.command == "doctor":
         from quality.doctor import doctor
 
@@ -80,6 +89,16 @@ def execute(args: argparse.Namespace) -> int:
     outcome = check(options)
     print(render_json(outcome) if args.as_json else render_text(outcome))
     return exit_code(outcome)
+
+
+def execute_image(args: argparse.Namespace) -> int:
+    if args.targets[0] == IMAGE_REPORT:
+        from quality.image.report import report
+
+        return report(args.targets[1:], args.as_json)
+    from quality.image.scan import scan
+
+    return scan(args.targets, args.rules, args.db, args.as_json)
 
 
 def execute_coverage(args: argparse.Namespace) -> int:

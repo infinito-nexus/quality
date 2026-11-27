@@ -46,6 +46,21 @@ quality-check:
 
 `--staged` needs no database. `--base` and `--all` add the deep tier, which reads the bundle of `quality db update`: mount it with `- <db>:/db:ro` and pass `--db /db`. `--rule <id>`, repeatable, runs only the named catalogue rules in any of the three modes, the checks the runner does itself and `.qualityignore.yml` staleness included; the database is then needed only when a named rule is of the deep tier, so `quality check --base origin/main --rule test.text-presence` runs without `--db`, and an id outside the catalogue stops the check with exit 2. `quality db update --licenses <repo>`, repeatable, also stores the registry licences of the exact pins at each named repository's HEAD and in its staging index for `legal.dependency-license`; a pin without an SPDX licence there stays `unchecked`, and an update without `--licenses` keeps the stored licences. Run the service from a main checkout, because a linked worktree's `.git` file points outside `/src`.
 
+## Image scan
+
+`quality image <ref|archive|dir>... [--json]` scans container images with Trivy and osv-scanner, offline, on the bundle of `quality db update` ([requirement 010](docs/requirements/010-image-vulnerability-scan.md)). It writes one `security.vulnerable-image` finding per vulnerable package and image, in the schema of `quality check --json` plus `package`, `installed`, `fixed`, `vulnerabilities`, `engines` and `message`, and exits 1 when an image has a finding or stays unscanned.
+
+- **Local only**: quality never pulls. A reference is exported from the local Docker daemon with `docker save`, once per image id; a `docker save` tar or an OCI layout directory is read as it is. A reference the daemon does not hold is listed as unscanned with the reason `not local`, as is an image an engine could not read, with the engine's first error line.
+- **Pull limits stay with the caller**: pull the images first, through a registry mirror or a pull-through cache, so a scan of many images costs no registry quota.
+
+```sh
+docker pull mirror.example/library/nginx:1.27
+quality image mirror.example/library/nginx:1.27 ./build/app.tar --json > images.json
+quality image report images.json ci-images.json
+```
+
+`quality image report <json>... [--json]` reduces such reports to one row per image, keyed by the last path segment and the tag, so `registry.example/x/nginx:1.27` and `mirror.example/nginx:1.27` join. A row shows the image, tag, its distinct ids per severity (`C`, `H`, `M`, `L`, `?`), the ids with a fixed-in version over all ids with the two packages that fix the most and their highest fixed-in version, the ids without a fix and the engines; unscanned images follow in their own list. It proposes no fix: bumping, rebuilding and suppressing stay with the caller.
+
 ## CI
 
 Another repository calls the reusable workflows by the commit of a release tag. Each workflow builds its tools from the flake at the commit it is called at (`job.workflow_sha`), so that `uses:` line is the only pin, and Dependabot's `github-actions` ecosystem moves it to the next release. `quality.yml` gates the range a pull request or push adds and scans every commit of it for secrets; `tool.yml` runs one tool of the flake, under its package name, over the whole tree:

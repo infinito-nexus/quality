@@ -101,7 +101,7 @@ osv-scanner:
   timeout: 300
   exit_codes: [0, 1]
   database: true
-  ecosystems: [PyPI, npm, Go, crates.io, RubyGems, Packagist]
+  ecosystems: [PyPI, npm, Go, crates.io, RubyGems, Packagist, Debian, Alpine, Ubuntu]
   offline_url: https://osv-vulnerabilities.storage.googleapis.com/{ecosystem}/all.zip
   offline_path: osv-scalibr/{ecosystem}/all.zip
   update_timeout: 1800

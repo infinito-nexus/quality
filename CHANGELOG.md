@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0] - 2026-11-27
+
+Added:
+
+- Rules: twelve pattern rules from core's generic lints, on added lines
+- Rules: *security.workflow-fork-checkout* and *security.sudo-preserve-env*
+- Rules: *coding.shell-or-true*, *coding.empty-except*, -latest runners
+- Rules: workflow timeouts, syntax directives, codename tags, *timeout*
+- Rules: private-use characters, line references, TODO without a link
+
+Changed:
+
+- Rules: *clean.default-value* flags a Dockerfile *ARG* with a real default
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): requirements
+
 ## [1.0.0] - 2026-11-26
 
 Breaking:

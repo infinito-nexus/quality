@@ -20,8 +20,21 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
     bundle = require(settings, "database", "runtime")
     if bundle is None:
         raise QualityError("trivy needs the vulnerability database: run `quality db update`")
-    prefix = [
-        "filesystem",
+    prefix = ["filesystem", *offline_flags(bundle), "--debug", "--list-all-pkgs", "--"]
+    return [Command(prefix, [path], bound) for path in all_files(bound)]
+
+
+def offline_flags(bundle) -> list:
+    """
+    Args:
+        bundle: The vulnerability database.
+
+    Returns:
+        Flags that read the bundle's database in place, keep the cache in
+        memory, never fetch, ignore every trivy config of the target and print
+        JSON vulnerability results.
+    """
+    return [
         "--cache-dir",
         str(bundle.trivy_cache()),
         "--cache-backend",
@@ -34,10 +47,8 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         "--disable-telemetry",
         "--skip-version-check",
         "--no-progress",
-        "--debug",
         "--scanners",
         "vuln",
-        "--list-all-pkgs",
         "--format",
         "json",
         "--config",
@@ -46,9 +57,7 @@ def commands(bound: list, settings: dict, _empty_file) -> list:
         "",
         "--secret-config",
         "",
-        "--",
     ]
-    return [Command(prefix, [path], bound) for path in all_files(bound)]
 
 
 def package_lines(result: dict) -> dict:
