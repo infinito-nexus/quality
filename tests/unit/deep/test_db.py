@@ -198,6 +198,24 @@ def test_failed_fetch_keeps_the_old_bundle(tmp_path):
     assert sorted(path.name for path in tmp_path.iterdir()) == ["db", "shims"]
 
 
+def test_fetch_trivy_loads_the_vulnerability_and_the_java_database(tmp_path):
+    shims, work = tmp_path / "shims", tmp_path / "work"
+    shims.mkdir()
+    work.mkdir()
+    log = tmp_path / "calls.log"
+    trivy = shims / "trivy"
+    trivy.write_text(f'#!/bin/sh\necho "$*" >> "{log}"\n', encoding="utf-8")
+    trivy.chmod(0o755)
+    data = load(RULES)
+    db.fetch_trivy(work, data, str(shims), {})
+    calls = [line.split() for line in log.read_text(encoding="utf-8").splitlines()]
+    settings = data.tool("trivy")
+    assert [call[1] for call in calls] == ["--download-db-only", "--download-java-db-only"]
+    assert calls[0][calls[0].index("--db-repository") + 1] == settings["db_repository"]
+    assert calls[1][calls[1].index("--java-db-repository") + 1] == settings["java_db_repository"]
+    assert not (work / "home").exists()
+
+
 def test_default_cache_is_created_private(tmp_path):
     cache = tmp_path / "cache" / "quality"
     db.guard_cache(cache)

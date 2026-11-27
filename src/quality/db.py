@@ -23,6 +23,10 @@ LICENSE_DIR = "licenses"
 LICENSE_INDEX = "index.json"
 LICENSE_KEY = "licenses"
 CONTENT_DIRS = (TRIVY_DIR, OSV_DIR, LICENSE_DIR)
+TRIVY_DATABASES = (
+    ("db_repository", "--download-db-only", "--db-repository"),
+    ("java_db_repository", "--download-java-db-only", "--java-db-repository"),
+)
 TIMESTAMP = "%Y-%m-%dT%H:%M:%SZ"
 UPDATE_HINT = "run `quality db update`"
 COPY_CHUNK = 1 << 20
@@ -290,29 +294,30 @@ def fetch_trivy(work: Path, data: RuleData, path_value: str, environ: dict) -> N
     binary = shutil.which("trivy", path=path_value)
     if binary is None:
         raise QualityError("missing tool: trivy")
-    repository = require(settings, "db_repository", "tools.yml trivy")
     timeout = require(settings, "update_timeout", "tools.yml trivy")
     home = work / "home"
     home.mkdir()
-    argv = [
-        binary,
-        "image",
-        "--download-db-only",
-        "--cache-dir",
-        str(work / TRIVY_DIR),
-        "--db-repository",
-        repository,
-        "--timeout",
-        f"{timeout}s",
-        "--no-progress",
-        "--quiet",
-        "--disable-telemetry",
-        "--skip-version-check",
-    ]
-    result = run(argv, str(work), network_env(path_value, home, environ), timeout)
+    for key, only, option in TRIVY_DATABASES:
+        repository = require(settings, key, "tools.yml trivy")
+        argv = [
+            binary,
+            "image",
+            only,
+            "--cache-dir",
+            str(work / TRIVY_DIR),
+            option,
+            repository,
+            "--timeout",
+            f"{timeout}s",
+            "--no-progress",
+            "--quiet",
+            "--disable-telemetry",
+            "--skip-version-check",
+        ]
+        result = run(argv, str(work), network_env(path_value, home, environ), timeout)
+        if result.code != 0:
+            raise QualityError(f"trivy could not fetch {repository} (exit {result.code})")
     shutil.rmtree(home)
-    if result.code != 0:
-        raise QualityError(f"trivy could not fetch {repository} (exit {result.code})")
 
 
 def download(url: str, destination: Path, timeout: int) -> None:

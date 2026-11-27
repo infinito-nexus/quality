@@ -51,6 +51,7 @@ quality-check:
 `quality image <ref|archive|dir>... [--json]` scans container images with Trivy and osv-scanner, offline, on the bundle of `quality db update` ([requirement 010](docs/requirements/010-image-vulnerability-scan.md)). It writes one `security.vulnerable-image` finding per vulnerable package and image, in the schema of `quality check --json` plus `package`, `installed`, `fixed`, `vulnerabilities`, `engines` and `message`, and exits 1 when an image has a finding or stays unscanned.
 
 - **Local only**: quality never pulls. A reference is exported from the local Docker daemon with `docker save`, once per image id; a `docker save` tar or an OCI layout directory is read as it is. A reference the daemon does not hold is listed as unscanned with the reason `not local`, as is an image an engine could not read, with the engine's first error line.
+- **Bundle**: `quality db update` fetches Trivy's vulnerability and Java databases and the osv-scanner databases of every ecosystem in `rules/tools.yml`, the Debian, Alpine and Ubuntu packages included; an image with JAR files stays unscanned on a bundle without the Java database, so update a bundle older than v1.2.0 first.
 - **Pull limits stay with the caller**: pull the images first, through a registry mirror or a pull-through cache, so a scan of many images costs no registry quota.
 
 ```sh

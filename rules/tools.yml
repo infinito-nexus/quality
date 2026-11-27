@@ -91,6 +91,7 @@ trivy:
   parse_errors: [Walk error, Analysis error, Failed to parse]
   database: true
   db_repository: ghcr.io/aquasecurity/trivy-db:2
+  java_db_repository: ghcr.io/aquasecurity/trivy-java-db:1
   update_timeout: 1800
   loads:
     - trivy.yaml
