@@ -405,6 +405,8 @@ def retire(work: Path, root: Path) -> None:
     retired = root.with_name(f"{work.name}.retired")
     root.rename(retired)
     work.rename(root)
+    for directory in [retired, *(path for path in retired.rglob("*") if path.is_dir() and not path.is_symlink())]:
+        directory.chmod(directory.stat().st_mode | stat.S_IWUSR)
     shutil.rmtree(retired)
 
 

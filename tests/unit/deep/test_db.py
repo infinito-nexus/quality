@@ -145,6 +145,17 @@ def test_update_stages_beside_the_bundle_inside_a_read_only_tree(tmp_path, monke
     assert db.open_bundle(mount / "bundle", 7, datetime.now(timezone.utc)).handle is not None
 
 
+def test_update_retires_a_read_only_bundle(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "fetch_trivy", fake_fetch)
+    monkeypatch.setattr(db, "fetch_osv", fake_fetch)
+    root = bundle_at(tmp_path / "db", NOW)
+    for directory in [*(path for path in root.rglob("*") if path.is_dir()), root]:
+        directory.chmod(0o555)
+    db.update(root, load(RULES), os.environ["PATH"], {})
+    assert [path.name for path in tmp_path.iterdir()] == ["db"]
+    assert db.open_bundle(root, 7, datetime.now(timezone.utc)).handle is not None
+
+
 def test_update_leaves_the_bundle_readable_to_the_image_user(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "fetch_trivy", fake_fetch)
     monkeypatch.setattr(db, "fetch_osv", fake_fetch)
