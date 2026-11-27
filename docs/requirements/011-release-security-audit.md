@@ -65,6 +65,15 @@ flowchart TD
 - [x] One `needs_validation` record, of any origin, makes the attestation `blocked` and the command exit 1.
 - [x] An attestation is written only after `validate-findings.cjs` and `validate-coverage-ledger.cjs` exit 0.
 - [x] A coverage ledger whose `reviewed_paths` miss a changed file is refused with exit 2, since the upstream validator accepts an empty ledger: `test_a_ledger_that_skips_a_changed_file_is_refused`.
+
+### Audit hardening (operator checkpoint 2026-11-27: the first real audit of v1.1.0..HEAD found these in audit.py)
+
+- [x] attest derives tree, files, seeds, out and budget from `--repo` and the prepare options and never reads the plan file back: `test_attest_derives_the_plan_and_never_trusts_the_plan_file`.
+- [x] A seed or a ledger candidate without a findings record, or a unit still planned or in progress, leaves the audit unfinished (exit 2): `test_a_seed_without_a_record_leaves_the_audit_unfinished`, `test_a_ledger_candidate_without_a_record_leaves_the_audit_unfinished`.
+- [x] The seed fingerprint binds rule, path, line and line digest, and a rejection must name the seed's path and line before it becomes an accept row: `test_identical_lines_in_two_files_are_two_seeds`, `test_a_rejection_that_never_names_the_seed_is_refused`.
+- [x] A stored attestation is reused only for the same tree, range, upstream and profile, and a range without changes is refused: `test_a_stored_attestation_answers_only_the_same_request`, `test_a_range_without_changes_is_refused`.
+- [x] `--out` is created private; an existing one others can write, or a `--medusa` report inside it, is refused: `test_an_out_dir_others_can_write_is_refused`, `test_a_medusa_report_the_agents_can_write_is_refused`.
+- [x] `quality image` treats only an absolute or `./`-relative target as a path and refuses a bare target that names a file, so a planted file cannot replace the daemon image (requirement 010 scope, found by the same audit): `test_a_file_named_like_a_ref_never_replaces_the_daemon_image`.
 - [x] Agent invocations never exceed `--budget`; the attestation reports the budget used, tokens and minutes.
 
 ### Docs

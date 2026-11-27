@@ -83,6 +83,12 @@ def test_dependencies_are_only_pyyaml_and_pathspec():
     assert sorted(project()["project"]["dependencies"]) == ["PyYAML", "pathspec"]
 
 
+def test_every_package_under_src_ships():
+    source = ROOT / "src"
+    found = {".".join(path.parent.relative_to(source).parts) for path in source.rglob("__init__.py")}
+    assert found - set(project()["tool"]["setuptools"]["packages"]) == set()
+
+
 def test_package_excludes_service(wheel):
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()

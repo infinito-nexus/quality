@@ -122,6 +122,10 @@ def packed(layout: Path, archive: Path) -> Path:
     return archive
 
 
+def explicit(target: str) -> bool:
+    return Path(target).is_absolute() or target.startswith((os.curdir + os.sep, os.pardir + os.sep))
+
+
 def sources(targets: list, context: Context, path_value: str) -> list:
     """
     Args:
@@ -132,15 +136,22 @@ def sources(targets: list, context: Context, path_value: str) -> list:
     Returns:
         One Source per distinct target. A reference is exported from the local
         daemon, never pulled; a directory is packed into a tar for osv-scanner.
+        Only an absolute or ./-relative target is a path; a bare target that
+        exists on disk is refused, since a planted file named like a reference
+        would otherwise replace the daemon image.
     """
     found = []
     exporter = None
     for index, target in enumerate(dict.fromkeys(targets)):
         path = Path(target)
-        if path.is_dir():
+        if explicit(target) and path.is_dir():
             found.append(Source(target, path.resolve(), packed(path, context.scratch / f"layout-{index}.tar"), ""))
-        elif path.is_file():
+        elif explicit(target) and path.is_file():
             found.append(Source(target, path.resolve(), path.resolve(), ""))
+        elif explicit(target) or os.path.lexists(target):
+            raise QualityError(
+                f"{printable(target)}: an archive or layout is an existing ./ or absolute path, a reference names no file here"
+            )
         else:
             if exporter is None:
                 exporter = Exporter(

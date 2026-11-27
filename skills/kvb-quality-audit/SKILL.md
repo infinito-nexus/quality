@@ -24,10 +24,13 @@ judgement. Requirement 011 of the quality repository holds the decisions.
    ```
 
    `<dir>` lies in `/tmp` or a git-ignored directory of the target, never
-   `~/security-audit-skill`. A printed document with a `verdict` key is the
-   stored attestation of this tree or a `skipped: docs-only` one: the audit
-   is done, start no agent. Otherwise it printed the plan
-   `<dir>/plan-<tree>.json`.
+   `~/security-audit-skill`; it is created private, and an existing one must
+   be yours and writable by no one else. `<report>` lies outside `<dir>`. A
+   range that changes no file is refused. A printed document with a
+   `verdict` key is the stored attestation of the same tree, range, upstream
+   and profile, or a `skipped: docs-only` one: the audit is done, start no
+   agent. Otherwise it printed the plan `<dir>/plan-<tree>.json`, the
+   agents' copy; attest never reads it back.
 3. **Audit.** Run the upstream `SKILL.md` (path in the plan's `skill`) in full
    audit mode on the plan:
    - scope: a diff between the two refs of `range`, the plan's `files` plus
@@ -46,12 +49,22 @@ judgement. Requirement 011 of the quality repository holds the decisions.
 4. **Attest.**
 
    ```bash
-   audit.py attest --repo <root> --plan <dir>/plan-<tree>.json --run <dir>/run-<tree> --invocations <n> --tokens <n> --minutes <n>
+   audit.py attest --repo <root> --out <dir> --budget <n> --medusa <report> [--range <a>..<b>] [--profile quick|standard|deep] --run <dir>/run-<tree> --invocations <n> --tokens <n> --minutes <n>
    ```
 
-   It validates both files with the upstream validators (needs `node`),
-   refuses a ledger whose `reviewed_paths` miss a changed file, records each rejected seed as a `security.py accept` row with the
-   verdict's reason, and writes `<dir>/attestation-<tree>.json`.
+   With the options of step 2 it derives the plan again from the
+   repository. It validates both files with the upstream validators (needs
+   `node`) and refuses:
+   - a ledger whose `reviewed_paths` miss a changed file;
+   - a seed or a ledger `result_fingerprints` entry without a findings
+     record;
+   - a unit still `planned` or `in_progress`;
+   - a rejection whose trace and evidence never name the seed's path and
+     line.
+
+   It then records each rejected seed as a `security.py accept` row with the
+   verdict's reason and writes `<dir>/attestation-<tree>.json`. A `blocked`
+   ledger unit blocks like a `needs_validation` record.
 
 ## Attestation
 
@@ -64,6 +77,7 @@ or `skipped: docs-only`.
 ## Exit codes
 
 - 0: plan written, `pass` or `skipped: docs-only`.
-- 1: `blocked`: a confirmed critical or high finding, or any
-  `needs_validation` record. The release stops.
-- 2: usage, lock, range, budget or validation error.
+- 1: `blocked`: a confirmed critical or high finding, any
+  `needs_validation` record or any `blocked` ledger unit. The release stops.
+- 2: usage, lock, range, budget, ownership, validation or unfinished-audit
+  error.

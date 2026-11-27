@@ -16,6 +16,12 @@ SKILL = REPO_ROOT / "skills" / "kvb-quality-audit"
 AUDIT = SKILL / "scripts" / "audit.py"
 SEEDED = "token = request.args['t']  # MARK-HIGH"
 SHA1 = hashlib.sha1(SEEDED.encode()).hexdigest()
+HIGH = {"rule": "FAKE-HIGH", "path": "app.py", "line": 2, "sha1": SHA1, "severity": "high"}
+
+
+def seed_print(item: dict) -> str:
+    place = hashlib.sha256(f"{item['path']}\0{item['line']}\0{item['sha1']}".encode()).hexdigest()
+    return f"medusa:{item['rule']}:{place}"
 needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node runs the upstream validators")
 
 
@@ -52,9 +58,16 @@ class Target(GitCase):
     def run(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, str(AUDIT), *args], env=self.env, capture_output=True, text=True, check=False)
 
-    def prepare(self, *extra: str, findings: list | None = None) -> subprocess.CompletedProcess:
+    def shared(self, command: str, findings: list | None) -> list:
         report = self.medusa([] if findings is None else findings)
-        return self.run("prepare", "--repo", str(self.repo), "--out", str(self.out), "--budget", "4", "--medusa", str(report), *extra)
+        return [command, "--repo", str(self.repo), "--out", str(self.out), "--budget", "4", "--medusa", str(report)]
+
+    def prepare(self, *extra: str, findings: list | None = None) -> subprocess.CompletedProcess:
+        return self.run(*self.shared("prepare", findings), *extra)
+
+    def attest(self, run: Path, invocations: str, findings: list | None = None) -> subprocess.CompletedProcess:
+        counters = ("--invocations", invocations, "--tokens", "1200", "--minutes", "3")
+        return self.run(*self.shared("attest", findings), "--run", str(run), *counters)
 
 
 def place(kind: str, line: int) -> dict:
@@ -79,7 +92,7 @@ def record(verdict: str, fingerprint: str, severity: str | None = None) -> dict:
     }
 
 
-def ledger(paths: list) -> list:
+def ledger(paths: list, fingerprints: list | None = None) -> list:
     refs = {"surface": "app.py#main", "boundary": "app.py#main", "subsystem": "app", "attack_class": "ATTACK-CLASSES.md#Injection"}
     check = {"agent_id": "hunter-1", "reviewed_paths": paths, "invariant": "No input reaches the call.", "method": "source", "result": "Held.", "artifact": None}
     unit = {
@@ -96,24 +109,31 @@ def ledger(paths: list) -> list:
         "prior_status": "new",
         "attempts": [],
         "wave": 1,
-        "status": "covered",
+        "status": "candidate" if fingerprints else "covered",
         "agent_id": "hunter-1",
         "reviewed_paths": paths,
         "local_checks": [check],
-        "result_fingerprints": [],
+        "result_fingerprints": fingerprints or [],
         "unresolved": [],
     }
     return [unit]
 
 
-def audited(target: Target, records: list, reviewed: list, invocations: str) -> subprocess.CompletedProcess:
-    plan = json.loads(target.prepare(findings=[{"rule": "FAKE-HIGH", "path": "app.py", "line": 2, "sha1": SHA1, "severity": "high"}]).stdout)
+def prepared(target: Target, records: list, reviewed: list, fingerprints: list | None = None, findings: list | None = None) -> Path:
+    plan = json.loads(target.prepare(findings=findings).stdout)
     run = target.out / f"run-{plan['tree']}"
     run.mkdir()
     (run / "findings.json").write_text(json.dumps(sorted(records, key=lambda item: item["fingerprint"])), encoding="utf-8")
-    (run / "coverage-ledger.json").write_text(json.dumps(ledger(reviewed)), encoding="utf-8")
-    plan_file = target.out / f"plan-{plan['tree']}.json"
-    return target.run("attest", "--repo", str(target.repo), "--plan", str(plan_file), "--run", str(run), "--invocations", invocations, "--tokens", "1200", "--minutes", "3")
+    (run / "coverage-ledger.json").write_text(json.dumps(ledger(reviewed, fingerprints)), encoding="utf-8")
+    return run
+
+
+def audited(target: Target, records: list, reviewed: list, fingerprints: list | None = None, findings: list | None = None) -> subprocess.CompletedProcess:
+    return target.attest(prepared(target, records, reviewed, fingerprints, findings), "3", findings=findings)
+
+
+def rejected_high() -> dict:
+    return record("rejected", seed_print(HIGH))
 
 
 @pytest.fixture
@@ -169,14 +189,21 @@ def test_out_must_lie_outside_the_tracked_tree(target, inside):
 def test_seeds_are_the_medusa_findings_of_changed_files(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
     other = {"rule": "FAKE-LOW", "path": "README.md", "line": 1, "sha1": "b" * 40, "severity": "low"}
-    plan = json.loads(target.prepare(findings=[other, {"rule": "FAKE-HIGH", "path": "app.py", "line": 2, "sha1": SHA1, "severity": "high"}]).stdout)
-    assert [seed["fingerprint"] for seed in plan["seeds"]] == [f"medusa:FAKE-HIGH:{SHA1}"]
+    plan = json.loads(target.prepare(findings=[other, HIGH]).stdout)
+    assert [seed["fingerprint"] for seed in plan["seeds"]] == [seed_print(HIGH)]
+
+
+def test_identical_lines_in_two_files_are_two_seeds(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n", "lib.py": f"print(2)\n{SEEDED}\n"})
+    twin = HIGH | {"path": "lib.py"}
+    plan = json.loads(target.prepare(findings=[HIGH, twin]).stdout)
+    assert sorted(seed["fingerprint"] for seed in plan["seeds"]) == sorted([seed_print(HIGH), seed_print(twin)])
 
 
 @needs_node
 def test_a_rejected_seed_becomes_one_acceptance_and_a_low_finding_passes(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record("rejected", f"medusa:FAKE-HIGH:{SHA1}"), record("confirmed", "audit:echo", "low")], ["app.py"], "3")
+    result = audited(target, [rejected_high(), record("confirmed", "audit:echo", "low")], ["app.py"],findings=[HIGH])
     assert result.returncode == 0, result.stderr
     document = json.loads(result.stdout)
     assert (document["verdict"], document["verdicts"], document["severities"]["low"]) == ("pass", {"confirmed": 1, "needs_validation": 0, "rejected": 1}, 1)
@@ -191,7 +218,7 @@ def test_a_rejected_seed_becomes_one_acceptance_and_a_low_finding_passes(target)
 @pytest.mark.parametrize(("verdict", "severity"), [("confirmed", "high"), ("confirmed", "critical"), ("needs_validation", None)])
 def test_a_grave_or_unvalidated_finding_blocks(target, verdict, severity):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record(verdict, "audit:token", severity)], ["app.py"], "3")
+    result = audited(target, [record(verdict, "audit:token", severity)], ["app.py"])
     assert result.returncode == 1, result.stderr
     assert json.loads(result.stdout)["verdict"] == "blocked"
 
@@ -199,7 +226,7 @@ def test_a_grave_or_unvalidated_finding_blocks(target, verdict, severity):
 @needs_node
 def test_a_ledger_that_skips_a_changed_file_is_refused(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n", "lib.py": "x = 1\n"})
-    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"], "3")
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"])
     assert result.returncode == 2
     assert "lib.py" in result.stderr
 
@@ -207,7 +234,7 @@ def test_a_ledger_that_skips_a_changed_file_is_refused(target):
 @needs_node
 def test_more_invocations_than_the_budget_are_refused(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"], "5")
+    result = target.attest(prepared(target, [record("confirmed", "audit:echo", "low")], ["app.py"]), "5")
     assert result.returncode == 2
     assert "exceed the budget of 4" in result.stderr
 
@@ -217,6 +244,80 @@ def test_findings_the_upstream_validator_refuses_stop_the_attestation(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
     broken = record("confirmed", "audit:echo", "low")
     del broken["remediation"]
-    result = audited(target, [broken], ["app.py"], "3")
+    result = audited(target, [broken], ["app.py"])
     assert result.returncode == 2
     assert "validate-findings.cjs refused" in result.stderr
+
+
+@needs_node
+def test_attest_derives_the_plan_and_never_trusts_the_plan_file(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n", "lib.py": "x = 1\n"})
+    plan = json.loads(target.prepare().stdout)
+    forged = target.out / f"plan-{plan['tree']}.json"
+    forged.write_text(json.dumps(plan | {"files": ["app.py"]}), encoding="utf-8")
+    run = target.out / f"run-{plan['tree']}"
+    run.mkdir()
+    (run / "findings.json").write_text("[]", encoding="utf-8")
+    (run / "coverage-ledger.json").write_text(json.dumps(ledger(["app.py"])), encoding="utf-8")
+    result = target.attest(run, "3")
+    assert result.returncode == 2
+    assert "lib.py" in result.stderr
+
+
+@needs_node
+def test_a_seed_without_a_record_leaves_the_audit_unfinished(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"],findings=[HIGH])
+    assert result.returncode == 2
+    assert seed_print(HIGH) in result.stderr
+
+
+@needs_node
+def test_a_ledger_candidate_without_a_record_leaves_the_audit_unfinished(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"],fingerprints=["audit:open"])
+    assert result.returncode == 2
+    assert "audit:open" in result.stderr
+
+
+@needs_node
+def test_a_rejection_that_never_names_the_seed_is_refused(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    elsewhere = rejected_high()
+    elsewhere["trace"] = [{"kind": "entrypoint", "scope": "main", "file": "lib.py", "line": 2, "description": "Read in the audit."}]
+    elsewhere["evidence"] = [{"file": "lib.py", "line": 2, "description": "Read in the audit."}]
+    result = audited(target, [elsewhere], ["app.py"],findings=[HIGH])
+    assert result.returncode == 2
+    assert "never names app.py:2" in result.stderr
+    assert not (Path(target.env["AGENTS_COUNCIL_ROOT"]) / "security-accepted.jsonl").exists()
+
+
+def test_a_stored_attestation_answers_only_the_same_request(target):
+    target.commit({"README.md": "# app\n\nMore.\n"})
+    assert json.loads(target.prepare().stdout)["profile"] == "quick"
+    again = target.prepare("--profile", "standard")
+    assert again.returncode == 0
+    assert json.loads(again.stdout)["profile"] == "standard"
+
+
+def test_a_range_without_changes_is_refused(target):
+    result = target.prepare("--range", "HEAD..HEAD")
+    assert result.returncode == 2
+    assert "changes no file" in result.stderr
+
+
+def test_an_out_dir_others_can_write_is_refused(target):
+    target.out.mkdir()
+    target.out.chmod(0o777)
+    result = target.prepare()
+    assert result.returncode == 2
+    assert "writable by no one else" in result.stderr
+
+
+def test_a_medusa_report_the_agents_can_write_is_refused(target):
+    target.out.mkdir(mode=0o700)
+    report = target.out / "medusa.json"
+    report.write_text(json.dumps({"security": 100, "findings": []}), encoding="utf-8")
+    result = target.run("prepare", "--repo", str(target.repo), "--out", str(target.out), "--budget", "1", "--medusa", str(report))
+    assert result.returncode == 2
+    assert "lies in --out" in result.stderr

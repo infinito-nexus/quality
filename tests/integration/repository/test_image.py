@@ -138,6 +138,23 @@ def test_archive_and_oci_layout_give_the_findings_of_the_daemon_ref(fakes):
     assert "index.json" in fakes.log.read_text(encoding="utf-8")
 
 
+def test_a_file_named_like_a_ref_never_replaces_the_daemon_image(fakes):
+    planted = fakes.root / REGISTRY_REF
+    planted.parent.mkdir(parents=True)
+    planted.write_bytes(b"clean-archive")
+    result = fakes.run(REGISTRY_REF, "--json")
+    assert result.returncode == 2
+    assert "a reference names no file here" in result.stderr
+    assert fakes.calls("docker") == []
+    assert fakes.calls("trivy") == []
+
+
+def test_a_dot_relative_archive_is_scanned_as_a_path(fakes):
+    (fakes.root / "nginx.tar").write_bytes(b"docker-archive")
+    daemon = findings_without_path(fakes.run(REGISTRY_REF, "--json"))
+    assert findings_without_path(fakes.run("./nginx.tar", "--json")) == daemon
+
+
 def test_a_ref_missing_locally_is_unscanned_and_never_pulled(fakes):
     result = fakes.run(ABSENT_REF, "--json")
     assert result.returncode == 1, result.stderr
