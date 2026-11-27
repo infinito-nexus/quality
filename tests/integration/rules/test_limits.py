@@ -110,7 +110,7 @@ def test_prefix_groups(target, mode):
 
 
 def workflow(*steps: tuple) -> str:
-    body = "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n"
+    body = "on: push\njobs:\n  build:\n    runs-on: ubuntu-24.04\n    steps:\n"
     for name, script in steps:
         indented = "".join(f"          {line}\n" for line in script)
         body += f"      - name: {name}\n        run: |\n{indented}"
@@ -155,9 +155,9 @@ def test_inline_script_aliases_counted_once(target):
     target.commit()
     script = "".join(f"          echo {index}\n" for index in range(12))
     text = (
-        "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps: &steps\n"
+        "on: push\njobs:\n  a:\n    runs-on: ubuntu-24.04\n    steps: &steps\n"
         f"      - name: long\n        run: |\n{script}"
-        "  b:\n    runs-on: ubuntu-latest\n    steps: *steps\n"
+        "  b:\n    runs-on: ubuntu-24.04\n    steps: *steps\n"
     )
     target.write(".github/workflows/w.yml", text)
     target.stage()

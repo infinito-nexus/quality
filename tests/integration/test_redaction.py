@@ -22,7 +22,7 @@ CASES = {
     "shell_finding": ("s.sh", f"#!/bin/bash\necho $1 {CANARY}\n", ("shellcheck", "s.sh")),
     "workflow_message": (
         ".github/workflows/w.yml",
-        "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
+        "on: push\njobs:\n  a:\n    runs-on: ubuntu-24.04\n    steps:\n"
         f"      - run: echo ${{{{ {CANARY}.x }}}}\n",
         ("actionlint", "-no-color", ".github/workflows/w.yml"),
     ),

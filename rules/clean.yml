@@ -131,6 +131,63 @@
     hcl: *em-dash
     jinja: *em-dash
     workflow: *em-dash
+- id: clean.private-use-char
+  severity: medium
+  summary: Private-use code point added; it renders as nothing or as a font-specific glyph
+  enforcer:
+    code: &private-use
+      tool: rg
+      pattern: '[\x{E000}-\x{F8FF}\x{F0000}-\x{10FFFD}]'
+    yaml: *private-use
+    json: *private-use
+    markdown: *private-use
+    html: *private-use
+    css: *private-use
+    xml: *private-use
+    sql: *private-use
+    toml: *private-use
+    ini: *private-use
+    conf: *private-use
+    env: *private-use
+    make: *private-use
+    dockerfile: *private-use
+    nginx: *private-use
+    systemd: *private-use
+    tex: *private-use
+    nix: *private-use
+    hcl: *private-use
+    jinja: *private-use
+    workflow: *private-use
+- id: clean.line-reference
+  severity: low
+  summary: Link to a line number goes stale with the next edit; link the file or a heading
+  enforcer:
+    markdown:
+      tool: rg
+      pcre2: true
+      pattern: '\]\((?:[^)\s]*#L[0-9]+|(?![A-Za-z][A-Za-z0-9+.-]*://)[^)\s]*:[0-9]+)\)'
+- id: clean.todo-without-link
+  severity: low
+  summary: TODO without a link to its issue; link the issue or do it now
+  enforcer:
+    code: &todo-text
+      tool: rg
+      pcre2: true
+      comment_only: true
+      pattern: '\bTODO\b(?!.*https?://)'
+    yaml: *todo-text
+    workflow: *todo-text
+    toml: *todo-text
+    make: *todo-text
+    env: *todo-text
+    conf: *todo-text
+    ini: *todo-text
+    nginx: *todo-text
+    dockerfile: *todo-text
+    systemd: *todo-text
+    nix: *todo-text
+    hcl: *todo-text
+    sql: *todo-text
 - id: clean.comment
   severity: low
   summary: Comment is neither a tool directive, a parameter doc nor an Exception
@@ -160,11 +217,16 @@
       tool: rg
       pcre2: true
       pattern: '^(?:[ \t]*(?:override[ \t]+|export[ \t]+)?[A-Za-z_][\w.-]*[ \t]*\?=[ \t]*(?!(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?[ \t]*(?:#|$))|(?:[^#\n]|(?<=[^ \t])#)*?\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\})'
-    dockerfile: &line-comment-expansion
+    dockerfile:
       tool: rg
       pcre2: true
-      pattern: '^(?![ \t]*#).*?\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\}'
-    env: *line-comment-expansion
+      pattern:
+        - &expansion '^(?![ \t]*#).*?\$\{(?:[A-Za-z_]\w*|\d+):?[-=](?!\s*(?:""|''''|``|(?i:false|none|null|nil|undefined)|\[\s*\]|\{\s*\}|\(\s*\))?\s*\})[^}\n]*\}'
+        - '(?i)^[ \t]*ARG[ \t]+\w+=(?![ \t]*(?:""|''''|false|none|null|nil|undefined)?[ \t]*$)'
+    env:
+      tool: rg
+      pcre2: true
+      pattern: *expansion
     yaml:
       tool: rg
       pcre2: true

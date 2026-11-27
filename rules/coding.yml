@@ -151,3 +151,56 @@
   enforcer:
     dockerfile:
       tool: hadolint
+- id: coding.empty-except
+  severity: medium
+  summary: Exception handler that only passes or continues; handle the error or let it raise
+  enforcer:
+    python:
+      tool: ruff
+      codes: [S110, S112]
+- id: coding.shell-or-true
+  severity: medium
+  summary: Command failure silenced with || true; handle the failure or let it stop the script
+  enforcer:
+    shell:
+      tool: rg
+      pcre2: true
+      pattern: '^(?![ \t]*#).*\|\|[ \t]*(?:true|:)[ \t]*(?:$|[;)&|#])'
+- id: coding.workflow-runner-latest
+  severity: medium
+  summary: Workflow runs on a moving -latest runner image; pin the image version
+  enforcer:
+    workflow:
+      tool: rg
+      pattern: '^[ \t]*runs-on:.*-latest\b'
+- id: coding.workflow-timeout
+  severity: low
+  summary: Job timeout above 355 minutes leaves no headroom under GitHub's 360 minute limit
+  enforcer:
+    workflow:
+      tool: rg
+      pattern: '^[ \t]*timeout-minutes:[ \t]*(?:35[6-9]|3[6-9][0-9]|[4-9][0-9]{2}|[0-9]{4,})\b'
+- id: coding.dockerfile-syntax-directive
+  severity: low
+  summary: Dockerfile syntax directive pulls a frontend image at build time; use the builder's own parser
+  enforcer:
+    dockerfile:
+      tool: rg
+      pattern: '(?i)^#[ \t]*syntax[ \t]*='
+- id: coding.distro-codename-tag
+  severity: low
+  summary: Image tag names a Debian codename that moves with every point release; pin the version
+  enforcer:
+    dockerfile: &codename-tag
+      tool: rg
+      pattern: '(?i)(?:^[ \t]*FROM[ \t]+|\bimage:[ \t]*["'']?)[^\s"'':]+:[^\s"'']*\b(?:buster|bullseye|bookworm|trixie)\b'
+    yaml: *codename-tag
+    workflow: *codename-tag
+- id: coding.timeout-foreground
+  severity: low
+  summary: timeout without --foreground moves the child out of the caller's process group, so the caller's terminal and signals miss it
+  enforcer:
+    python:
+      tool: rg
+      pcre2: true
+      pattern: '(?<![\w\])}"''])\[[ \t]*["'']timeout["''](?![^\]]*["'']--foreground["''])'

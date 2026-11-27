@@ -360,7 +360,7 @@ def write_every_kind(target: Target) -> None:
     target.write("requirements.txt", VULNERABLE_PIN)
     target.write(
         ".github/workflows/w.yml",
-        "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
+        "on: push\njobs:\n  a:\n    runs-on: ubuntu-24.04\n    steps:\n"
         "      - run: echo ${{ undefined.thing }}\n",
     )
     target.write("Dockerfile", UNTAGGED_DOCKERFILE)

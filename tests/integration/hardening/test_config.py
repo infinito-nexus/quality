@@ -43,7 +43,7 @@ def test_repo_config_ignored(target):
     target.write("s.sh", "#!/bin/bash\necho $1\n")
     target.write(
         ".github/workflows/w.yml",
-        "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
+        "on: push\njobs:\n  a:\n    runs-on: ubuntu-24.04\n    steps:\n"
         "      - run: echo ${{ undefined.thing }}\n",
     )
     target.write("Dockerfile", UNTAGGED_DOCKERFILE)

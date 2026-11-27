@@ -45,3 +45,6 @@
 - rule: legal.foreign-origin
   paths: ["service/web/quality_web/templates/notices.html.j2"]
   reason: the notices page names the licence of every bundled package as its attribution; it carries no code under those licences
+- rule: coding.distro-codename-tag
+  paths: ["service/web/Dockerfile"]
+  reason: python's slim tag without the codename moves to the next Debian release silently; the web image pins Debian trixie on purpose

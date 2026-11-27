@@ -78,6 +78,25 @@
     python:
       tool: ruff
       codes: [S108]
+- id: security.workflow-fork-checkout
+  severity: high
+  summary: pull_request_target checks out the fork's head; untrusted code runs with the base repository's secrets
+  enforcer:
+    workflow:
+      tool: rg
+      multiline: true
+      pcre2: true
+      pattern: '(?s)\bpull_request_target\b.*?\K\bgithub\.event\.pull_request\.head\.(?:sha|ref)\b'
+- id: security.sudo-preserve-env
+  severity: high
+  summary: sudo keeps the caller's whole environment; pass the variables the command needs by name
+  enforcer:
+    shell: &sudo-preserve-env
+      tool: rg
+      pattern: '\bsudo(?:[ \t]+-[A-Za-z]+)*[ \t]+(?:-[A-Za-z]*E[A-Za-z]*|--preserve-env)(?:[ \t]|$)'
+    make: *sudo-preserve-env
+    dockerfile: *sudo-preserve-env
+    workflow: *sudo-preserve-env
 - id: security.unverified-download
   severity: high
   summary: Downloaded script runs without a digest check; write it to a file and check its digest first
