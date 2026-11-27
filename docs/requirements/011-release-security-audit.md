@@ -47,28 +47,29 @@ flowchart TD
 
 ### Vendor
 
-- [ ] `skills/kvb-quality-audit/upstream/` holds the upstream `skills/security-audit/` files and `LICENSE` at the pinned commit; `lock.json` names the commit and a sha256 per file, and a test fails on any changed byte.
-- [ ] The skill's README and the repository notice name Cloudflare, the MIT licence and the upstream URL.
-- [ ] `skills/` holds nine `kvb-quality-*` folders and 003 decision 1 says nine.
+- [x] `skills/kvb-quality-audit/upstream/` holds the upstream `skills/security-audit/` files and `LICENSE` at the pinned commit; `lock.json` names the commit and a sha256 per file, and a test fails on any changed byte.
+- [x] The skill's README and the repository notice name Cloudflare, the MIT licence and the upstream URL.
+- [x] `skills/` holds nine `kvb-quality-*` folders and 003 decision 1 says nine.
 
 ### Scope
 
-- [ ] Without `--range`, the range is the newest `vX.Y.Z` tag reachable from HEAD to HEAD; with none, the run exits 2 naming `--range`.
-- [ ] A docs-only range writes the verdict `skipped: docs-only` and starts no agent.
-- [ ] A second run on the same tree id returns the stored attestation and starts no agent.
-- [ ] `--out` on a tracked path, or missing, exits 2.
+- [x] Without `--range`, the range is the newest `vX.Y.Z` tag reachable from HEAD to HEAD; with none, the run exits 2 naming `--range`.
+- [x] A docs-only range writes the verdict `skipped: docs-only` and starts no agent.
+- [x] A second run on the same tree id returns the stored attestation and starts no agent.
+- [x] `--out` on a tracked path, or missing, exits 2.
 
 ### Audit
 
-- [ ] MEDUSA findings of the range appear as validation candidates; a `rejected` one with a source trace produces exactly one `security.py accept` row.
-- [ ] A `confirmed` critical or high finding makes the attestation `blocked` and the command exit 1; only lower ones give `pass` and exit 0.
-- [ ] One `needs_validation` record, of any origin, makes the attestation `blocked` and the command exit 1.
-- [ ] An attestation is written only after `validate-findings.cjs` and `validate-coverage-ledger.cjs` exit 0.
-- [ ] Agent invocations never exceed `--budget`; the attestation reports the budget used, tokens and minutes.
+- [x] MEDUSA findings of the range appear as validation candidates; a `rejected` one with a source trace produces exactly one `security.py accept` row.
+- [x] A `confirmed` critical or high finding makes the attestation `blocked` and the command exit 1; only lower ones give `pass` and exit 0.
+- [x] One `needs_validation` record, of any origin, makes the attestation `blocked` and the command exit 1.
+- [x] An attestation is written only after `validate-findings.cjs` and `validate-coverage-ledger.cjs` exit 0.
+- [x] A coverage ledger whose `reviewed_paths` miss a changed file is refused with exit 2, since the upstream validator accepts an empty ledger: `test_a_ledger_that_skips_a_changed_file_is_refused`.
+- [x] Agent invocations never exceed `--budget`; the attestation reports the budget used, tokens and minutes.
 
 ### Docs
 
-- [ ] The skill's SKILL.md names the command, every option, the attestation schema and the exit codes; README lists the skill.
+- [x] The skill's SKILL.md names the command, every option, the attestation schema and the exit codes; README lists the skill.
 
 ### Tests
 

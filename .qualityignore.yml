@@ -48,3 +48,6 @@
 - rule: coding.distro-codename-tag
   paths: ["service/web/Dockerfile"]
   reason: python's slim tag without the codename moves to the next Debian release silently; the web image pins Debian trixie on purpose
+- rule: clean
+  paths: ["skills/kvb-quality-audit/upstream", "skills/kvb-quality-audit/upstream/**"]
+  reason: requirement 011 decision 2 vendors Cloudflare's security-audit skill unchanged at a pinned commit, and lock.json refuses any edit, so its em dashes, comments, file sizes, clones and folder layout stay upstream's
