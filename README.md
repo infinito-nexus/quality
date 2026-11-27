@@ -21,6 +21,8 @@ make install
 
 It mirrors `skills/kvb-quality-*` into `~/.claude/skills`, `~/.agents/skills` and, when `~/.codex` exists, `~/.codex/skills`; installs the checkout into `~/.local/share/kvb-quality/venv`; and writes `~/.local/bin/kvb-quality-python`, the interpreter every skill script starts with.
 
+`kvb-quality-audit` ([requirement 011](docs/requirements/011-release-security-audit.md)) audits the code a release changes and writes one attestation per tree; skills' `kvb-release-cut` runs it before every release. Its `upstream/` folder is Cloudflare's [security-audit-skill](https://github.com/cloudflare/security-audit-skill), MIT, vendored unchanged at a pinned commit with its licence; see `skills/kvb-quality-audit/README.md`.
+
 ## Dev stack
 
 Hosts without Nix, CI and dev stacks use `packages.image` (`nix build .#image`), the OCI image of the same closure, published to ghcr by digest; the digest is in the release notes. A dev stack adds it as a compose service under the profile `tools` and a make target that runs it:
