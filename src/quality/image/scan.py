@@ -171,7 +171,7 @@ def docker_env(env: dict) -> dict:
 
 def engine_argv(name: str, source: Source, context: Context) -> list:
     if name == TRIVY:
-        return [context.programs[TRIVY], "image", "--input", str(source.trivy_input), *offline_flags(context.bundle)]
+        return [context.programs[TRIVY], "image", "--input", str(source.trivy_input), *offline_flags(context.bundle), "--debug"]
     empty = context.scratch / "osv-scanner.toml"
     empty.touch()
     return [
@@ -205,6 +205,8 @@ def engine_rows(name: str, source: Source, context: Context) -> tuple:
     result = run(engine_argv(name, source, context), str(context.scratch), context.env, settings["timeout"])
     if result.code not in settings["exit_codes"]:
         return [], f"{name}: {first_line(result.stderr)}"
+    if any(marker.encode() in result.stderr for marker in settings.get("parse_errors", [])):
+        return [], f"{name}: could not parse part of the image"
     parse = engines.trivy_rows if name == TRIVY else engines.osv_rows
     try:
         return [(*row, name) for row in parse(result.stdout)], ""

@@ -156,6 +156,27 @@ def test_update_retires_a_read_only_bundle(tmp_path, monkeypatch):
     assert db.open_bundle(root, 7, datetime.now(timezone.utc)).handle is not None
 
 
+def test_update_never_opens_a_tree_swapped_in_for_the_bundle(tmp_path, monkeypatch):
+    root = bundle_at(tmp_path / "db", NOW)
+    victim = tmp_path / "victim"
+    (victim / "inner").mkdir(parents=True)
+    (victim / "inner").chmod(0o555)
+
+    def swapping_fetch(work: Path, *_args) -> None:
+        fake_fetch(work)
+        root.rename(tmp_path / "moved")
+        root.symlink_to(victim)
+
+    monkeypatch.setattr(db, "fetch_trivy", swapping_fetch)
+    monkeypatch.setattr(db, "fetch_osv", fake_fetch)
+    try:
+        with pytest.raises(QualityError, match="turned into a link or file during the update"):
+            db.update(root, load(RULES), os.environ["PATH"], {})
+        assert stat.S_IMODE((victim / "inner").stat().st_mode) == 0o555
+    finally:
+        (victim / "inner").chmod(0o755)
+
+
 def test_update_leaves_the_bundle_readable_to_the_image_user(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "fetch_trivy", fake_fetch)
     monkeypatch.setattr(db, "fetch_osv", fake_fetch)

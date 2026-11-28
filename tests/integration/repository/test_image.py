@@ -168,7 +168,7 @@ def test_engines_run_offline_on_the_archive_only(fakes):
     fakes.run(REGISTRY_REF)
     trivy = fakes.calls("trivy")[0].split()
     osv = fakes.calls("osv-scanner")[0].split()
-    assert {"--input", "--offline-scan", "--skip-db-update"} <= set(trivy)
+    assert {"--input", "--offline-scan", "--skip-db-update", "--debug"} <= set(trivy)
     assert {"--archive", "--offline", "--offline-vulnerabilities"} <= set(osv)
     assert REGISTRY_REF not in trivy + osv
 
@@ -188,6 +188,15 @@ def test_an_engine_error_is_an_unscanned_entry_with_its_first_line(tmp_path, fai
     document = json.loads(result.stdout)
     assert document["unscanned"] == [{"path": REGISTRY_REF, "reason": f"{failing}: FATAL  unable to open archive"}]
     assert {engine for item in document["findings"] for engine in item["engines"]} == {working}
+
+
+def test_a_trivy_parse_error_on_exit_0_leaves_the_image_unscanned(fakes):
+    write_shim(fakes.root / "bin", "trivy", f'cat "{fakes.root}/trivy.json"\necho "DEBUG Analysis error: failed to parse app.jar" >&2')
+    result = fakes.run(REGISTRY_REF, "--json")
+    assert result.returncode == 1
+    document = json.loads(result.stdout)
+    assert document["unscanned"] == [{"path": REGISTRY_REF, "reason": "trivy: could not parse part of the image"}]
+    assert {engine for item in document["findings"] for engine in item["engines"]} == {"osv-scanner"}
 
 
 def test_report_joins_registry_and_mirror_and_lists_unscanned(fakes):

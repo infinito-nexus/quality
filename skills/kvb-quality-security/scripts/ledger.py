@@ -52,7 +52,7 @@ def reviewed_context(parser: argparse.ArgumentParser, root: Path, args: argparse
     """Returns:
         the context sha1 of --line, None without it; a parser error when
         --sha1 is not that line's, or, without --line, when the line's text
-        recurs in the file.
+        recurs in the file or --sha1 names neither a line nor the whole file.
     """
     if args.line is not None:
         sha1, context = fingerprint(root, args.path, args.line)
@@ -60,12 +60,14 @@ def reviewed_context(parser: argparse.ArgumentParser, root: Path, args: argparse
             parser.error(f"--sha1 is not the sha1 of line {args.line} of {args.path}")
         return context
     try:
-        rows = (root / args.path).read_text(encoding="utf-8", errors="replace").splitlines()
+        text = (root / args.path).read_text(encoding="utf-8", errors="replace")
     except OSError:
-        rows = []
-    twins = sum(shared.digest(row.strip()) == args.sha1 for row in rows)
+        text = ""
+    twins = sum(shared.digest(row.strip()) == args.sha1 for row in text.splitlines())
     if twins > 1:
         parser.error(f"the line occurs {twins} times in {args.path}; name the reviewed one with --line")
+    if twins == 0 and shared.digest(text) != args.sha1:
+        parser.error(f"--sha1 names no line of {args.path} and is not the sha1 of the whole file")
     return None
 
 

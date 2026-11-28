@@ -90,6 +90,13 @@ class TestAccepted(support.SecurityCase):
         self.write("Dockerfile", text + "USER app\n")
         self.assertEqual(self.scan(env=self.env).returncode, 3)
 
+    def test_a_sha1_of_no_line_and_not_of_the_file_is_never_accepted(self):
+        self.write("app.py", "print(1)\n")
+        future = hashlib.sha1(b"eval(x)  # MARK-HIGH").hexdigest()
+        result = self.accept("--rule", "FAKE-HIGH", "--path", "app.py", "--sha1", future, "--reason", "fixture")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("names no line of app.py and is not the sha1 of the whole file", result.stderr)
+
     def test_one_accept_takes_every_rule_of_a_line(self):
         line = "z = both()  # MARK-HIGH MARK-LOW"
         self.write("app.py", f"{line}\n")

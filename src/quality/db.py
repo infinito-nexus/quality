@@ -404,6 +404,8 @@ def retire(work: Path, root: Path) -> None:
         return
     retired = root.with_name(f"{work.name}.retired")
     root.rename(retired)
+    if retired.is_symlink() or not retired.is_dir():
+        raise QualityError(f"{root} turned into a link or file during the update, left it at {retired}")
     work.rename(root)
     for directory in [retired, *(path for path in retired.rglob("*") if path.is_dir() and not path.is_symlink())]:
         directory.chmod(directory.stat().st_mode | stat.S_IWUSR)

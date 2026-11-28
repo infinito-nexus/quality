@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -65,9 +66,9 @@ class Target(GitCase):
     def prepare(self, *extra: str, findings: list | None = None) -> subprocess.CompletedProcess:
         return self.run(*self.shared("prepare", findings), *extra)
 
-    def attest(self, run: Path, invocations: str, findings: list | None = None) -> subprocess.CompletedProcess:
+    def attest(self, invocations: str, findings: list | None = None) -> subprocess.CompletedProcess:
         counters = ("--invocations", invocations, "--tokens", "1200", "--minutes", "3")
-        return self.run(*self.shared("attest", findings), "--run", str(run), *counters)
+        return self.run(*self.shared("attest", findings), *counters)
 
 
 def place(kind: str, line: int) -> dict:
@@ -119,17 +120,47 @@ def ledger(paths: list, fingerprints: list | None = None) -> list:
     return [unit]
 
 
-def prepared(target: Target, records: list, reviewed: list, fingerprints: list | None = None, findings: list | None = None) -> Path:
+def archived(status: str, fingerprints: list | None = None) -> dict:
+    unit = ledger(["app.py"])[0]
+    refs = unit["canonical_refs"] | {"surface": "app.py#other"}
+    check = unit["local_checks"][0] | {"agent_id": "hunter-2"}
+    attempt = {
+        "wave": 1,
+        "status": status,
+        "agent_id": "hunter-2",
+        "reviewed_paths": ["app.py"],
+        "local_checks": [check],
+        "result_fingerprints": fingerprints or [],
+        "unresolved": ["Needs a sandbox."] if status == "blocked" else [],
+        "reassignment_reason": "The critic reassigned it.",
+    }
+    return unit | {
+        "coverage_id": "::".join(urllib.parse.quote(refs[key], safe="-._~") for key in ("surface", "boundary", "subsystem", "attack_class")),
+        "canonical_refs": refs,
+        "surface": "Other entry",
+        "attempts": [attempt],
+        "wave": 2,
+        "status": "deferred",
+        "agent_id": None,
+        "reviewed_paths": [],
+        "local_checks": [],
+        "result_fingerprints": [],
+        "unresolved": ["quick_profile_final_critic: reassigned."],
+    }
+
+
+def prepared(target: Target, records: list, units: list, findings: list | None = None) -> Path:
     plan = json.loads(target.prepare(findings=findings).stdout)
     run = target.out / f"run-{plan['tree']}"
     run.mkdir()
     (run / "findings.json").write_text(json.dumps(sorted(records, key=lambda item: item["fingerprint"])), encoding="utf-8")
-    (run / "coverage-ledger.json").write_text(json.dumps(ledger(reviewed, fingerprints)), encoding="utf-8")
+    (run / "coverage-ledger.json").write_text(json.dumps(sorted(units, key=lambda unit: unit["coverage_id"])), encoding="utf-8")
     return run
 
 
-def audited(target: Target, records: list, reviewed: list, fingerprints: list | None = None, findings: list | None = None) -> subprocess.CompletedProcess:
-    return target.attest(prepared(target, records, reviewed, fingerprints, findings), "3", findings=findings)
+def audited(target: Target, records: list, units: list, findings: list | None = None) -> subprocess.CompletedProcess:
+    prepared(target, records, units, findings)
+    return target.attest("3", findings=findings)
 
 
 def rejected_high() -> dict:
@@ -203,7 +234,7 @@ def test_identical_lines_in_two_files_are_two_seeds(target):
 @needs_node
 def test_a_rejected_seed_becomes_one_acceptance_and_a_low_finding_passes(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [rejected_high(), record("confirmed", "audit:echo", "low")], ["app.py"],findings=[HIGH])
+    result = audited(target, [rejected_high(), record("confirmed", "audit:echo", "low")], ledger(["app.py"]), findings=[HIGH])
     assert result.returncode == 0, result.stderr
     document = json.loads(result.stdout)
     assert (document["verdict"], document["verdicts"], document["severities"]["low"]) == ("pass", {"confirmed": 1, "needs_validation": 0, "rejected": 1}, 1)
@@ -218,7 +249,7 @@ def test_a_rejected_seed_becomes_one_acceptance_and_a_low_finding_passes(target)
 @pytest.mark.parametrize(("verdict", "severity"), [("confirmed", "high"), ("confirmed", "critical"), ("needs_validation", None)])
 def test_a_grave_or_unvalidated_finding_blocks(target, verdict, severity):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record(verdict, "audit:token", severity)], ["app.py"])
+    result = audited(target, [record(verdict, "audit:token", severity)], ledger(["app.py"]))
     assert result.returncode == 1, result.stderr
     assert json.loads(result.stdout)["verdict"] == "blocked"
 
@@ -226,7 +257,7 @@ def test_a_grave_or_unvalidated_finding_blocks(target, verdict, severity):
 @needs_node
 def test_a_ledger_that_skips_a_changed_file_is_refused(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n", "lib.py": "x = 1\n"})
-    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"])
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ledger(["app.py"]))
     assert result.returncode == 2
     assert "lib.py" in result.stderr
 
@@ -234,7 +265,8 @@ def test_a_ledger_that_skips_a_changed_file_is_refused(target):
 @needs_node
 def test_more_invocations_than_the_budget_are_refused(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = target.attest(prepared(target, [record("confirmed", "audit:echo", "low")], ["app.py"]), "5")
+    prepared(target, [record("confirmed", "audit:echo", "low")], ledger(["app.py"]))
+    result = target.attest("5")
     assert result.returncode == 2
     assert "exceed the budget of 4" in result.stderr
 
@@ -244,7 +276,7 @@ def test_findings_the_upstream_validator_refuses_stop_the_attestation(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
     broken = record("confirmed", "audit:echo", "low")
     del broken["remediation"]
-    result = audited(target, [broken], ["app.py"])
+    result = audited(target, [broken], ledger(["app.py"]))
     assert result.returncode == 2
     assert "validate-findings.cjs refused" in result.stderr
 
@@ -259,7 +291,7 @@ def test_attest_derives_the_plan_and_never_trusts_the_plan_file(target):
     run.mkdir()
     (run / "findings.json").write_text("[]", encoding="utf-8")
     (run / "coverage-ledger.json").write_text(json.dumps(ledger(["app.py"])), encoding="utf-8")
-    result = target.attest(run, "3")
+    result = target.attest("3")
     assert result.returncode == 2
     assert "lib.py" in result.stderr
 
@@ -267,7 +299,7 @@ def test_attest_derives_the_plan_and_never_trusts_the_plan_file(target):
 @needs_node
 def test_a_seed_without_a_record_leaves_the_audit_unfinished(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"],findings=[HIGH])
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ledger(["app.py"]), findings=[HIGH])
     assert result.returncode == 2
     assert seed_print(HIGH) in result.stderr
 
@@ -275,7 +307,7 @@ def test_a_seed_without_a_record_leaves_the_audit_unfinished(target):
 @needs_node
 def test_a_ledger_candidate_without_a_record_leaves_the_audit_unfinished(target):
     target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
-    result = audited(target, [record("confirmed", "audit:echo", "low")], ["app.py"],fingerprints=["audit:open"])
+    result = audited(target, [record("confirmed", "audit:echo", "low")], ledger(["app.py"], ["audit:open"]))
     assert result.returncode == 2
     assert "audit:open" in result.stderr
 
@@ -286,7 +318,7 @@ def test_a_rejection_that_never_names_the_seed_is_refused(target):
     elsewhere = rejected_high()
     elsewhere["trace"] = [{"kind": "entrypoint", "scope": "main", "file": "lib.py", "line": 2, "description": "Read in the audit."}]
     elsewhere["evidence"] = [{"file": "lib.py", "line": 2, "description": "Read in the audit."}]
-    result = audited(target, [elsewhere], ["app.py"],findings=[HIGH])
+    result = audited(target, [elsewhere], ledger(["app.py"]), findings=[HIGH])
     assert result.returncode == 2
     assert "never names app.py:2" in result.stderr
     assert not (Path(target.env["AGENTS_COUNCIL_ROOT"]) / "security-accepted.jsonl").exists()
@@ -321,3 +353,98 @@ def test_a_medusa_report_the_agents_can_write_is_refused(target):
     result = target.run("prepare", "--repo", str(target.repo), "--out", str(target.out), "--budget", "1", "--medusa", str(report))
     assert result.returncode == 2
     assert "lies in --out" in result.stderr
+
+
+def test_an_out_dir_under_a_directory_others_can_change_is_refused(target):
+    shared = target.repo.parent / "shared"
+    shared.mkdir()
+    shared.chmod(0o777)
+    target.out = shared / "out"
+    result = target.prepare()
+    assert result.returncode == 2
+    assert f"lies under {shared}, which another user can change" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("uid_map", "mapped"),
+    [("0 0 4294967295\n", True), ("1000 1000 1\n", False), ("0 1000 1\n", True), ("1 100000 65536\n", False)],
+)
+def test_only_a_namespace_without_root_trusts_the_overflow_uid(uid_map, mapped):
+    spec = importlib.util.spec_from_file_location("audit_scope", AUDIT.with_name("scope.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.maps_root(uid_map) is mapped
+
+
+def test_a_tag_on_a_merged_side_commit_never_moves_the_start(target):
+    target.commit({"app.py": "print(2)\n"})
+    target.git("checkout", "-q", "-b", "side", "v1.0.0")
+    target.commit({"lib.py": "x = 1\n"})
+    target.git("tag", "v99.0.0")
+    target.git("checkout", "-q", "main")
+    target.git("merge", "-q", "--no-ff", "-m", "merge", "side")
+    plan = json.loads(target.prepare().stdout)
+    assert plan["range"] == "v1.0.0..HEAD"
+    assert plan["files"] == ["app.py", "lib.py"]
+
+
+@pytest.mark.parametrize("name", ["requirements.txt", "skills/x/SKILL.md", "AGENTS.md", "docs/CMakeLists.txt"])
+def test_build_inputs_and_agent_instructions_are_never_docs(target, name):
+    target.commit({name: "pinned==1\n"})
+    result = target.prepare()
+    assert result.returncode == 0
+    assert "verdict" not in json.loads(result.stdout)
+
+
+def test_a_deleted_file_is_never_docs(target):
+    target.git("rm", "-q", "app.py")
+    target.commit({"README.md": "# app\n\nMore.\n"})
+    assert "verdict" not in json.loads(target.prepare().stdout)
+
+
+@needs_node
+def test_an_archived_blocked_attempt_blocks(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [record("confirmed", "audit:echo", "low")], [*ledger(["app.py"]), archived("blocked")])
+    assert result.returncode == 1, result.stderr
+    document = json.loads(result.stdout)
+    assert (document["verdict"], document["coverage"]) == ("blocked", {"covered": 1, "deferred": 1})
+
+
+@needs_node
+def test_an_archived_candidate_without_a_record_leaves_the_audit_unfinished(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [record("confirmed", "audit:echo", "low")], [*ledger(["app.py"]), archived("candidate", ["audit:archived"])])
+    assert result.returncode == 2
+    assert "audit:archived" in result.stderr
+
+
+@needs_node
+def test_a_blocked_audit_records_no_acceptance(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [rejected_high(), record("needs_validation", "audit:token")], ledger(["app.py"]), findings=[HIGH])
+    assert result.returncode == 1, result.stderr
+    assert json.loads(result.stdout)["accepted"] == []
+    assert not (Path(target.env["AGENTS_COUNCIL_ROOT"]) / "security-accepted.jsonl").exists()
+
+
+@needs_node
+def test_a_planted_pass_attestation_is_refused_on_reuse(target):
+    target.commit({"app.py": f"print(1)\n{SEEDED}\n"})
+    result = audited(target, [record("needs_validation", "audit:token")], ledger(["app.py"]))
+    assert result.returncode == 1, result.stderr
+    stored = target.out / f"attestation-{json.loads(result.stdout)['tree']}.json"
+    stored.write_text(json.dumps(json.loads(stored.read_text(encoding="utf-8")) | {"verdict": "pass"}), encoding="utf-8")
+    again = target.prepare()
+    assert again.returncode == 2
+    assert "disagrees with what its run supports" in again.stderr
+
+
+def test_a_planted_docs_only_attestation_is_refused_on_reuse(target):
+    target.commit({"app.py": "print(2)\n"})
+    plan = json.loads(target.prepare().stdout)
+    planted = {key: plan[key] for key in ("tree", "range", "upstream", "profile", "budget")} | {"verdict": "skipped: docs-only"}
+    (target.out / f"attestation-{plan['tree']}.json").write_text(json.dumps(planted), encoding="utf-8")
+    again = target.prepare()
+    assert again.returncode == 2
+    assert "disagrees with what its run supports" in again.stderr

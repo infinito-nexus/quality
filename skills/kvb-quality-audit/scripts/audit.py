@@ -3,18 +3,20 @@
 Args:
     prepare --repo DIR --out DIR --budget N --medusa FILE [--range A..B] [--profile NAME]:
         verifies the vendored upstream against lock.json, resolves the range
-        (newest vX.Y.Z tag reachable from HEAD to HEAD by default), then
-        prints the stored attestation of the same tree, range, upstream and
-        profile, writes a `skipped: docs-only` attestation, or writes the
-        audit plan <out>/plan-<tree>.json with the MEDUSA seeds of the
-        changed files. FILE is the `security.py --json` report of the range
-        and lies outside DIR, which must be yours and writable by no one else.
-    attest --repo DIR --out DIR --budget N --medusa FILE [--range A..B] [--profile NAME] --run DIR --invocations N --tokens N --minutes N:
+        (newest vX.Y.Z tag on the first-parent line of HEAD to HEAD by
+        default), then prints the stored attestation of the same request once
+        its run supports it, writes a `skipped: docs-only` attestation, or
+        writes the audit plan <out>/plan-<tree>.json with the MEDUSA seeds of
+        the changed files. FILE is the `security.py --json` report of the
+        range and lies outside DIR, which must be yours, writable by no one
+        else and under directories no other user can change.
+    attest --repo DIR --out DIR --budget N --medusa FILE [--range A..B] [--profile NAME] --invocations N --tokens N --minutes N:
         derives the plan again from the same options (the plan file in DIR is
-        the agents' copy and never read back), validates <run>/findings.json
-        and <run>/coverage-ledger.json with the upstream validators, refuses
-        an audit that left a seed, a candidate or a unit unfinished, records
-        every rejected MEDUSA seed as a `security.py accept` row and writes
+        the agents' copy and never read back), validates
+        <out>/run-<tree>/findings.json and coverage-ledger.json with the
+        upstream validators, refuses an audit that left a seed, a candidate
+        or a unit unfinished, records every rejected MEDUSA seed of a
+        non-blocked audit as a `security.py accept` row and writes
         <out>/attestation-<tree>.json.
 
 Output:
@@ -22,47 +24,35 @@ Output:
 
 Exit codes:
     0 plan written, pass or skipped; 1 blocked; 2 usage, lock, range,
-    budget, ownership, validation or unfinished-audit error.
+    budget, ownership, validation, unfinished-audit or stored-attestation
+    error.
 """
 
 import argparse
 import hashlib
 import json
-import os
 import shutil
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
+
+from scope import Usage, changed, docs_only, git, output_dir, resolved_range, toplevel
 
 SKILL = Path(__file__).resolve().parents[1]
 UPSTREAM = SKILL / "upstream"
 LOCK = SKILL / "lock.json"
 ACCEPT = SKILL.parent / "kvb-quality-security" / "scripts" / "security.py"
 PROFILES = ("quick", "standard", "deep")
-TAGS = "v[0-9]*.[0-9]*.[0-9]*"
-DOCS = frozenset({".md", ".txt", ".rst", ".png", ".jpg", ".jpeg", ".gif", ".webp"})
 VERDICTS = ("confirmed", "needs_validation", "rejected")
 SEVERITIES = ("critical", "high", "medium", "low", "informational")
 BLOCKING = frozenset({"critical", "high"})
 SKIPPED = "skipped: docs-only"
 SEED = "medusa:{rule}:{place}"
-REUSED = ("tree", "range", "upstream", "profile")
+REUSED = ("tree", "range", "upstream", "profile", "budget")
 UNFINISHED = frozenset({"planned", "in_progress"})
-SHARED_WRITE = 0o022
-PRIVATE = 0o700
 REASON_CHARS = 200
 LISTED = 5
-
-
-class Usage(Exception):
-    pass
-
-
-def git(root: Path, *args: str) -> str:
-    result = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise Usage(f"git {' '.join(args)} exited {result.returncode}: {result.stderr.strip()}")
-    return result.stdout
 
 
 def listed(names: list) -> str:
@@ -85,56 +75,6 @@ def verified_upstream() -> dict:
             raise Usage(f"{UPSTREAM / name} differs from lock.json")
     return lock
 
-
-def toplevel(repo: str) -> Path:
-    return Path(git(Path(repo), "rev-parse", "--show-toplevel").strip())
-
-
-def output_dir(root: Path, out: str) -> Path:
-    """
-    Args:
-        root: The target's work tree.
-        out: The --out value.
-
-    Returns:
-        The directory, created private when missing. A path inside the tree
-        must be ignored by git, and an existing directory must belong to the
-        caller and be writable by no one else, since its attestations are
-        trusted on reuse.
-    """
-    folder = Path(out).resolve()
-    if folder.is_relative_to(root):
-        ignored = subprocess.run(["git", "check-ignore", "-q", "--", str(folder)], cwd=root, check=False)
-        if ignored.returncode != 0:
-            raise Usage(f"--out {folder} lies in the tracked tree: use /tmp or a git-ignored directory")
-    folder.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
-    status = folder.stat()
-    if status.st_uid != os.getuid() or status.st_mode & SHARED_WRITE:
-        raise Usage(f"--out {folder} must belong to you and be writable by no one else")
-    return folder
-
-
-def resolved_range(root: Path, option: str | None) -> tuple[str, str]:
-    if option is None:
-        described = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0", "--match", TAGS, "HEAD"],
-            cwd=root, capture_output=True, text=True, check=False,
-        )
-        if described.returncode != 0:
-            raise Usage("no vX.Y.Z tag is reachable from HEAD: pass --range <a>..<b>")
-        start, end = described.stdout.strip(), "HEAD"
-    else:
-        start, separator, end = option.partition("..")
-        if not separator or not start or not end:
-            raise Usage(f"--range wants <a>..<b>, got {option!r}")
-    for ref in (start, end):
-        git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
-    return start, end
-
-
-def changed(root: Path, start: str, end: str) -> list[str]:
-    listed_names = git(root, "diff", "--name-only", "--diff-filter=d", "-z", start, end)
-    return sorted(name for name in listed_names.split("\0") if name)
 
 
 def fingerprint(item: dict) -> str:
@@ -214,6 +154,7 @@ def empty_run() -> dict:
         "invocations": 0,
         "verdicts": dict.fromkeys(VERDICTS, 0),
         "severities": dict.fromkeys(SEVERITIES, 0),
+        "coverage": {},
         "accepted": [],
         "tokens": 0,
         "minutes": 0,
@@ -228,20 +169,6 @@ def emitted(document: dict) -> int:
 def written(folder: Path, document: dict) -> int:
     (folder / f"attestation-{document['tree']}.json").write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
     return emitted(document)
-
-
-def prepare(args: argparse.Namespace) -> int:
-    _root, folder, plan = planned(args)
-    stored = folder / f"attestation-{plan['tree']}.json"
-    if stored.is_file():
-        document = json.loads(stored.read_text(encoding="utf-8"))
-        if all(document.get(key) == plan[key] for key in REUSED):
-            return emitted(document)
-    if all(Path(name).suffix.lower() in DOCS for name in plan["files"]):
-        return written(folder, attestation(plan, SKIPPED, empty_run()))
-    (folder / f"plan-{plan['tree']}.json").write_text(json.dumps(plan, indent=2, sort_keys=True), encoding="utf-8")
-    print(json.dumps(plan, indent=2, sort_keys=True))
-    return 0
 
 
 def validated(run: Path, files: list[str]) -> tuple[list, list]:
@@ -270,6 +197,10 @@ def validated(run: Path, files: list[str]) -> tuple[list, list]:
     return json.loads((run / "findings.json").read_text(encoding="utf-8")), ledger
 
 
+def states(ledger: list) -> list:
+    return [*ledger, *(attempt for unit in ledger for attempt in unit["attempts"])]
+
+
 def finished(plan: dict, findings: list, ledger: list) -> None:
     """
     Args:
@@ -278,12 +209,13 @@ def finished(plan: dict, findings: list, ledger: list) -> None:
         ledger: The validated coverage ledger.
 
     Raises:
-        Usage when a seed or a ledger candidate has no findings record, or a
-        unit is still planned or in progress: an audit that stopped early
-        must not attest from the records it happened to write.
+        Usage when a seed or a candidate of a unit or of an archived attempt
+        has no findings record, or a unit is still planned or in progress:
+        an audit that stopped early must not attest from the records it
+        happened to write.
     """
     recorded = {item["fingerprint"] for item in findings}
-    owed = {seed["fingerprint"] for seed in plan["seeds"]} | {name for unit in ledger for name in unit["result_fingerprints"]}
+    owed = {seed["fingerprint"] for seed in plan["seeds"]} | {name for state in states(ledger) for name in state["result_fingerprints"]}
     missing = sorted(owed - recorded)
     if missing:
         raise Usage(f"the audit is unfinished: no findings record for {listed(missing)}")
@@ -300,6 +232,81 @@ def counted(findings: list) -> tuple[dict, dict]:
         if item["verdict"] == "confirmed":
             severities[item["severity"]["overall_severity"]] += 1
     return verdicts, severities
+
+
+def judged(plan: dict, folder: Path) -> tuple[list, dict, bool]:
+    """
+    Args:
+        plan: The derived plan.
+        folder: The output directory holding run-<tree>.
+
+    Returns:
+        The validated findings, the verdict and severity counts with the
+        ledger's unit statuses, and whether the audit blocks: an unvalidated
+        record, a confirmed critical or high finding, or a blocked unit or
+        archived attempt.
+    """
+    findings, ledger = validated(folder / f"run-{plan['tree']}", plan["files"])
+    finished(plan, findings, ledger)
+    verdicts, severities = counted(findings)
+    blocked = verdicts["needs_validation"] or any(severities[name] for name in BLOCKING) or any(state["status"] == "blocked" for state in states(ledger))
+    coverage = dict(sorted(Counter(unit["status"] for unit in ledger).items()))
+    return findings, {"verdicts": verdicts, "severities": severities, "coverage": coverage}, bool(blocked)
+
+
+def stored_request(stored: Path, plan: dict) -> dict | None:
+    """
+    Returns:
+        The attestation at stored when it answers the plan's request, None
+        when there is none or it answers another one.
+    """
+    if not stored.is_file():
+        return None
+    try:
+        document = json.loads(stored.read_text(encoding="utf-8"))
+    except ValueError:
+        raise Usage(f"{stored} is no attestation: remove it and attest again") from None
+    if not isinstance(document, dict) or any(document.get(key) != plan[key] for key in REUSED):
+        return None
+    return document
+
+
+def reused(root: Path, folder: Path, plan: dict) -> dict | None:
+    """
+    Args:
+        root: The target's work tree.
+        folder: The output directory.
+        plan: The derived plan.
+
+    Returns:
+        The stored attestation of the same request, None without one; a
+        stored verdict or count its run or range no longer supports is
+        refused, since the audit agents can write the output directory.
+    """
+    stored = folder / f"attestation-{plan['tree']}.json"
+    document = stored_request(stored, plan)
+    if document is None:
+        return None
+    if document.get("verdict") == SKIPPED:
+        expected, derived = (SKIPPED if docs_only(root, plan) else None), {}
+    else:
+        _findings, derived, blocked = judged(plan, folder)
+        expected = "blocked" if blocked else "pass"
+    if document.get("verdict") != expected or any(document.get(key) != value for key, value in derived.items()):
+        raise Usage(f"{stored} disagrees with what its run supports: remove it and attest again")
+    return document
+
+
+def prepare(args: argparse.Namespace) -> int:
+    root, folder, plan = planned(args)
+    document = reused(root, folder, plan)
+    if document is not None:
+        return emitted(document)
+    if docs_only(root, plan):
+        return written(folder, attestation(plan, SKIPPED, empty_run()))
+    (folder / f"plan-{plan['tree']}.json").write_text(json.dumps(plan, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps(plan, indent=2, sort_keys=True))
+    return 0
 
 
 def traced(item: dict, seed: dict) -> bool:
@@ -342,15 +349,11 @@ def attest(args: argparse.Namespace) -> int:
     root, folder, plan = planned(args)
     if args.invocations > plan["budget"]:
         raise Usage(f"{args.invocations} agent invocations exceed the budget of {plan['budget']}")
-    findings, ledger = validated(Path(args.run), plan["files"])
-    finished(plan, findings, ledger)
-    verdicts, severities = counted(findings)
-    rows = accepted(root, plan, findings)
-    blocked = verdicts["needs_validation"] or any(severities[name] for name in BLOCKING) or any(unit["status"] == "blocked" for unit in ledger)
+    findings, judgement, blocked = judged(plan, folder)
+    rows = [] if blocked else accepted(root, plan, findings)
     run = {
         "invocations": args.invocations,
-        "verdicts": verdicts,
-        "severities": severities,
+        **judgement,
         "accepted": rows,
         "tokens": args.tokens,
         "minutes": args.minutes,
@@ -375,7 +378,6 @@ def options(argv: list[str]) -> argparse.Namespace:
         command.add_argument("--range")
         command.add_argument("--profile", choices=PROFILES, default="quick")  # nocheck: clean.default-value -- requirement 011 decision 7 makes quick the profile unless --profile names another
         if name == "attest":
-            command.add_argument("--run", required=True)
             for flag in ("--invocations", "--tokens", "--minutes"):
                 command.add_argument(flag, type=count, required=True)
     return parser.parse_args(argv)

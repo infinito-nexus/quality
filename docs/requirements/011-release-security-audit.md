@@ -76,6 +76,18 @@ flowchart TD
 - [x] `quality image` treats only an absolute or `./`-relative target as a path and refuses a bare target that names a file, so a planted file cannot replace the daemon image (requirement 010 scope, found by the same audit): `test_a_file_named_like_a_ref_never_replaces_the_daemon_image`.
 - [x] Agent invocations never exceed `--budget`; the attestation reports the budget used, tokens and minutes.
 
+### Audit hardening, round 2 (operator pick "Fix the 9, then run 3": the second real audit of v1.1.0..HEAD found these)
+
+- [x] Without `--range` the start is the newest `vX.Y.Z` tag on the first-parent line of HEAD, so a tag on a merged side commit never shrinks the range: `test_a_tag_on_a_merged_side_commit_never_moves_the_start`.
+- [x] Build inputs, agent instructions, paths under agent directories and deleted files never count as documentation: `test_build_inputs_and_agent_instructions_are_never_docs`, `test_a_deleted_file_is_never_docs`.
+- [x] A blocked archived attempt blocks, a candidate of an archived attempt without a record leaves the audit unfinished, and the attestation counts the live unit statuses under `coverage`: `test_an_archived_blocked_attempt_blocks`, `test_an_archived_candidate_without_a_record_leaves_the_audit_unfinished`.
+- [x] A blocked audit records no `security.py accept` row: `test_a_blocked_audit_records_no_acceptance`.
+- [x] A stored attestation is reused only for the same budget too and only while its run supports its verdict and counts; a planted one is refused: `test_a_planted_pass_attestation_is_refused_on_reuse`, `test_a_planted_docs_only_attestation_is_refused_on_reuse`.
+- [x] attest reads `<out>/run-<tree>` and takes no `--run`; every directory above `--out` must belong to root or the caller and be sticky or writable by no one else, where a user namespace that maps no root counts its overflow uid as root: `test_an_out_dir_under_a_directory_others_can_change_is_refused`, `test_only_a_namespace_without_root_trusts_the_overflow_uid`.
+- [x] `security.py accept` without `--line` refuses a sha1 that names no line of the file and is not the whole file's: `test_a_sha1_of_no_line_and_not_of_the_file_is_never_accepted`.
+- [x] `quality image` leaves an image unscanned when trivy exits 0 after a parse error (requirement 010 scope): `test_a_trivy_parse_error_on_exit_0_leaves_the_image_unscanned`.
+- [x] `quality db update` refuses a bundle root that turned into a link or file during the update and never changes the link's target (requirement 010 scope): `test_update_never_opens_a_tree_swapped_in_for_the_bundle`.
+
 ### Docs
 
 - [x] The skill's SKILL.md names the command, every option, the attestation schema and the exit codes; README lists the skill.
