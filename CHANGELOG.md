@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0] - 2026-11-28
+
+Added:
+
+- Audit: *kvb-quality-audit* runs a release security audit of a tag range
+- Audit: the pinned Cloudflare audit method, checked by sha256 per file
+- Audit: *audit.py prepare* plans the range; *attest* writes the verdict
+- Audit: MEDUSA findings seed it; traced rejections become waiver rows
+- Audit: one attestation per tree with tokens, minutes and coverage
+
+Fixed:
+
+- Packaging: the wheel ships the *quality.image* subpackage again
+
+Contributors:
+
+- [Kevin Veen-Birkenbach](https://veen.world): release audit, packaging
+
 ## [1.2.0] - 2026-11-27
 
 Added:
