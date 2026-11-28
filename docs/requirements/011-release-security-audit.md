@@ -97,3 +97,4 @@ flowchart TD
 - Unit: lock verification, range resolution, docs-only detection, attestation counts and verdict per fixture `findings.json`, tracked-path refusal.
 - Integration: fixture `findings.json` and ledger through the real upstream validators to an attestation; MEDUSA fixture to one acceptance row; same tree reuse without agents.
 - E2E: one real audit of quality `v1.1.0..HEAD` at profile `quick` with its attestation, tokens and minutes shown at the operator checkpoint.
+- [x] E2E met 2026-11-28 (operator pick "Fits", decision 98d608756a91afba): run 3 audited `v1.2.0..HEAD` on tree 3f412e19, since v1.2.0 shipped during the work; attestation `blocked` with 14 of 20 invocations, 1926203 tokens and 44 minutes, 5 needs_validation and 3 rejected records go to a follow-up requirement.
